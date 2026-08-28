@@ -36,7 +36,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
   }
 
-  /* 드래그 블록 지정 시 글자 색상 및 음영 가시성 최적화 */
   ::selection {
     background-color: rgba(255, 255, 255, 0.38);
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
@@ -46,7 +45,7 @@
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
   }
 
-  /* 상단 고정 툴바 */
+  /* 상단 고정 툴바 (최상위 레이어) */
   #toolbar {
     position: fixed;
     top: 0;
@@ -59,8 +58,8 @@
     justify-content: space-between;
     padding: 0 16px;
     border-bottom: 1px solid #333;
-    z-index: 99999;
-    transform: translate3d(0, 0, 0);
+    z-index: 999999;
+    pointer-events: auto;
   }
   .btn-group { display: flex; gap: 8px; align-items: center; }
   
@@ -115,7 +114,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 무한 스크롤 편집 컨테이너 */
+  /* 편집 스크롤 영역 */
   #editor-container {
     position: absolute;
     top: 60px;
@@ -128,6 +127,7 @@
     display: flex;
     justify-content: center;
     padding: 0;
+    z-index: 10;
   }
   #editor-container::-webkit-scrollbar { display: none; }
 
@@ -136,6 +136,7 @@
     width: 100%;
     max-width: var(--content-max-width);
     min-height: 100%;
+    pointer-events: none;
   }
 
   #slide-indicators-layer {
@@ -158,6 +159,7 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    pointer-events: none;
   }
 
   .slide-boundary-badge {
@@ -170,6 +172,7 @@
     border-radius: 10px;
     transform: translateY(-50%);
     margin-right: 20px;
+    pointer-events: none;
   }
 
   #main-editor {
@@ -188,6 +191,7 @@
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
+    pointer-events: auto;
   }
 
   body.paint-mode #main-editor {
@@ -196,25 +200,26 @@
     -webkit-user-select: none;
   }
 
-  /* 회색 테마의 고속 퀵스크롤러 */
+  /* 고속 퀵스크롤러 (최상위 레이어) */
   #quick-scrollbar-track {
     position: fixed;
     top: 70px;
     right: 6px;
     bottom: 20px;
     width: 36px;
-    z-index: 99998;
+    z-index: 999998;
     display: flex;
     justify-content: center;
     user-select: none;
     touch-action: none;
+    pointer-events: auto;
   }
   #quick-scrollbar-thumb {
     position: absolute;
     top: 0;
     width: 12px;
     height: 60px;
-    background: rgba(160, 160, 160, 0.45); /* 회색 반투명 기본 */
+    background: rgba(160, 160, 160, 0.45);
     border: 1.5px solid rgba(220, 220, 220, 0.6);
     border-radius: 8px;
     cursor: grab;
@@ -223,7 +228,7 @@
   }
   #quick-scrollbar-thumb:active, #quick-scrollbar-track.dragging #quick-scrollbar-thumb {
     width: 20px;
-    background: rgba(220, 220, 220, 0.85); /* 드래그 시 밝은 회색 */
+    background: rgba(220, 220, 220, 0.85);
     border-color: #ffffff;
     cursor: grabbing;
   }
@@ -239,7 +244,7 @@
     border-radius: 20px;
     font-size: 15px;
     font-weight: bold;
-    z-index: 99999;
+    z-index: 999999;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -256,7 +261,7 @@
     top: 0;
     left: 0;
     background-color: #000000;
-    z-index: 1000000;
+    z-index: 10000000;
     user-select: none;
     overflow: hidden;
   }
@@ -325,20 +330,19 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 9999999;
+    z-index: 99999999;
   }
   #toast-msg.show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
 
-  /* 모달 */
   .modal-backdrop {
     display: none;
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: rgba(0, 0, 0, 0.85);
-    z-index: 2000000;
+    z-index: 20000000;
     justify-content: center;
     align-items: center;
   }
@@ -421,7 +425,6 @@
     align-items: center;
   }
 
-  /* 인쇄 전용 컨테이너 */
   #print-container { display: none; }
 
   @media print {
@@ -531,7 +534,6 @@
   </div>
 </div>
 
-<!-- 회색 테마 퀵스크롤러 -->
 <div id="quick-scrollbar-track">
   <div id="quick-scrollbar-thumb"></div>
 </div>
@@ -593,20 +595,6 @@
   let historyStack = [];
   const MAX_HISTORY = 30;
 
-  function fixToolbarPosition() {
-    if (window.visualViewport) {
-      const offsetTop = window.visualViewport.offsetTop;
-      const toolbar = document.getElementById('toolbar');
-      toolbar.style.top = offsetTop + 'px';
-      editorContainer.style.top = (offsetTop + 60) + 'px';
-    }
-  }
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', fixToolbarPosition);
-    window.visualViewport.addEventListener('scroll', fixToolbarPosition);
-  }
-
   function pushHistory() {
     historyStack.push(editor.innerHTML);
     if (historyStack.length > MAX_HISTORY) {
@@ -632,7 +620,7 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_final_v12');
+    const saved = localStorage.getItem('yslide_final_fix_v13');
     if (saved) {
       editor.innerHTML = saved;
     }
@@ -891,7 +879,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_final_v12', editor.innerHTML);
+      localStorage.setItem('yslide_final_fix_v13', editor.innerHTML);
     }
   }
 
