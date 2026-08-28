@@ -101,7 +101,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 편집 스크롤 영역 */
+  /* 단일 편집 캔버스 영역 */
   #editor-container {
     position: absolute;
     top: 60px;
@@ -112,25 +112,18 @@
     -webkit-overflow-scrolling: touch;
     background-color: #141414;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 40px 20px 100px 20px;
+    justify-content: center;
+    padding: 30px 20px 120px 20px;
   }
 
-  .card-wrapper {
-    position: relative; margin-bottom: 45px; width: 100%; max-width: 1000px;
-  }
-  
-  .page-card {
-    background-color: #000;
-    border: 2px dashed rgba(255, 255, 255, 0.28);
-    border-radius: 12px;
-    padding: 16px 24px;
+  #main-editor {
     width: 100%;
-    height: calc(var(--font-size) * var(--line-height) * 17 + 32px) !important;
-    max-height: calc(var(--font-size) * var(--line-height) * 17 + 32px) !important;
-    overflow: hidden !important;
-    box-sizing: border-box;
+    max-width: 1000px;
+    min-height: 80vh;
+    background-color: #000000;
+    border: 1px solid #282828;
+    border-radius: 12px;
+    padding: 24px 30px;
     outline: none;
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -138,31 +131,30 @@
     word-break: keep-all;
     color: #ffffff;
     white-space: pre-wrap;
-    position: relative;
   }
-  .page-card:focus { border-color: #888; }
 
-  body.paint-mode .page-card {
+  /* 17줄 가로 점선 구분선 스타일 */
+  .page-divider {
+    display: block;
+    user-select: none;
+    -webkit-user-select: none;
+    border-bottom: 2px dashed rgba(255, 183, 3, 0.5);
+    margin: 20px 0;
+    text-align: right;
+    color: rgba(255, 183, 3, 0.7);
+    font-size: 13px;
+    font-weight: bold;
+    padding-bottom: 4px;
+    pointer-events: none;
+  }
+
+  body.paint-mode #main-editor {
     cursor: crosshair;
     user-select: none;
     -webkit-user-select: none;
   }
 
-  .page-card-label {
-    position: absolute; top: -26px; right: 4px; font-size: 13px;
-    font-weight: bold; color: #aaa; user-select: none;
-  }
-
-  .card-delete-btn {
-    position: absolute; top: -28px; left: 4px;
-    width: 24px; height: 24px; font-size: 14px;
-    background-color: #222; color: #888; border: 1px solid #383838;
-    border-radius: 4px; cursor: pointer; font-weight: bold;
-    display: inline-flex; align-items: center; justify-content: center;
-  }
-  .card-delete-btn:active { background-color: #333; color: #fff; }
-
-  /* 설교 리더 모드 */
+  /* 전체모드 (설교 리더 모드) */
   #reader-container {
     display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0;
     background-color: #000; z-index: 1000000; user-select: none;
@@ -197,10 +189,12 @@
   }
   #exit-btn:active { background: rgba(239, 68, 68, 0.9); }
 
+  /* 슬라이드 번호: 좌측 상단으로 이동 */
   #page-info {
-    position: absolute; bottom: 18px; left: 24px; font-size: 15px;
-    background: rgba(30, 30, 30, 0.75); padding: 5px 12px; border-radius: 12px;
-    color: #888; z-index: 5000; user-select: none; pointer-events: none;
+    position: absolute; top: 18px; left: 24px; font-size: 15px;
+    background: rgba(30, 30, 30, 0.75); padding: 5px 14px; border-radius: 12px;
+    color: #ffb703; font-weight: bold; z-index: 5000; user-select: none; pointer-events: none;
+    border: 1px solid #333;
   }
 
   #toast-msg {
@@ -226,7 +220,7 @@
     transform: translateX(-50%) translateY(0);
   }
 
-  /* 문서 보관함 모달창 */
+  /* 보관함 모달창 */
   #storage-modal {
     display: none;
     position: fixed;
@@ -315,53 +309,28 @@
     align-items: center;
   }
 
-  /* ================= 인쇄 전용 스타일 (@media print) ================= */
+  /* 인쇄 전용 스타일 */
   @media print {
-    @page {
-      margin: 20mm 15mm;
-      size: auto;
-    }
+    @page { margin: 20mm 15mm; size: auto; }
     html, body {
-      position: static !important;
-      overflow: visible !important;
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      height: auto !important;
-      width: auto !important;
+      position: static !important; overflow: visible !important;
+      background-color: #ffffff !important; color: #000000 !important;
+      height: auto !important; width: auto !important;
     }
-    #toolbar, #reader-container, #storage-modal, #toast-msg, .card-delete-btn, .page-card-label {
-      display: none !important;
-    }
+    #toolbar, #reader-container, #storage-modal, #toast-msg { display: none !important; }
     #editor-container {
-      position: static !important;
-      overflow: visible !important;
-      padding: 0 !important;
-      background-color: #ffffff !important;
-      display: block !important;
+      position: static !important; overflow: visible !important;
+      padding: 0 !important; background-color: #ffffff !important; display: block !important;
     }
-    .card-wrapper {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      max-width: none !important;
-      page-break-after: always !important; /* 각 점선창마다 인쇄 페이지 강제 나눔 */
-      break-after: page !important;
+    #main-editor {
+      background-color: #ffffff !important; color: #000000 !important;
+      border: none !important; padding: 0 !important;
+      font-size: 18pt !important; line-height: 1.5 !important;
     }
-    .card-wrapper:last-child {
-      page-break-after: avoid !important;
-      break-after: avoid !important;
-    }
-    .page-card {
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      border: 1px solid #cccccc !important;
-      border-radius: 0 !important;
-      padding: 10px 0 !important;
-      height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      font-size: 20pt !important;
-      line-height: 1.5 !important;
+    .page-divider {
+      page-break-after: always !important; break-after: page !important;
+      border-bottom: 1px dashed #aaa !important; color: #888 !important;
+      margin: 20px 0 !important;
     }
   }
 </style>
@@ -387,7 +356,7 @@
       </svg>
     </button>
 
-    <!-- 인쇄 버튼 (새로 추가) -->
+    <!-- 인쇄 버튼 -->
     <button class="btn-icon" onclick="printSermonDocument()" title="인쇄 및 PDF 출력">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -404,16 +373,8 @@
       </svg>
     </button>
 
-    <!-- 새 페이지 추가 -->
-    <button class="btn-icon" onclick="pushHistory(); addNewCard('');" title="새 페이지 추가">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-      </svg>
-    </button>
-
-    <!-- 17줄 정리 -->
-    <button onclick="pushHistory(); processAllCardsTo17Lines();" title="모든 글을 17줄 단위로 일괄 재정렬">17</button>
+    <!-- 17줄 가로 점선 자동 정렬 버튼 -->
+    <button onclick="pushHistory(); formatTo17Lines();" title="17번째 줄마다 가로 점선 자동 정렬">17</button>
     
     <!-- 연속 채색 모드 -->
     <button id="btn-continuous" onclick="toggleContinuousMode()">연속</button>
@@ -433,14 +394,16 @@
     </div>
   </div>
   <div class="btn-group">
-    <button class="btn-play" onclick="startSermonMode()" title="시작">▶</button>
+    <button class="btn-play" onclick="startSermonMode()" title="전체모드 (설교 시작)">▶</button>
   </div>
 </div>
 
 <div id="editor-container">
-  <div id="card-list" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
+  <!-- 단일 에디터 캔버스 -->
+  <div id="main-editor" contenteditable="true" spellcheck="false"></div>
 </div>
 
+<!-- 전체모드 (설교 리더 모드) -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
@@ -448,11 +411,13 @@
   <div id="reader-box">
     <div id="reader-content"></div>
   </div>
+  <!-- 좌측 상단으로 이동된 슬라이드 번호 -->
   <div id="page-info"><span id="curr-page">1</span> / <span id="total-page">1</span></div>
 </div>
 
 <div id="toast-msg">💾 저장되었습니다</div>
 
+<!-- 바둑판식 문서 보관함 모달 -->
 <div id="storage-modal">
   <div id="storage-box">
     <div class="modal-header">
@@ -482,7 +447,7 @@
   let currentFontSize = 30;
   let pagesData = [];
   let currentPageIndex = 0;
-  const cardList = document.getElementById('card-list');
+  const editor = document.getElementById('main-editor');
 
   let historyStack = [];
   const MAX_HISTORY = 30;
@@ -492,8 +457,8 @@
       const offsetTop = window.visualViewport.offsetTop;
       const toolbar = document.getElementById('toolbar');
       toolbar.style.top = offsetTop + 'px';
-      const editor = document.getElementById('editor-container');
-      editor.style.top = (offsetTop + 60) + 'px';
+      const editorContainer = document.getElementById('editor-container');
+      editorContainer.style.top = (offsetTop + 60) + 'px';
     }
   }
 
@@ -503,9 +468,7 @@
   }
 
   function pushHistory() {
-    const cards = document.querySelectorAll('.page-card');
-    const data = Array.from(cards).map(c => c.innerHTML);
-    historyStack.push(JSON.stringify(data));
+    historyStack.push(editor.innerHTML);
     if (historyStack.length > MAX_HISTORY) {
       historyStack.shift();
     }
@@ -514,17 +477,8 @@
   function undoState() {
     if (historyStack.length === 0) return;
     const prev = historyStack.pop();
-    try {
-      const data = JSON.parse(prev);
-      cardList.innerHTML = '';
-      if (data && data.length > 0) {
-        data.forEach(html => addNewCard(html));
-      } else {
-        addNewCard('');
-      }
-      updateCardLabels();
-      saveAllCards(false);
-    } catch(e){}
+    editor.innerHTML = prev;
+    saveEditorContent();
   }
 
   window.onload = () => {
@@ -536,24 +490,17 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_doc_data');
+    const saved = localStorage.getItem('yslide_single_canvas_v1');
     if (saved) {
-      try {
-        const arr = JSON.parse(saved);
-        if (arr.length > 0) {
-          arr.forEach(html => addNewCard(html));
-          return;
-        }
-      } catch(e){}
+      editor.innerHTML = saved;
     }
-    addNewCard('');
   };
 
   window.addEventListener('mouseup', () => {
     if (isContinuousMode && isMouseDown) {
       isMouseDown = false;
       lastPaintedKey = "";
-      saveAllCards();
+      saveEditorContent();
     }
   });
 
@@ -561,7 +508,7 @@
     if (isContinuousMode) {
       isMouseDown = false;
       lastPaintedKey = "";
-      saveAllCards();
+      saveEditorContent();
     }
   });
 
@@ -577,15 +524,17 @@
   }
 
   function normalizeHtmlToLines(html) {
-    let s = html.replace(/<br\s*[\/]?>/gi, '\n')
-                .replace(/<\/div>/gi, '\n')
-                .replace(/<div>/gi, '')
-                .replace(/<p>/gi, '')
-                .replace(/<\/p>/gi, '\n');
+    let clean = html.replace(/<div class="page-divider"[^>]*>[\s\S]*?<\/div>/gi, '\n---DIVIDER---\n');
+    let s = clean.replace(/<br\s*[\/]?>/gi, '\n')
+                 .replace(/<\/div>/gi, '\n')
+                 .replace(/<div>/gi, '')
+                 .replace(/<p>/gi, '')
+                 .replace(/<\/p>/gi, '\n');
     return s.split('\n');
   }
 
   function getVisualLinesCount(str) {
+    if (str.includes('---DIVIDER---')) return 0;
     const temp = document.createElement('div');
     temp.innerHTML = str;
     const plain = temp.textContent || temp.innerText || '';
@@ -594,83 +543,31 @@
     return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
   }
 
-  function getTotalCardLines(card) {
-    const lines = normalizeHtmlToLines(card.innerHTML);
-    let total = 0;
-    lines.forEach(l => {
-      total += getVisualLinesCount(l);
-    });
-    return total;
-  }
-
-  function resegmentAllHtml(fullHtml) {
-    const lines = normalizeHtmlToLines(fullHtml);
-    const pages = [];
-    let currentChunk = [];
+  // 17번째 줄마다 가로 점선 자동 배치 엔진
+  function formatTo17Lines() {
+    const rawLines = normalizeHtmlToLines(editor.innerHTML);
+    const cleanLines = rawLines.filter(l => !l.includes('---DIVIDER---'));
+    
+    let result = [];
     let currentLineCount = 0;
+    let pageNum = 1;
 
-    lines.forEach(line => {
+    cleanLines.forEach((line) => {
       const vCount = getVisualLinesCount(line);
-      if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
-        pages.push(currentChunk.join('<br>'));
-        currentChunk = [line];
+      if (currentLineCount + vCount > 17 && result.length > 0) {
+        result.push(`<div class="page-divider" contenteditable="false">--- [ ${pageNum} 슬라이드 ] ---</div>`);
+        pageNum++;
+        result.push(line);
         currentLineCount = vCount;
       } else {
-        currentChunk.push(line);
+        result.push(line);
         currentLineCount += vCount;
       }
     });
 
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk.join('<br>'));
-    }
-
-    return pages.length > 0 ? pages : [''];
-  }
-
-  function processAllCardsTo17Lines() {
-    const cards = Array.from(document.querySelectorAll('.page-card'));
-    let combinedHtml = cards.map(c => c.innerHTML).join('<br>');
-
-    const pages = resegmentAllHtml(combinedHtml);
-    cardList.innerHTML = '';
-    pages.forEach(html => addNewCard(html));
-
-    updateCardLabels();
-    saveAllCards();
-  }
-
-  function getGlobalCaretPosition(element) {
-    let position = 0;
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const preRange = range.cloneRange();
-      preRange.selectNodeContents(element);
-      preRange.setEnd(range.endContainer, range.endOffset);
-      position = preRange.toString().length;
-    }
-    return position;
-  }
-
-  function setCursorToEnd(el) {
-    el.focus();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-
-  function setCursorToStart(el) {
-    el.focus();
-    const range = document.createRange();
-    range.setStart(el, 0);
-    range.collapse(true);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    editor.innerHTML = result.join('<br>');
+    saveEditorContent();
+    showQuickToast("✂️ 17줄 단위로 가로 점선이 정렬되었습니다");
   }
 
   function paintWordAtPoint(x, y) {
@@ -703,13 +600,9 @@
       const offset = range.startOffset;
 
       let start = Math.min(offset, text.length > 0 ? text.length - 1 : 0);
-      while (start > 0 && !/\s/.test(text[start - 1])) {
-        start--;
-      }
+      while (start > 0 && !/\s/.test(text[start - 1])) start--;
       let end = offset;
-      while (end < text.length && !/\s/.test(text[end])) {
-        end++;
-      }
+      while (end < text.length && !/\s/.test(text[end])) end++;
 
       if (start < end) {
         const currentKey = `${node.textContent}_${start}_${end}`;
@@ -730,272 +623,53 @@
     }
   }
 
-  function cascadeOverflow(startWrapper) {
-    let currentWrapper = startWrapper;
-
-    while (currentWrapper) {
-      const card = currentWrapper.querySelector('.page-card');
-      const lines = normalizeHtmlToLines(card.innerHTML);
-      
-      let totalLines = 0;
-      let splitIdx = -1;
-
-      for (let i = 0; i < lines.length; i++) {
-        const vCount = getVisualLinesCount(lines[i]);
-        if (totalLines + vCount > 17) {
-          splitIdx = i;
-          break;
-        }
-        totalLines += vCount;
-      }
-
-      if (splitIdx !== -1) {
-        const keepLines = lines.slice(0, splitIdx);
-        const overflowLines = lines.slice(splitIdx);
-
-        card.innerHTML = keepLines.join('<br>');
-
-        let nextWrapper = currentWrapper.nextElementSibling;
-        const overflowHtml = overflowLines.join('<br>');
-
-        if (!nextWrapper) {
-          nextWrapper = createCardElement(overflowHtml);
-          currentWrapper.after(nextWrapper);
-          break;
-        } else {
-          const nextCard = nextWrapper.querySelector('.page-card');
-          const nextHtml = nextCard.innerHTML.trim();
-          nextCard.innerHTML = overflowHtml + (nextHtml ? '<br>' + nextHtml : '');
-          currentWrapper = nextWrapper;
-        }
-      } else {
-        break;
-      }
-    }
-    updateCardLabels();
-    saveAllCards();
-  }
-
-  function handleEnterAtCard(card, cardWrapper, e) {
-    const currentLines = getTotalCardLines(card);
-
-    if (currentLines >= 17) {
+  // 에디터 터치 및 마우스 연속 채색 이벤트
+  editor.addEventListener('touchstart', (e) => {
+    if (isContinuousMode) {
+      pushHistory();
+      isMouseDown = true;
+      const touch = e.touches[0];
+      paintWordAtPoint(touch.clientX, touch.clientY);
       e.preventDefault();
-      pushHistory();
-
-      const sel = window.getSelection();
-      let headHtml = '';
-      let tailHtml = '';
-
-      if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        
-        const preRange = range.cloneRange();
-        preRange.selectNodeContents(card);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        const headContainer = document.createElement('div');
-        headContainer.appendChild(preRange.cloneContents());
-        headHtml = headContainer.innerHTML;
-
-        const postRange = range.cloneRange();
-        postRange.selectNodeContents(card);
-        postRange.setStart(range.endContainer, range.endOffset);
-        const tailContainer = document.createElement('div');
-        tailContainer.appendChild(postRange.cloneContents());
-        tailHtml = tailContainer.innerHTML;
-      }
-
-      card.innerHTML = headHtml;
-
-      let nextWrapper = cardWrapper.nextElementSibling;
-      let nextCard;
-
-      if (!nextWrapper) {
-        nextWrapper = createCardElement(tailHtml);
-        cardWrapper.after(nextWrapper);
-        nextCard = nextWrapper.querySelector('.page-card');
-      } else {
-        nextCard = nextWrapper.querySelector('.page-card');
-        const prevNextHtml = nextCard.innerHTML.trim();
-        nextCard.innerHTML = tailHtml + (tailHtml && prevNextHtml ? '<br>' : '') + prevNextHtml;
-      }
-
-      cascadeOverflow(nextWrapper);
-
-      setTimeout(() => {
-        setCursorToStart(nextCard);
-      }, 10);
-      return true;
     }
-    return false;
-  }
+  }, { passive: false });
 
-  function createCardElement(initialHtml = '') {
-    const cardWrapper = document.createElement('div');
-    cardWrapper.className = 'card-wrapper';
-
-    const card = document.createElement('div');
-    card.className = 'page-card';
-    card.contentEditable = 'true';
-    card.innerHTML = initialHtml;
-
-    card.addEventListener('touchstart', (e) => {
-      if (isContinuousMode) {
-        pushHistory();
-        isMouseDown = true;
-        const touch = e.touches[0];
-        paintWordAtPoint(touch.clientX, touch.clientY);
-        e.preventDefault();
-      }
-    }, { passive: false });
-
-    card.addEventListener('touchmove', (e) => {
-      if (isContinuousMode && isMouseDown) {
-        const touch = e.touches[0];
-        paintWordAtPoint(touch.clientX, touch.clientY);
-        e.preventDefault();
-      }
-    }, { passive: false });
-
-    card.addEventListener('mousedown', (e) => {
-      if (isContinuousMode) {
-        pushHistory();
-        isMouseDown = true;
-        paintWordAtPoint(e.clientX, e.clientY);
-        e.preventDefault();
-      }
-    });
-
-    card.addEventListener('mousemove', (e) => {
-      if (isContinuousMode && isMouseDown) {
-        paintWordAtPoint(e.clientX, e.clientY);
-        e.preventDefault();
-      }
-    });
-
-    card.addEventListener('keydown', (e) => {
-      if (isContinuousMode) return;
-
-      const allCards = Array.from(document.querySelectorAll('.page-card'));
-      const cardIndex = allCards.indexOf(card);
-
-      const isAtStart = (getGlobalCaretPosition(card) === 0);
-      const isAtEnd = (getGlobalCaretPosition(card) === card.textContent.length);
-
-      if (e.key === 'Enter') {
-        if (handleEnterAtCard(card, cardWrapper, e)) {
-          return;
-        }
-      }
-
-      if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && isAtStart) {
-        if (cardIndex > 0) {
-          e.preventDefault();
-          setCursorToEnd(allCards[cardIndex - 1]);
-          return;
-        }
-      }
-
-      if ((e.key === 'ArrowRight' || e.key === 'ArrowDown') && isAtEnd) {
-        if (cardIndex < allCards.length - 1) {
-          e.preventDefault();
-          setCursorToStart(allCards[cardIndex + 1]);
-          return;
-        }
-      }
-
-      if (e.key === 'Backspace' && isAtStart) {
-        if (cardIndex > 0) {
-          e.preventDefault();
-          pushHistory();
-
-          const prevCard = allCards[cardIndex - 1];
-          const prevHtml = prevCard.innerHTML.trim();
-          const currentHtml = card.innerHTML.trim();
-
-          prevCard.innerHTML = prevHtml ? (prevHtml + (currentHtml ? '<br>' + currentHtml : '')) : currentHtml;
-          cardWrapper.remove();
-          updateCardLabels();
-          saveAllCards();
-
-          setCursorToEnd(prevCard);
-        }
-      }
-    });
-
-    card.addEventListener('paste', (e) => {
+  editor.addEventListener('touchmove', (e) => {
+    if (isContinuousMode && isMouseDown) {
+      const touch = e.touches[0];
+      paintWordAtPoint(touch.clientX, touch.clientY);
       e.preventDefault();
+    }
+  }, { passive: false });
+
+  editor.addEventListener('mousedown', (e) => {
+    if (isContinuousMode) {
       pushHistory();
+      isMouseDown = true;
+      paintWordAtPoint(e.clientX, e.clientY);
+      e.preventDefault();
+    }
+  });
 
-      const clipboardData = e.clipboardData || window.clipboardData;
-      const text = clipboardData.getData('text/plain') || clipboardData.getData('text') || '';
-      if (!text.trim()) return;
+  editor.addEventListener('mousemove', (e) => {
+    if (isContinuousMode && isMouseDown) {
+      paintWordAtPoint(e.clientX, e.clientY);
+      e.preventDefault();
+    }
+  });
 
-      const pages = resegmentAllHtml(text.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
-      card.innerHTML = pages[0];
+  editor.addEventListener('input', () => {
+    saveEditorContent();
+  });
 
-      let lastWrapper = cardWrapper;
-      for (let i = 1; i < pages.length; i++) {
-        const newWrapper = createCardElement(pages[i]);
-        lastWrapper.after(newWrapper);
-        lastWrapper = newWrapper;
-      }
+  editor.addEventListener('paste', () => {
+    pushHistory();
+    setTimeout(saveEditorContent, 10);
+  });
 
-      updateCardLabels();
-      saveAllCards();
-    });
-
-    card.addEventListener('input', () => {
-      saveAllCards();
-    });
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'card-delete-btn';
-    delBtn.innerHTML = '✕';
-    delBtn.title = '이 페이지 삭제';
-    delBtn.onclick = () => {
-      pushHistory();
-      const allCards = document.querySelectorAll('.page-card');
-      if (allCards.length > 1) {
-        cardWrapper.remove();
-        updateCardLabels();
-        saveAllCards();
-      } else {
-        card.innerHTML = '';
-        saveAllCards();
-      }
-    };
-
-    const label = document.createElement('span');
-    label.className = 'page-card-label';
-
-    cardWrapper.appendChild(delBtn);
-    cardWrapper.appendChild(label);
-    cardWrapper.appendChild(card);
-
-    return cardWrapper;
-  }
-
-  function addNewCard(initialHtml = '') {
-    const cardWrapper = createCardElement(initialHtml);
-    cardList.appendChild(cardWrapper);
-    updateCardLabels();
-    saveAllCards();
-    return cardWrapper.querySelector('.page-card');
-  }
-
-  function updateCardLabels() {
-    const labels = document.querySelectorAll('.page-card-label');
-    labels.forEach((lbl, idx) => {
-      lbl.innerText = `[ ${idx + 1} 페이지 ]`;
-    });
-  }
-
-  function saveAllCards(shouldSave = true) {
-    const cards = document.querySelectorAll('.page-card');
-    const data = Array.from(cards).map(c => c.innerHTML);
+  function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_doc_data', JSON.stringify(data));
+      localStorage.setItem('yslide_single_canvas_v1', editor.innerHTML);
     }
   }
 
@@ -1011,18 +685,6 @@
     }, 900);
   }
 
-  /* 인쇄 실행 함수 */
-  function printSermonDocument() {
-    const cards = document.querySelectorAll('.page-card');
-    const hasContent = Array.from(cards).some(c => c.innerText.trim() !== '');
-
-    if (!hasContent) {
-      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
-      return;
-    }
-    window.print();
-  }
-
   function getStoredDocuments() {
     try {
       const stored = localStorage.getItem('yslide_saved_archive');
@@ -1032,10 +694,10 @@
     }
   }
 
-  function saveDocumentToArchive(data) {
+  function saveDocumentToArchive(contentHtml) {
     const archive = getStoredDocuments();
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = data[0] || '';
+    tempDiv.innerHTML = contentHtml;
     const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
     const title = firstLine.substring(0, 30);
 
@@ -1047,8 +709,7 @@
       title: title,
       preview: (tempDiv.textContent || '').substring(0, 80),
       date: timeStr,
-      pages: data.length,
-      data: data
+      html: contentHtml
     };
 
     archive.unshift(newDoc);
@@ -1086,7 +747,6 @@
         </div>
         <div class="doc-footer">
           <span>${doc.date}</span>
-          <span>${doc.pages} 페이지</span>
         </div>
       `;
       card.onclick = () => loadDocumentFromArchive(doc.id);
@@ -1100,10 +760,8 @@
     if (!target) return;
 
     pushHistory();
-    cardList.innerHTML = '';
-    target.data.forEach(html => addNewCard(html));
-    updateCardLabels();
-    saveAllCards();
+    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<div class="page-divider" contenteditable="false">--- [ 슬라이드 구분 ] ---</div>') : '');
+    saveEditorContent();
     closeStorageModal();
     showQuickToast("📂 문서를 불러왔습니다");
   }
@@ -1117,17 +775,14 @@
   }
 
   async function saveToFile() {
-    const cards = document.querySelectorAll('.page-card');
-    const data = Array.from(cards).map(c => c.innerHTML);
-
-    if (data.length === 0 || (data.length === 1 && data[0].trim() === '')) {
+    const content = editor.innerHTML;
+    if (editor.innerText.trim() === '') {
       showQuickToast("⚠️ 저장할 내용이 없습니다.");
       return;
     }
 
-    saveDocumentToArchive(data);
+    saveDocumentToArchive(content);
 
-    const jsonString = JSON.stringify(data, null, 2);
     const now = new Date();
     const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
     const defaultFilename = `Yslide_${dateStr}.txt`;
@@ -1138,13 +793,11 @@
           suggestedName: defaultFilename,
           types: [{
             description: '텍스트 파일 (.txt, .json)',
-            accept: {
-              'text/plain': ['.txt', '.json']
-            }
+            accept: { 'text/plain': ['.txt', '.json'] }
           }]
         });
         const writable = await fileHandle.createWritable();
-        await writable.write(jsonString);
+        await writable.write(content);
         await writable.close();
         showQuickToast("💾 파일이 저장되었습니다");
         return;
@@ -1153,7 +806,7 @@
       }
     }
 
-    const blob = new Blob([jsonString], { type: "application/json;charset=utf-8" });
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = defaultFilename;
@@ -1170,33 +823,35 @@
     const reader = new FileReader();
     reader.onload = (e) => {
       const raw = e.target.result;
-      cardList.innerHTML = '';
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          parsed.forEach(html => addNewCard(html));
-          saveDocumentToArchive(parsed);
+        if (Array.isArray(parsed)) {
+          editor.innerHTML = parsed.join('<div class="page-divider" contenteditable="false">--- [ 슬라이드 구분 ] ---</div>');
+          saveEditorContent();
+          saveDocumentToArchive(editor.innerHTML);
           showQuickToast("📂 파일을 불러왔습니다");
           return;
         }
-      } catch (err) {
-        const pages = resegmentAllHtml(raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
-        if (pages.length > 0) {
-          pages.forEach(chunk => addNewCard(chunk));
-          saveDocumentToArchive(pages);
-        } else {
-          addNewCard('');
-        }
-        showQuickToast("📂 텍스트를 불러왔습니다");
-      }
+      } catch (err) {}
+      editor.innerHTML = raw.replace(/\n/g, '<br>');
+      formatTo17Lines();
+      saveDocumentToArchive(editor.innerHTML);
+      showQuickToast("📂 텍스트를 불러왔습니다");
     };
     reader.readAsText(files[0], 'utf-8');
+  }
+
+  function printSermonDocument() {
+    if (editor.innerText.trim() === '') {
+      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
+      return;
+    }
+    window.print();
   }
 
   function toggleContinuousMode() {
     isContinuousMode = !isContinuousMode;
     const btn = document.getElementById('btn-continuous');
-
     if (isContinuousMode) {
       btn.classList.add('active');
       document.body.classList.add('paint-mode');
@@ -1213,7 +868,8 @@
 
     if (!isContinuousMode) {
       pushHistory();
-      applyColor(color);
+      document.execCommand('foreColor', false, color);
+      saveEditorContent();
     }
   }
 
@@ -1221,13 +877,13 @@
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   }
 
-  function applyColor(color) { document.execCommand('foreColor', false, color); saveAllCards(); }
-
+  // 전체모드 (가로 점선 기준으로 슬라이드 분할)
   function startSermonMode() {
-    const cards = document.querySelectorAll('.page-card');
-    pagesData = Array.from(cards)
-      .map(c => c.innerHTML)
-      .filter(html => html.trim() !== '');
+    const rawHtml = editor.innerHTML;
+    if (editor.innerText.trim() === '') return;
+
+    const sections = rawHtml.split(/<div class="page-divider"[^>]*>[\s\S]*?<\/div>/gi);
+    pagesData = sections.map(s => s.trim()).filter(s => s !== '');
 
     if (pagesData.length === 0) return;
 
