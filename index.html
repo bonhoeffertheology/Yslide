@@ -23,6 +23,9 @@
     /* 정확히 17줄 분량의 슬라이드 높이 */
     --slide-block-height: calc(var(--single-line-height) * 17);
     --color-yellow: #ffb703;
+    /* 입력창과 전체화면의 텍스트 가로폭 완전 통일 규격 */
+    --content-max-width: 1000px;
+    --content-padding-x: 32px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
@@ -123,7 +126,7 @@
   #editor-wrapper {
     position: relative;
     width: 100%;
-    max-width: 1050px;
+    max-width: var(--content-max-width);
     min-height: 100%;
   }
 
@@ -162,19 +165,20 @@
     margin-right: 20px;
   }
 
-  /* 삼성노트 스타일 무한 텍스트 캔버스 */
+  /* 입력창 본문 스타일 */
   #main-editor {
     position: relative;
     z-index: 2;
     width: 100%;
     min-height: 100%;
     background-color: transparent;
-    padding: 24px 32px calc(100vh - 120px) 32px;
+    padding: 24px var(--content-padding-x) calc(100vh - 120px) var(--content-padding-x);
     outline: none;
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
     word-break: keep-all;
+    letter-spacing: normal;
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
@@ -188,20 +192,42 @@
 
   /* 전체모드 (설교 리더 모드) */
   #reader-container {
-    display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0;
-    background-color: #000000; z-index: 1000000; user-select: none;
+    display: none;
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #000000;
+    z-index: 1000000;
+    user-select: none;
+    overflow: hidden;
   }
+
+  /* 전체화면 중앙 정렬 박스 */
   #reader-box {
-    width: 100%; height: 100%;
-    padding: calc(var(--font-size) * var(--line-height) * 1.5) 48px 30px 48px;
-    display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: calc(var(--font-size) * var(--line-height) * 1.5);
     pointer-events: none;
   }
+
+  /* 입력창과 완전히 동일한 너비와 여백을 갖는 리더 텍스트 영역 */
   #reader-content {
+    width: 100%;
+    max-width: var(--content-max-width);
+    padding: 0 var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
-    word-break: keep-all; color: #ffffff; width: 100%; white-space: pre-wrap;
+    word-break: keep-all;
+    letter-spacing: normal;
+    color: #ffffff;
+    white-space: pre-wrap;
+    box-sizing: border-box;
   }
 
   .touch-zone {
@@ -511,7 +537,7 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_pixel_perfect_v6');
+    const saved = localStorage.getItem('yslide_exact_match_v7');
     if (saved) {
       editor.innerHTML = saved;
     }
@@ -546,6 +572,7 @@
     updateSlideIndicators();
   }
 
+  // 17줄마다 슬라이드 눈금선 및 번호 뱃지([ 1 ], [ 2 ]...) 생성
   function updateSlideIndicators() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
@@ -669,7 +696,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_pixel_perfect_v6', editor.innerHTML);
+      localStorage.setItem('yslide_exact_match_v7', editor.innerHTML);
     }
   }
 
@@ -880,16 +907,15 @@
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   }
 
-  // 실제 화면 렌더링 픽셀 좌표 기준 17줄 단위 슬라이드 분할 엔진 (경계선 위치와 100% 일치)
+  // 화면 픽셀 좌표 기준 17줄 슬라이드 분할
   function startSermonMode() {
     if (editor.innerText.trim() === '') return;
 
     const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17; // 정확히 17줄 높이
+    const slideHeight = singleLineHeight * 17;
     const editorRect = editor.getBoundingClientRect();
-    const editorTop = editorRect.top + 24; // 패딩 보정
+    const editorTop = editorRect.top + 24;
 
-    // 캔버스 내의 모든 자식 블록 요소를 순회하며 픽셀 위치 측정
     const childNodes = Array.from(editor.childNodes);
     pagesData = [];
     let currentSlideNodes = [];
@@ -925,7 +951,6 @@
       pagesData.push(container.innerHTML);
     }
 
-    // 빈 페이지 제거
     pagesData = pagesData.filter(html => {
       const temp = document.createElement('div');
       temp.innerHTML = html;
