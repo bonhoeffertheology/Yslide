@@ -31,7 +31,7 @@
     height: 100%;
     position: fixed;
     overflow: hidden;
-    background-color: #121212;
+    background-color: #000000;
     color: #f3f4f6;
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
   }
@@ -114,21 +114,62 @@
     right: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background-color: #141414;
+    background-color: #000000;
     display: flex;
     justify-content: center;
-    padding: 20px 20px 250px 20px;
+    padding: 0;
   }
 
-  /* 삼성노트 스타일 무한 캔버스 + 17줄 고정 회색 눈금선 */
-  #main-editor {
+  #editor-wrapper {
+    position: relative;
     width: 100%;
-    max-width: 1000px;
-    min-height: 100vh;
-    background-color: #000000;
-    border: 1px solid #282828;
-    border-radius: 8px;
-    padding: 20px 30px;
+    max-width: 1050px;
+    min-height: 100%;
+  }
+
+  /* 17줄 눈금선 오버레이 레이어 */
+  #slide-indicators-layer {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+  }
+
+  .slide-boundary {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    border-bottom: 2px dashed rgba(255, 255, 255, 0.25);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+
+  .slide-boundary-badge {
+    background-color: #1a1a1a;
+    border: 1px solid #444;
+    color: #a3a3a3;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 2px 10px;
+    border-radius: 10px;
+    transform: translateY(-50%);
+    margin-right: 20px;
+  }
+
+  /* 삼성노트 스타일 무한 텍스트 캔버스 */
+  #main-editor {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    min-height: 100%;
+    background-color: transparent;
+    padding: 24px 32px calc(100vh - 120px) 32px;
     outline: none;
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -136,12 +177,7 @@
     word-break: keep-all;
     color: #ffffff;
     white-space: pre-wrap;
-
-    /* 17줄마다 지워지지 않는 영구 고정 회색 가로 점선 눈금 */
-    background-image: linear-gradient(to bottom, transparent calc(var(--slide-block-height) - 2px), rgba(255, 255, 255, 0.22) calc(var(--slide-block-height) - 2px), rgba(255, 255, 255, 0.22) var(--slide-block-height));
-    background-size: 100% var(--slide-block-height);
-    background-position: 0 20px;
-    background-repeat: repeat-y;
+    box-sizing: border-box;
   }
 
   body.paint-mode #main-editor {
@@ -153,11 +189,11 @@
   /* 전체모드 (설교 리더 모드) */
   #reader-container {
     display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0;
-    background-color: #000; z-index: 1000000; user-select: none;
+    background-color: #000000; z-index: 1000000; user-select: none;
   }
   #reader-box {
     width: 100%; height: 100%;
-    padding: calc(var(--font-size) * var(--line-height) * 2) 48px 30px 48px;
+    padding: calc(var(--font-size) * var(--line-height) * 1.5) 48px 30px 48px;
     display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start;
     pointer-events: none;
   }
@@ -313,7 +349,7 @@
       background-color: #ffffff !important; color: #000000 !important;
       height: auto !important; width: auto !important;
     }
-    #toolbar, #reader-container, #storage-modal, #toast-msg { display: none !important; }
+    #toolbar, #reader-container, #storage-modal, #toast-msg, #slide-indicators-layer { display: none !important; }
     #editor-container {
       position: static !important; overflow: visible !important;
       padding: 0 !important; background-color: #ffffff !important; display: block !important;
@@ -322,7 +358,6 @@
       background-color: #ffffff !important; color: #000000 !important;
       border: none !important; padding: 0 !important;
       font-size: 18pt !important; line-height: 1.5 !important;
-      background-image: none !important;
     }
   }
 </style>
@@ -381,8 +416,12 @@
 </div>
 
 <div id="editor-container">
-  <!-- 무한 세로 캔버스 -->
-  <div id="main-editor" contenteditable="true" spellcheck="false"></div>
+  <div id="editor-wrapper">
+    <!-- 슬라이드 눈금선 및 번호 뱃지 오버레이 -->
+    <div id="slide-indicators-layer"></div>
+    <!-- 무한 세로 캔버스 -->
+    <div id="main-editor" contenteditable="true" spellcheck="false"></div>
+  </div>
 </div>
 
 <!-- 전체모드 (설교 리더 모드) -->
@@ -428,6 +467,7 @@
   let pagesData = [];
   let currentPageIndex = 0;
   const editor = document.getElementById('main-editor');
+  const indicatorsLayer = document.getElementById('slide-indicators-layer');
 
   let historyStack = [];
   const MAX_HISTORY = 30;
@@ -459,6 +499,7 @@
     const prev = historyStack.pop();
     editor.innerHTML = prev;
     saveEditorContent();
+    updateSlideIndicators();
   }
 
   window.onload = () => {
@@ -470,10 +511,11 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_samsung_style_v2');
+    const saved = localStorage.getItem('yslide_slide_badges_v5');
     if (saved) {
       editor.innerHTML = saved;
     }
+    updateSlideIndicators();
   };
 
   window.addEventListener('mouseup', () => {
@@ -501,6 +543,29 @@
     document.documentElement.style.setProperty('--font-size', size + 'px');
     document.getElementById('size-val').innerText = size;
     localStorage.setItem('yslide_font_size', size);
+    updateSlideIndicators();
+  }
+
+  // 17줄마다 슬라이드 눈금선 및 번호 뱃지([ 1 ], [ 2 ]...) 생성
+  function updateSlideIndicators() {
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+    const editorHeight = Math.max(editor.scrollHeight, window.innerHeight);
+    const totalSlides = Math.max(1, Math.ceil(editorHeight / slideHeight));
+
+    indicatorsLayer.innerHTML = '';
+    for (let i = 1; i <= totalSlides; i++) {
+      const boundary = document.createElement('div');
+      boundary.className = 'slide-boundary';
+      boundary.style.top = `${slideHeight * i}px`;
+
+      const badge = document.createElement('div');
+      badge.className = 'slide-boundary-badge';
+      badge.innerText = `[ ${i} ]`; // '슬라이드' 글자 제거 후 번호만 표기
+
+      boundary.appendChild(badge);
+      indicatorsLayer.appendChild(boundary);
+    }
   }
 
   function normalizeHtmlToLines(html) {
@@ -510,15 +575,6 @@
                 .replace(/<p>/gi, '')
                 .replace(/<\/p>/gi, '\n');
     return s.split('\n');
-  }
-
-  function getVisualLinesCount(str) {
-    const temp = document.createElement('div');
-    temp.innerHTML = str;
-    const plain = temp.textContent || temp.innerText || '';
-    const MAX_CHARS = Math.max(18, Math.floor(880 / (currentFontSize * 1.05)));
-    if (plain.length === 0) return 1;
-    return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
   }
 
   function paintWordAtPoint(x, y) {
@@ -610,16 +666,20 @@
 
   editor.addEventListener('input', () => {
     saveEditorContent();
+    updateSlideIndicators();
   });
 
   editor.addEventListener('paste', () => {
     pushHistory();
-    setTimeout(saveEditorContent, 10);
+    setTimeout(() => {
+      saveEditorContent();
+      updateSlideIndicators();
+    }, 10);
   });
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_samsung_style_v2', editor.innerHTML);
+      localStorage.setItem('yslide_slide_badges_v5', editor.innerHTML);
     }
   }
 
@@ -712,6 +772,7 @@
     pushHistory();
     editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
     saveEditorContent();
+    updateSlideIndicators();
     closeStorageModal();
     showQuickToast("📂 문서를 불러왔습니다");
   }
@@ -778,6 +839,7 @@
         if (Array.isArray(parsed)) {
           editor.innerHTML = parsed.join('<br>');
           saveEditorContent();
+          updateSlideIndicators();
           saveDocumentToArchive(editor.innerHTML);
           showQuickToast("📂 파일을 불러왔습니다");
           return;
@@ -785,6 +847,7 @@
       } catch (err) {}
       editor.innerHTML = raw.replace(/\n/g, '<br>');
       saveEditorContent();
+      updateSlideIndicators();
       saveDocumentToArchive(editor.innerHTML);
       showQuickToast("📂 텍스트를 불러왔습니다");
     };
@@ -827,29 +890,20 @@
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   }
 
-  // 전체모드 실행 시 17줄 단위로 완벽 슬라이드 분할
+  // 전체모드 실행 시 정확히 17줄 단위로 완벽 분할
   function startSermonMode() {
     const rawLines = normalizeHtmlToLines(editor.innerHTML);
     if (editor.innerText.trim() === '') return;
 
     pagesData = [];
-    let currentChunk = [];
-    let currentLineCount = 0;
+    const LINES_PER_SLIDE = 17;
 
-    rawLines.forEach((line) => {
-      const vCount = getVisualLinesCount(line);
-      if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
-        pagesData.push(currentChunk.join('<br>'));
-        currentChunk = [line];
-        currentLineCount = vCount;
-      } else {
-        currentChunk.push(line);
-        currentLineCount += vCount;
+    for (let i = 0; i < rawLines.length; i += LINES_PER_SLIDE) {
+      const slideChunk = rawLines.slice(i, i + LINES_PER_SLIDE);
+      const slideHtml = slideChunk.join('<br>');
+      if (slideHtml.trim() !== '') {
+        pagesData.push(slideHtml);
       }
-    });
-
-    if (currentChunk.length > 0) {
-      pagesData.push(currentChunk.join('<br>'));
     }
 
     if (pagesData.length === 0) return;
