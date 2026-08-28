@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>Yslide</title>
 
-<!-- PWA 등록 및 아이콘 설정 -->
+<!-- PWA 설정 -->
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
@@ -18,6 +18,10 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
+    /* 1줄의 정확한 픽셀 높이 */
+    --single-line-height: calc(var(--font-size) * var(--line-height));
+    /* 정확히 17줄 분량의 슬라이드 높이 */
+    --slide-block-height: calc(var(--single-line-height) * 17);
     --color-yellow: #ffb703;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -101,7 +105,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 단일 편집 캔버스 영역 */
+  /* 무한 스크롤 편집 컨테이너 */
   #editor-container {
     position: absolute;
     top: 60px;
@@ -113,17 +117,18 @@
     background-color: #141414;
     display: flex;
     justify-content: center;
-    padding: 30px 20px 120px 20px;
+    padding: 20px 20px 250px 20px;
   }
 
+  /* 삼성노트 스타일 무한 캔버스 + 17줄 고정 회색 눈금선 */
   #main-editor {
     width: 100%;
     max-width: 1000px;
-    min-height: 80vh;
+    min-height: 100vh;
     background-color: #000000;
     border: 1px solid #282828;
-    border-radius: 12px;
-    padding: 24px 30px;
+    border-radius: 8px;
+    padding: 20px 30px;
     outline: none;
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -131,21 +136,12 @@
     word-break: keep-all;
     color: #ffffff;
     white-space: pre-wrap;
-  }
 
-  /* 17줄 가로 점선 구분선 스타일 */
-  .page-divider {
-    display: block;
-    user-select: none;
-    -webkit-user-select: none;
-    border-bottom: 2px dashed rgba(255, 183, 3, 0.5);
-    margin: 20px 0;
-    text-align: right;
-    color: rgba(255, 183, 3, 0.7);
-    font-size: 13px;
-    font-weight: bold;
-    padding-bottom: 4px;
-    pointer-events: none;
+    /* 17줄마다 지워지지 않는 영구 고정 회색 가로 점선 눈금 */
+    background-image: linear-gradient(to bottom, transparent calc(var(--slide-block-height) - 2px), rgba(255, 255, 255, 0.22) calc(var(--slide-block-height) - 2px), rgba(255, 255, 255, 0.22) var(--slide-block-height));
+    background-size: 100% var(--slide-block-height);
+    background-position: 0 20px;
+    background-repeat: repeat-y;
   }
 
   body.paint-mode #main-editor {
@@ -189,7 +185,7 @@
   }
   #exit-btn:active { background: rgba(239, 68, 68, 0.9); }
 
-  /* 슬라이드 번호: 좌측 상단으로 이동 */
+  /* 좌측 상단 슬라이드 번호 */
   #page-info {
     position: absolute; top: 18px; left: 24px; font-size: 15px;
     background: rgba(30, 30, 30, 0.75); padding: 5px 14px; border-radius: 12px;
@@ -326,11 +322,7 @@
       background-color: #ffffff !important; color: #000000 !important;
       border: none !important; padding: 0 !important;
       font-size: 18pt !important; line-height: 1.5 !important;
-    }
-    .page-divider {
-      page-break-after: always !important; break-after: page !important;
-      border-bottom: 1px dashed #aaa !important; color: #888 !important;
-      margin: 20px 0 !important;
+      background-image: none !important;
     }
   }
 </style>
@@ -339,7 +331,6 @@
 
 <div id="toolbar">
   <div class="btn-group" id="edit-tools">
-    <!-- 불러오기 버튼 -->
     <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
@@ -347,7 +338,6 @@
     </button>
     <input type="file" id="file-input" accept=".txt,.json" onchange="handleFiles(this.files)">
 
-    <!-- 저장 버튼 -->
     <button class="btn-icon" onclick="saveToFile()" title="파일 저장 및 보관">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -356,7 +346,6 @@
       </svg>
     </button>
 
-    <!-- 인쇄 버튼 -->
     <button class="btn-icon" onclick="printSermonDocument()" title="인쇄 및 PDF 출력">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -365,28 +354,21 @@
       </svg>
     </button>
 
-    <!-- 되돌리기 버튼 -->
     <button class="btn-icon" onclick="undoState()" title="되돌리기 (실행 취소)">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M3 7v6h6"></path>
         <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
       </svg>
     </button>
-
-    <!-- 17줄 가로 점선 자동 정렬 버튼 -->
-    <button onclick="pushHistory(); formatTo17Lines();" title="17번째 줄마다 가로 점선 자동 정렬">17</button>
     
-    <!-- 연속 채색 모드 -->
     <button id="btn-continuous" onclick="toggleContinuousMode()">연속</button>
 
-    <!-- 색상 팔레트 -->
     <button class="color-btn c-white" onclick="onColorBtnClick('#ffffff', this)" title="흰색"></button>
     <button class="color-btn c-red selected" onclick="onColorBtnClick('#ef4444', this)" title="빨간색"></button>
     <button class="color-btn c-yellow" onclick="onColorBtnClick('#ffb703', this)" title="밝은 황금 주황"></button>
     <button class="color-btn c-blue" onclick="onColorBtnClick('#38bdf8', this)" title="밝은 파란색"></button>
     <button class="color-btn c-green" onclick="onColorBtnClick('#4ade80', this)" title="밝은 초록색"></button>
 
-    <!-- 글자 크기 조절기 -->
     <div class="size-control">
       <button class="btn-step" onclick="stepFontSize(-1)" title="글자 작게">&lt;</button>
       <span id="size-val">30</span>
@@ -399,7 +381,7 @@
 </div>
 
 <div id="editor-container">
-  <!-- 단일 에디터 캔버스 -->
+  <!-- 무한 세로 캔버스 -->
   <div id="main-editor" contenteditable="true" spellcheck="false"></div>
 </div>
 
@@ -411,13 +393,11 @@
   <div id="reader-box">
     <div id="reader-content"></div>
   </div>
-  <!-- 좌측 상단으로 이동된 슬라이드 번호 -->
   <div id="page-info"><span id="curr-page">1</span> / <span id="total-page">1</span></div>
 </div>
 
 <div id="toast-msg">💾 저장되었습니다</div>
 
-<!-- 바둑판식 문서 보관함 모달 -->
 <div id="storage-modal">
   <div id="storage-box">
     <div class="modal-header">
@@ -490,7 +470,7 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_single_canvas_v1');
+    const saved = localStorage.getItem('yslide_samsung_style_v2');
     if (saved) {
       editor.innerHTML = saved;
     }
@@ -524,50 +504,21 @@
   }
 
   function normalizeHtmlToLines(html) {
-    let clean = html.replace(/<div class="page-divider"[^>]*>[\s\S]*?<\/div>/gi, '\n---DIVIDER---\n');
-    let s = clean.replace(/<br\s*[\/]?>/gi, '\n')
-                 .replace(/<\/div>/gi, '\n')
-                 .replace(/<div>/gi, '')
-                 .replace(/<p>/gi, '')
-                 .replace(/<\/p>/gi, '\n');
+    let s = html.replace(/<br\s*[\/]?>/gi, '\n')
+                .replace(/<\/div>/gi, '\n')
+                .replace(/<div>/gi, '')
+                .replace(/<p>/gi, '')
+                .replace(/<\/p>/gi, '\n');
     return s.split('\n');
   }
 
   function getVisualLinesCount(str) {
-    if (str.includes('---DIVIDER---')) return 0;
     const temp = document.createElement('div');
     temp.innerHTML = str;
     const plain = temp.textContent || temp.innerText || '';
     const MAX_CHARS = Math.max(18, Math.floor(880 / (currentFontSize * 1.05)));
     if (plain.length === 0) return 1;
     return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
-  }
-
-  // 17번째 줄마다 가로 점선 자동 배치 엔진
-  function formatTo17Lines() {
-    const rawLines = normalizeHtmlToLines(editor.innerHTML);
-    const cleanLines = rawLines.filter(l => !l.includes('---DIVIDER---'));
-    
-    let result = [];
-    let currentLineCount = 0;
-    let pageNum = 1;
-
-    cleanLines.forEach((line) => {
-      const vCount = getVisualLinesCount(line);
-      if (currentLineCount + vCount > 17 && result.length > 0) {
-        result.push(`<div class="page-divider" contenteditable="false">--- [ ${pageNum} 슬라이드 ] ---</div>`);
-        pageNum++;
-        result.push(line);
-        currentLineCount = vCount;
-      } else {
-        result.push(line);
-        currentLineCount += vCount;
-      }
-    });
-
-    editor.innerHTML = result.join('<br>');
-    saveEditorContent();
-    showQuickToast("✂️ 17줄 단위로 가로 점선이 정렬되었습니다");
   }
 
   function paintWordAtPoint(x, y) {
@@ -623,7 +574,6 @@
     }
   }
 
-  // 에디터 터치 및 마우스 연속 채색 이벤트
   editor.addEventListener('touchstart', (e) => {
     if (isContinuousMode) {
       pushHistory();
@@ -669,7 +619,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_single_canvas_v1', editor.innerHTML);
+      localStorage.setItem('yslide_samsung_style_v2', editor.innerHTML);
     }
   }
 
@@ -760,7 +710,7 @@
     if (!target) return;
 
     pushHistory();
-    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<div class="page-divider" contenteditable="false">--- [ 슬라이드 구분 ] ---</div>') : '');
+    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
     saveEditorContent();
     closeStorageModal();
     showQuickToast("📂 문서를 불러왔습니다");
@@ -826,7 +776,7 @@
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          editor.innerHTML = parsed.join('<div class="page-divider" contenteditable="false">--- [ 슬라이드 구분 ] ---</div>');
+          editor.innerHTML = parsed.join('<br>');
           saveEditorContent();
           saveDocumentToArchive(editor.innerHTML);
           showQuickToast("📂 파일을 불러왔습니다");
@@ -834,7 +784,7 @@
         }
       } catch (err) {}
       editor.innerHTML = raw.replace(/\n/g, '<br>');
-      formatTo17Lines();
+      saveEditorContent();
       saveDocumentToArchive(editor.innerHTML);
       showQuickToast("📂 텍스트를 불러왔습니다");
     };
@@ -877,13 +827,30 @@
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   }
 
-  // 전체모드 (가로 점선 기준으로 슬라이드 분할)
+  // 전체모드 실행 시 17줄 단위로 완벽 슬라이드 분할
   function startSermonMode() {
-    const rawHtml = editor.innerHTML;
+    const rawLines = normalizeHtmlToLines(editor.innerHTML);
     if (editor.innerText.trim() === '') return;
 
-    const sections = rawHtml.split(/<div class="page-divider"[^>]*>[\s\S]*?<\/div>/gi);
-    pagesData = sections.map(s => s.trim()).filter(s => s !== '');
+    pagesData = [];
+    let currentChunk = [];
+    let currentLineCount = 0;
+
+    rawLines.forEach((line) => {
+      const vCount = getVisualLinesCount(line);
+      if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
+        pagesData.push(currentChunk.join('<br>'));
+        currentChunk = [line];
+        currentLineCount = vCount;
+      } else {
+        currentChunk.push(line);
+        currentLineCount += vCount;
+      }
+    });
+
+    if (currentChunk.length > 0) {
+      pagesData.push(currentChunk.join('<br>'));
+    }
 
     if (pagesData.length === 0) return;
 
