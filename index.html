@@ -122,6 +122,8 @@
     justify-content: center;
     padding: 0;
   }
+  /* 기본 스크롤바 숨김 (터치식 퀵스크롤러 사용) */
+  #editor-container::-webkit-scrollbar { display: none; }
 
   #editor-wrapper {
     position: relative;
@@ -190,7 +192,56 @@
     -webkit-user-select: none;
   }
 
-  /* 전체모드 (설교 리더 모드) */
+  /* 1. 손으로 터치하여 고속 이동하는 퀵스크롤러 */
+  #quick-scrollbar-track {
+    position: fixed;
+    top: 70px;
+    right: 6px;
+    bottom: 20px;
+    width: 36px;
+    z-index: 99998;
+    display: flex;
+    justify-content: center;
+    user-select: none;
+    touch-action: none;
+  }
+  #quick-scrollbar-thumb {
+    position: absolute;
+    top: 0;
+    width: 14px;
+    height: 60px;
+    background: rgba(255, 183, 3, 0.6);
+    border: 2px solid rgba(255, 183, 3, 0.9);
+    border-radius: 8px;
+    cursor: grab;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    transition: width 0.1s ease, background 0.1s ease;
+  }
+  #quick-scrollbar-thumb:active, #quick-scrollbar-track.dragging #quick-scrollbar-thumb {
+    width: 22px;
+    background: #ffb703;
+    cursor: grabbing;
+  }
+  #quick-scroll-badge {
+    position: fixed;
+    right: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(26, 26, 26, 0.95);
+    border: 1px solid #ffb703;
+    color: #ffb703;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: bold;
+    z-index: 99999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  #quick-scroll-badge.show { opacity: 1; }
+
+  /* 전체모드 & 미리보기 (설교 리더 모드) */
   #reader-container {
     display: none;
     height: 100vh;
@@ -204,7 +255,6 @@
     overflow: hidden;
   }
 
-  /* 전체화면 중앙 정렬 박스 */
   #reader-box {
     width: 100%;
     height: 100%;
@@ -215,7 +265,6 @@
     pointer-events: none;
   }
 
-  /* 입력창과 완전히 동일한 너비와 여백을 갖는 리더 텍스트 영역 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
@@ -247,7 +296,6 @@
   }
   #exit-btn:active { background: rgba(239, 68, 68, 0.9); }
 
-  /* 좌측 상단 슬라이드 번호 */
   #page-info {
     position: absolute; top: 18px; left: 24px; font-size: 15px;
     background: rgba(30, 30, 30, 0.75); padding: 5px 14px; border-radius: 12px;
@@ -375,7 +423,7 @@
       background-color: #ffffff !important; color: #000000 !important;
       height: auto !important; width: auto !important;
     }
-    #toolbar, #reader-container, #storage-modal, #toast-msg, #slide-indicators-layer { display: none !important; }
+    #toolbar, #reader-container, #storage-modal, #toast-msg, #slide-indicators-layer, #quick-scrollbar-track, #quick-scroll-badge { display: none !important; }
     #editor-container {
       position: static !important; overflow: visible !important;
       padding: 0 !important; background-color: #ffffff !important; display: block !important;
@@ -436,8 +484,17 @@
       <button class="btn-step" onclick="stepFontSize(1)" title="글자 크게">&gt;</button>
     </div>
   </div>
+
   <div class="btn-group">
-    <button class="btn-play" onclick="startSermonMode()" title="전체모드 (설교 시작)">▶</button>
+    <!-- 2. 현재 작성 중인 슬라이드 바로보기 버튼 -->
+    <button class="btn-icon" onclick="startPreviewCurrentSlide()" title="현재 슬라이드 미리보기">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </button>
+    <!-- 전체 설교 시작 (1페이지부터) -->
+    <button class="btn-play" onclick="startSermonMode(0)" title="처음부터 전체모드 시작">▶</button>
   </div>
 </div>
 
@@ -450,7 +507,13 @@
   </div>
 </div>
 
-<!-- 전체모드 (설교 리더 모드) -->
+<!-- 1. 우측 고속 퀵스크롤러 트랙 및 핸들 -->
+<div id="quick-scrollbar-track">
+  <div id="quick-scrollbar-thumb"></div>
+</div>
+<div id="quick-scroll-badge">1 슬라이드</div>
+
+<!-- 전체모드 & 미리보기 (설교 리더 모드) -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
@@ -493,7 +556,11 @@
   let pagesData = [];
   let currentPageIndex = 0;
   const editor = document.getElementById('main-editor');
+  const editorContainer = document.getElementById('editor-container');
   const indicatorsLayer = document.getElementById('slide-indicators-layer');
+  const scrollTrack = document.getElementById('quick-scrollbar-track');
+  const scrollThumb = document.getElementById('quick-scrollbar-thumb');
+  const scrollBadge = document.getElementById('quick-scroll-badge');
 
   let historyStack = [];
   const MAX_HISTORY = 30;
@@ -503,7 +570,6 @@
       const offsetTop = window.visualViewport.offsetTop;
       const toolbar = document.getElementById('toolbar');
       toolbar.style.top = offsetTop + 'px';
-      const editorContainer = document.getElementById('editor-container');
       editorContainer.style.top = (offsetTop + 60) + 'px';
     }
   }
@@ -526,6 +592,7 @@
     editor.innerHTML = prev;
     saveEditorContent();
     updateSlideIndicators();
+    updateScrollThumbPosition();
   }
 
   window.onload = () => {
@@ -537,11 +604,12 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_exact_match_v7');
+    const saved = localStorage.getItem('yslide_final_v8');
     if (saved) {
       editor.innerHTML = saved;
     }
     updateSlideIndicators();
+    updateScrollThumbPosition();
   };
 
   window.addEventListener('mouseup', () => {
@@ -570,9 +638,10 @@
     document.getElementById('size-val').innerText = size;
     localStorage.setItem('yslide_font_size', size);
     updateSlideIndicators();
+    updateScrollThumbPosition();
   }
 
-  // 17줄마다 슬라이드 눈금선 및 번호 뱃지([ 1 ], [ 2 ]...) 생성
+  /* 17줄마다 슬라이드 눈금선 및 번호 뱃지 생성 */
   function updateSlideIndicators() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
@@ -594,6 +663,94 @@
     }
   }
 
+  /* 1. 고속 퀵스크롤러 제어 엔진 */
+  function updateScrollThumbPosition() {
+    const scrollHeight = editorContainer.scrollHeight - editorContainer.clientHeight;
+    if (scrollHeight <= 0) {
+      scrollThumb.style.display = 'none';
+      return;
+    }
+    scrollThumb.style.display = 'block';
+    const trackHeight = scrollTrack.clientHeight - scrollThumb.offsetHeight;
+    const progress = editorContainer.scrollTop / scrollHeight;
+    scrollThumb.style.top = `${progress * trackHeight}px`;
+  }
+
+  editorContainer.addEventListener('scroll', () => {
+    if (!isDraggingScroll) {
+      updateScrollThumbPosition();
+    }
+  });
+
+  let isDraggingScroll = false;
+  let startDragY = 0;
+  let startScrollTop = 0;
+
+  function onScrollDragStart(clientY) {
+    isDraggingScroll = true;
+    startDragY = clientY;
+    startScrollTop = editorContainer.scrollTop;
+    scrollTrack.classList.add('dragging');
+    scrollBadge.classList.add('show');
+    onScrollDragMove(clientY);
+  }
+
+  function onScrollDragMove(clientY) {
+    if (!isDraggingScroll) return;
+    const trackRect = scrollTrack.getBoundingClientRect();
+    const trackHeight = trackRect.height - scrollThumb.offsetHeight;
+    let offsetY = clientY - trackRect.top - (scrollThumb.offsetHeight / 2);
+    offsetY = Math.max(0, Math.min(trackHeight, offsetY));
+
+    const progress = offsetY / trackHeight;
+    const maxScroll = editorContainer.scrollHeight - editorContainer.clientHeight;
+    editorContainer.scrollTop = progress * maxScroll;
+    scrollThumb.style.top = `${offsetY}px`;
+
+    // 현재 슬라이드 번호 뱃지 표시
+    const singleLineHeight = currentFontSize * 1.45;
+    const currentSlide = Math.floor(editorContainer.scrollTop / (singleLineHeight * 17)) + 1;
+    scrollBadge.innerText = `${currentSlide} 슬라이드`;
+  }
+
+  function onScrollDragEnd() {
+    if (isDraggingScroll) {
+      isDraggingScroll = false;
+      scrollTrack.classList.remove('dragging');
+      scrollBadge.classList.remove('show');
+    }
+  }
+
+  // 터치 & 마우스 드래그 이벤트 등록
+  scrollTrack.addEventListener('touchstart', (e) => {
+    onScrollDragStart(e.touches[0].clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (isDraggingScroll) {
+      onScrollDragMove(e.touches[0].clientY);
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchend', onScrollDragEnd);
+
+  scrollTrack.addEventListener('mousedown', (e) => {
+    onScrollDragStart(e.clientY);
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isDraggingScroll) {
+      onScrollDragMove(e.clientY);
+      e.preventDefault();
+    }
+  });
+
+  window.addEventListener('mouseup', onScrollDragEnd);
+
+  /* 페인팅 및 텍스트 편집 엔진 */
   function paintWordAtPoint(x, y) {
     let range;
     if (document.caretRangeFromPoint) {
@@ -684,6 +841,7 @@
   editor.addEventListener('input', () => {
     saveEditorContent();
     updateSlideIndicators();
+    updateScrollThumbPosition();
   });
 
   editor.addEventListener('paste', () => {
@@ -691,12 +849,13 @@
     setTimeout(() => {
       saveEditorContent();
       updateSlideIndicators();
+      updateScrollThumbPosition();
     }, 10);
   });
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_exact_match_v7', editor.innerHTML);
+      localStorage.setItem('yslide_final_v8', editor.innerHTML);
     }
   }
 
@@ -790,6 +949,7 @@
     editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
     saveEditorContent();
     updateSlideIndicators();
+    updateScrollThumbPosition();
     closeStorageModal();
     showQuickToast("📂 문서를 불러왔습니다");
   }
@@ -857,6 +1017,7 @@
           editor.innerHTML = parsed.join('<br>');
           saveEditorContent();
           updateSlideIndicators();
+          updateScrollThumbPosition();
           saveDocumentToArchive(editor.innerHTML);
           showQuickToast("📂 파일을 불러왔습니다");
           return;
@@ -865,6 +1026,7 @@
       editor.innerHTML = raw.replace(/\n/g, '<br>');
       saveEditorContent();
       updateSlideIndicators();
+      updateScrollThumbPosition();
       saveDocumentToArchive(editor.innerHTML);
       showQuickToast("📂 텍스트를 불러왔습니다");
     };
@@ -907,8 +1069,8 @@
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   }
 
-  // 화면 픽셀 좌표 기준 17줄 슬라이드 분할
-  function startSermonMode() {
+  /* 2. 화면 픽셀 좌표 기준 17줄 슬라이드 분할 및 전체모드/미리보기 실행 */
+  function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
     const singleLineHeight = currentFontSize * 1.45;
@@ -959,7 +1121,7 @@
 
     if (pagesData.length === 0) return;
 
-    currentPageIndex = 0;
+    currentPageIndex = Math.min(Math.max(0, targetPageIndex), pagesData.length - 1);
     updateReader();
 
     document.getElementById('reader-container').style.display = 'block';
@@ -968,6 +1130,15 @@
     const docEl = document.documentElement;
     if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
     else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+  }
+
+  /* 현재 편집 위치 기준 슬라이드 미리보기 실행 */
+  function startPreviewCurrentSlide() {
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+    const currentViewY = editorContainer.scrollTop + 50;
+    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / slideHeight));
+    startSermonMode(currentSlideIndex);
   }
 
   function exitSermonMode() {
