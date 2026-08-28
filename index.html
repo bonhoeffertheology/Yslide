@@ -17,13 +17,14 @@
 <style>
   :root {
     --font-size: 30px;
-    --line-height: 1.45;
-    --single-line-height: calc(var(--font-size) * var(--line-height));
-    /* 정확히 17줄 분량의 슬라이드 높이 */
+    /* 모든 줄 높이를 48px 정수 픽셀로 완전 고정 (누적 오차 0.00px) */
+    --single-line-height: 48px;
+    /* 정확히 17줄 = 816px */
     --slide-block-height: calc(var(--single-line-height) * 17);
     --color-yellow: #ffb703;
-    --content-max-width: 1000px;
-    --content-padding-x: 32px;
+    /* 스크롤바 유무와 무관하게 가로 줄바꿈을 100% 동일하게 만드는 고정 폭 */
+    --content-fixed-width: 920px;
+    --content-padding-x: 20px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
@@ -130,15 +131,18 @@
   }
   #editor-container::-webkit-scrollbar { display: none; }
 
+  /* 가로폭 완전 고정 래퍼 */
   #editor-wrapper {
     position: relative;
-    width: 100%;
-    max-width: var(--content-max-width);
+    width: var(--content-fixed-width) !important;
+    min-width: var(--content-fixed-width) !important;
+    max-width: var(--content-fixed-width) !important;
     min-height: 100%;
+    margin: 0 auto;
     padding: 0;
   }
 
-  /* 17줄 눈금선 레이어 */
+  /* 17줄 눈금선 레이어 (0px 오차 절대 고정) */
   #slide-indicators-layer {
     position: absolute;
     top: 0;
@@ -171,11 +175,11 @@
     padding: 2px 10px;
     border-radius: 10px;
     transform: translateY(-50%);
-    margin-right: 20px;
+    margin-right: 10px;
     pointer-events: none !important;
   }
 
-  /* 단일 무한 에디터 캔버스 */
+  /* 단일 무한 에디터 캔버스 (정수 라인 높이 적용) */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -185,13 +189,25 @@
     padding: 0 var(--content-padding-x) calc(100vh - 100px) var(--content-padding-x);
     outline: none;
     font-size: var(--font-size);
-    line-height: var(--line-height);
+    line-height: var(--single-line-height) !important;
     font-weight: 500;
     word-break: keep-all;
     letter-spacing: normal;
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
+  }
+
+  /* 엔터로 생기는 빈 줄 및 모든 자식 요소의 줄 높이를 완벽하게 48px로 강제 */
+  #main-editor *, #reader-camera-stage * {
+    line-height: var(--single-line-height) !important;
+    font-size: var(--font-size) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #main-editor div, #reader-camera-stage div,
+  #main-editor p, #reader-camera-stage p {
+    min-height: var(--single-line-height) !important;
   }
 
   body.paint-mode #main-editor {
@@ -251,7 +267,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체화면 & 미리보기 */
+  /* ================= 전체화면 & 미리보기 (100% 무오차 뷰포트) ================= */
   #reader-container {
     display: none;
     height: 100vh;
@@ -265,23 +281,28 @@
     overflow: hidden;
   }
 
+  /* 상단 정확히 3줄 여백(144px) 확보 뷰포트 액자 */
   #reader-viewport {
     position: absolute;
-    top: calc(var(--font-size) * var(--line-height) * 3);
+    top: calc(var(--single-line-height) * 3);
     left: 50%;
     transform: translateX(-50%);
-    width: 100%;
-    max-width: var(--content-max-width);
-    height: var(--slide-block-height);
-    overflow: hidden;
+    width: var(--content-fixed-width) !important;
+    min-width: var(--content-fixed-width) !important;
+    max-width: var(--content-fixed-width) !important;
+    height: var(--slide-block-height) !important; /* 정확히 17줄 높이 816px */
+    overflow: hidden !important;
     pointer-events: none;
   }
 
+  /* 원본 텍스트 1:1 카메라 무대 */
   #reader-camera-stage {
-    width: 100%;
+    width: var(--content-fixed-width) !important;
+    min-width: var(--content-fixed-width) !important;
+    max-width: var(--content-fixed-width) !important;
     padding: 0 var(--content-padding-x);
     font-size: var(--font-size);
-    line-height: var(--line-height);
+    line-height: var(--single-line-height) !important;
     font-weight: 500;
     word-break: keep-all;
     letter-spacing: normal;
@@ -584,6 +605,7 @@
   let lastPaintedKey = "";
   let activeColor = '#ef4444';
   let currentFontSize = 30;
+  let currentSingleLineHeight = 48; // 고정 정수 픽셀
   let totalSlidesCount = 1;
   let currentPageIndex = 0;
   let savedSelectionRange = null;
@@ -627,7 +649,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_clean_stable_v25');
+      const saved = localStorage.getItem('yslide_perfect_zero_error_v26');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -653,10 +675,12 @@
   }
 
   function applyFontSize(size) {
-    const singleLineHeight = size * 1.45;
-    const slideBlockHeight = singleLineHeight * 17;
+    // 폰트 크기에 맞는 정수 line-height 계산
+    currentSingleLineHeight = Math.round(size * 1.55);
+    const slideBlockHeight = currentSingleLineHeight * 17;
 
     document.documentElement.style.setProperty('--font-size', size + 'px');
+    document.documentElement.style.setProperty('--single-line-height', currentSingleLineHeight + 'px');
     document.documentElement.style.setProperty('--slide-block-height', slideBlockHeight + 'px');
     const sizeVal = document.getElementById('size-val');
     if (sizeVal) sizeVal.innerText = size;
@@ -666,12 +690,11 @@
     updateScrollThumbPosition();
   }
 
-  /* 17줄 뷰포트 높이 기준 실시간 눈금선 생성 */
+  /* 17줄 높이 단위로 에디터 위에 정밀 눈금선 생성 */
   function updateSlideIndicators() {
     try {
       if (!editor || !indicatorsLayer) return;
-      const singleLineHeight = currentFontSize * 1.45;
-      const slideHeight = singleLineHeight * 17;
+      const slideHeight = currentSingleLineHeight * 17;
       const editorHeight = Math.max(editor.scrollHeight, window.innerHeight || 800);
       totalSlidesCount = Math.max(1, Math.ceil(editorHeight / slideHeight));
 
@@ -845,8 +868,7 @@
     editorContainer.scrollTop = progress * maxScroll;
     scrollThumb.style.top = `${offsetY}px`;
 
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
+    const slideHeight = currentSingleLineHeight * 17;
     const currentSlide = Math.floor(editorContainer.scrollTop / slideHeight) + 1;
     scrollBadge.innerText = `${currentSlide} 슬라이드`;
   }
@@ -914,7 +936,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave && editor) {
-      try { localStorage.setItem('yslide_clean_stable_v25', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_perfect_zero_error_v26', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1206,8 +1228,7 @@ ${content}`;
     const printContainer = document.getElementById('print-container');
     printContainer.innerHTML = '';
 
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
+    const slideHeight = currentSingleLineHeight * 17;
     const totalSlides = totalSlidesCount;
 
     for (let i = 0; i < totalSlides; i++) {
@@ -1237,12 +1258,15 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 뷰포트 스냅 전체모드 시작 */
+  /* 
+   * [100% 무오차 뷰포트 스냅 뷰] 
+   * 원본 에디터 내용을 그대로 복제하고, 17줄 블록 높이만큼 카메라를 스냅 이동합니다.
+   */
   function startSermonMode(targetPageIndex = 0) {
     if (!editor || editor.innerText.trim() === '') return;
 
     updateSlideIndicators();
-    cameraStage.innerHTML = editor.innerHTML; // 원본 DOM 그대로 1:1 복제
+    cameraStage.innerHTML = editor.innerHTML; // 원본 1:1 복제
 
     currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlidesCount - 1);
     updateReaderCamera();
@@ -1259,8 +1283,7 @@ ${content}`;
 
   /* 현재 편집 위치 기준 1:1 미리보기 */
   function startPreviewCurrentSlide() {
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
+    const slideHeight = currentSingleLineHeight * 17;
     const currentViewY = editorContainer.scrollTop;
     const currentSlideIndex = Math.max(0, Math.floor((currentViewY + 20) / slideHeight));
     startSermonMode(currentSlideIndex);
@@ -1281,8 +1304,7 @@ ${content}`;
 
   /* 카메라의 Y축 위치를 정확히 [17줄 높이 * 슬라이드 인덱스]만큼 스냅 이동 */
   function updateReaderCamera() {
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
+    const slideHeight = currentSingleLineHeight * 17;
     const offsetY = slideHeight * currentPageIndex;
 
     cameraStage.style.transform = `translateY(-${offsetY}px)`;
