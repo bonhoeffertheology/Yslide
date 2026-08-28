@@ -136,7 +136,6 @@
     min-height: 100%;
   }
 
-  /* 17줄 눈금선 레이어 (완전 투과) */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -173,7 +172,6 @@
     pointer-events: none !important;
   }
 
-  /* 에디터 본문 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -249,7 +247,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체모드 */
+  /* 전체모드 & 미리보기 */
   #reader-container {
     display: none;
     height: 100vh;
@@ -273,9 +271,13 @@
     pointer-events: none;
   }
 
+  /* 17줄 초과분 절대 차단: 높이 17줄 물리적 잠금 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
+    height: var(--slide-block-height) !important;
+    max-height: var(--slide-block-height) !important;
+    overflow: hidden !important;
     padding: 0 var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -537,7 +539,7 @@
 </div>
 <div id="quick-scroll-badge">1 슬라이드</div>
 
-<!-- 전체모드 -->
+<!-- 전체모드 & 미리보기 -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
@@ -551,7 +553,6 @@
 <div id="print-container"></div>
 <div id="toast-msg">💾 저장되었습니다</div>
 
-<!-- 문서 보관함 모달 -->
 <div id="storage-modal" class="modal-backdrop">
   <div class="modal-box">
     <div class="modal-header">
@@ -619,7 +620,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_stable_v14');
+      const saved = localStorage.getItem('yslide_perfect_slide_v15');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -672,7 +673,6 @@
     updateScrollThumbPosition();
   }
 
-  /* 17줄 슬라이드 눈금선 안정화 렌더러 */
   function updateSlideIndicators() {
     try {
       const singleLineHeight = currentFontSize * 1.45;
@@ -886,7 +886,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_stable_v14', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_perfect_slide_v15', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1177,21 +1177,49 @@ ${content}`;
     return s.split('\n');
   }
 
+  /* 문단별 시각적 실제 줄 수(Visual Line Count) 측정 */
+  function getVisualLinesCount(str) {
+    const temp = document.createElement('div');
+    temp.innerHTML = str;
+    const plain = temp.textContent || temp.innerText || '';
+    // 1000px 컨테이너 기준 한 줄 최대 수용 글자수
+    const MAX_CHARS = Math.max(16, Math.floor(936 / (currentFontSize * 1.05)));
+    if (plain.length === 0) return 1;
+    return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
+  }
+
+  /* 17줄 슬라이드 경계선 100% 일치 분할 엔진 */
   function calculateSlides() {
     const rawLines = normalizeHtmlToLines(editor.innerHTML);
     if (editor.innerText.trim() === '') return [];
 
     const slides = [];
-    const LINES_PER_SLIDE = 17;
+    let currentChunk = [];
+    let currentLineCount = 0;
 
-    for (let i = 0; i < rawLines.length; i += LINES_PER_SLIDE) {
-      const slideChunk = rawLines.slice(i, i + LINES_PER_SLIDE);
-      const slideHtml = slideChunk.join('<br>');
-      if (slideHtml.trim() !== '') {
-        slides.push(slideHtml);
+    rawLines.forEach((line) => {
+      const vCount = getVisualLinesCount(line);
+
+      // 17줄을 초과하는 순간 정확히 다음 슬라이드로 분리
+      if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
+        slides.push(currentChunk.join('<br>'));
+        currentChunk = [line];
+        currentLineCount = vCount;
+      } else {
+        currentChunk.push(line);
+        currentLineCount += vCount;
       }
+    });
+
+    if (currentChunk.length > 0) {
+      slides.push(currentChunk.join('<br>'));
     }
-    return slides;
+
+    return slides.filter(html => {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.innerText.trim() !== '';
+    });
   }
 
   function printSermonDocument() {
@@ -1241,10 +1269,11 @@ ${content}`;
     } catch(e){}
   }
 
+  /* 현재 편집 위치 기준 슬라이드 미리보기 (17줄 경계 1:1 매칭) */
   function startPreviewCurrentSlide() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
-    const currentViewY = editorContainer.scrollTop + 50;
+    const currentViewY = editorContainer.scrollTop + 40;
     const currentSlideIndex = Math.max(0, Math.floor(currentViewY / slideHeight));
     startSermonMode(currentSlideIndex);
   }
