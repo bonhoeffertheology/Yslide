@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+<title>Yslide</title>
+
+<!-- PWA 등록 및 아이콘 설정 -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#1e1e1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Yslide">
+
+<style>
+  :root {
+    --font-size: 30px;
+    --line-height: 1.45;
+    --color-yellow: #ffb703;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html, body {
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    overflow: hidden;
+    background-color: #121212;
+    color: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  }
+
+  /* 상단 고정 툴바 */
+  #toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background-color: #1e1e1e;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid #333;
+    z-index: 99999;
+    transform: translate3d(0, 0, 0);
+  }
+  .btn-group { display: flex; gap: 8px; align-items: center; }
+  
+  button {
+    padding: 0 12px; height: 38px; font-size: 14px; font-weight: bold;
+    border: 1px solid #444; border-radius: 6px;
+    background-color: #2c2c2c; color: #d1d5db; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; user-select: none;
+    transition: all 0.15s ease;
+  }
+  button:active { background-color: #404040; color: #fff; }
+  
+  .btn-icon { width: 38px; padding: 0; }
+  
+  .icon-svg {
+    width: 18px; height: 18px; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  #btn-continuous.active {
+    background-color: #ea580c; color: #ffffff; border-color: #f97316;
+    box-shadow: 0 0 8px rgba(234, 88, 12, 0.6);
+  }
+
+  /* 색상 팔레트 */
+  .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #555; cursor: pointer; position: relative; padding: 0; }
+  .color-btn.selected { border-color: #ffffff; transform: scale(1.15); box-shadow: 0 0 6px rgba(255,255,255,0.8); }
+  .c-white { background-color: #ffffff; }
+  .c-red { background-color: #ef4444; }
+  .c-yellow { background-color: var(--color-yellow); }
+  .c-blue { background-color: #38bdf8; }
+  .c-green { background-color: #4ade80; }
+
+  .size-control {
+    display: flex; align-items: center; gap: 4px; margin-left: 4px; background: #222;
+    padding: 2px 4px; border-radius: 6px; border: 1px solid #383838;
+  }
+  .btn-step {
+    width: 32px; height: 32px; font-size: 16px; font-weight: bold;
+    background: #2c2c2c; border: 1px solid #444; border-radius: 4px; color: #e5e5e5;
+  }
+  .btn-step:active { background: #444; }
+  #size-val {
+    font-size: 14px; font-weight: bold; color: #d1d5db; width: 32px; text-align: center;
+  }
+
+  #file-input { display: none; }
+
+  .btn-play {
+    background-color: #2c2c2c; color: #d1d5db; border: 1px solid #444;
+    width: 44px; height: 38px; font-size: 16px; border-radius: 6px; padding: 0;
+  }
+  .btn-play:active { background-color: #404040; color: #fff; }
+
+  /* 편집 스크롤 영역 */
+  #editor-container {
+    position: absolute;
+    top: 60px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: #141414;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 100px 20px;
+  }
+
+  .card-wrapper {
+    position: relative; margin-bottom: 45px; width: 100%; max-width: 1000px;
+  }
+  
+  .page-card {
+    background-color: #000;
+    border: 2px dashed rgba(255, 255, 255, 0.28);
+    border-radius: 12px;
+    padding: 16px 24px;
+    width: 100%;
+    height: calc(var(--font-size) * var(--line-height) * 17 + 32px) !important;
+    max-height: calc(var(--font-size) * var(--line-height) * 17 + 32px) !important;
+    overflow: hidden !important;
+    box-sizing: border-box;
+    outline: none;
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    font-weight: 500;
+    word-break: keep-all;
+    color: #ffffff;
+    white-space: pre-wrap;
+    position: relative;
+  }
+  .page-card:focus { border-color: #888; }
+
+  body.paint-mode .page-card {
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .page-card-label {
+    position: absolute; top: -26px; right: 4px; font-size: 13px;
+    font-weight: bold; color: #aaa; user-select: none;
+  }
+
+  .card-delete-btn {
+    position: absolute; top: -28px; left: 4px;
+    width: 24px; height: 24px; font-size: 14px;
+    background-color: #222; color: #888; border: 1px solid #383838;
+    border-radius: 4px; cursor: pointer; font-weight: bold;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .card-delete-btn:active { background-color: #333; color: #fff; }
+
+  /* 설교 리더 모드 */
+  #reader-container {
+    display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0;
+    background-color: #000; z-index: 1000000; user-select: none;
+  }
+  #reader-box {
+    width: 100%; height: 100%;
+    padding: calc(var(--font-size) * var(--line-height) * 2) 48px 30px 48px;
+    display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start;
+    pointer-events: none;
+  }
+  #reader-content {
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    font-weight: 500;
+    word-break: keep-all; color: #ffffff; width: 100%; white-space: pre-wrap;
+  }
+
+  .touch-zone {
+    position: absolute; top: 0; bottom: 0; width: 50%; z-index: 3000;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  #touch-left { left: 0; }
+  #touch-right { right: 0; }
+
+  #exit-btn {
+    position: absolute; top: 18px; right: 24px;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(45, 45, 45, 0.75); border: 1px solid #777;
+    color: #fff; font-size: 22px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5000; cursor: pointer; padding: 0;
+  }
+  #exit-btn:active { background: rgba(239, 68, 68, 0.9); }
+
+  #page-info {
+    position: absolute; bottom: 18px; left: 24px; font-size: 15px;
+    background: rgba(30, 30, 30, 0.75); padding: 5px 12px; border-radius: 12px;
+    color: #888; z-index: 5000; user-select: none; pointer-events: none;
+  }
+
+  #toast-msg {
+    position: fixed;
+    bottom: 35px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(34, 34, 34, 0.92);
+    color: #38bdf8;
+    border: 1px solid #444;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 9999999;
+  }
+  #toast-msg.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* 문서 보관함 모달창 */
+  #storage-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 2000000;
+    justify-content: center;
+    align-items: center;
+  }
+  #storage-box {
+    width: 90%; max-width: 950px; height: 82vh;
+    background-color: #1a1a1a;
+    border: 1px solid #383838;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  }
+  .modal-header {
+    padding: 16px 20px;
+    background-color: #222;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h3 { font-size: 18px; color: #f3f4f6; font-weight: 600; }
+  .modal-close {
+    background: transparent; border: none; font-size: 20px; color: #888; cursor: pointer; width: 32px; height: 32px; padding: 0;
+  }
+  .modal-close:active { color: #fff; }
+  
+  #doc-grid {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 18px;
+    align-content: start;
+  }
+  .doc-card {
+    background-color: #242424;
+    border: 1px solid #383838;
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 140px;
+    transition: all 0.15s ease;
+  }
+  .doc-card:active { transform: scale(0.98); border-color: #38bdf8; background-color: #2a2a2a; }
+  .doc-title {
+    font-size: 16px; font-weight: bold; color: #f3f4f6;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  .doc-preview {
+    font-size: 13px; color: #9ca3af; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 12px;
+  }
+  .doc-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: #6b7280; border-top: 1px solid #2e2e2e; padding-top: 8px;
+  }
+  .doc-del-btn {
+    position: absolute; top: 10px; right: 10px;
+    width: 22px; height: 22px; background: rgba(0,0,0,0.5);
+    border: 1px solid #444; border-radius: 4px; color: #888;
+    font-size: 12px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .doc-del-btn:active { background: #ef4444; color: #fff; }
+
+  .modal-footer {
+    padding: 12px 20px;
+    background-color: #222;
+    border-top: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* ================= 인쇄 전용 스타일 (@media print) ================= */
+  @media print {
+    @page {
+      margin: 20mm 15mm;
+      size: auto;
+    }
+    html, body {
+      position: static !important;
+      overflow: visible !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      height: auto !important;
+      width: auto !important;
+    }
+    #toolbar, #reader-container, #storage-modal, #toast-msg, .card-delete-btn, .page-card-label {
+      display: none !important;
+    }
+    #editor-container {
+      position: static !important;
+      overflow: visible !important;
+      padding: 0 !important;
+      background-color: #ffffff !important;
+      display: block !important;
+    }
+    .card-wrapper {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      page-break-after: always !important; /* 각 점선창마다 인쇄 페이지 강제 나눔 */
+      break-after: page !important;
+    }
+    .card-wrapper:last-child {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    .page-card {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      border: 1px solid #cccccc !important;
+      border-radius: 0 !important;
+      padding: 10px 0 !important;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      font-size: 20pt !important;
+      line-height: 1.5 !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="btn-group" id="edit-tools">
+    <!-- 불러오기 버튼 -->
+    <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+      </svg>
+    </button>
+    <input type="file" id="file-input" accept=".txt,.json" onchange="handleFiles(this.files)">
+
+    <!-- 저장 버튼 -->
+    <button class="btn-icon" onclick="saveToFile()" title="파일 저장 및 보관">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+    </button>
+
+    <!-- 인쇄 버튼 (새로 추가) -->
+    <button class="btn-icon" onclick="printSermonDocument()" title="인쇄 및 PDF 출력">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="8"></rect>
+      </svg>
+    </button>
+
+    <!-- 되돌리기 버튼 -->
+    <button class="btn-icon" onclick="undoState()" title="되돌리기 (실행 취소)">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M3 7v6h6"></path>
+        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+      </svg>
+    </button>
+
+    <!-- 새 페이지 추가 -->
+    <button class="btn-icon" onclick="pushHistory(); addNewCard('');" title="새 페이지 추가">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    </button>
+
+    <!-- 17줄 정리 -->
+    <button onclick="pushHistory(); processAllCardsTo17Lines();" title="모든 글을 17줄 단위로 일괄 재정렬">17</button>
+    
+    <!-- 연속 채색 모드 -->
+    <button id="btn-continuous" onclick="toggleContinuousMode()">연속</button>
+
+    <!-- 색상 팔레트 -->
+    <button class="color-btn c-white" onclick="onColorBtnClick('#ffffff', this)" title="흰색"></button>
+    <button class="color-btn c-red selected" onclick="onColorBtnClick('#ef4444', this)" title="빨간색"></button>
+    <button class="color-btn c-yellow" onclick="onColorBtnClick('#ffb703', this)" title="밝은 황금 주황"></button>
+    <button class="color-btn c-blue" onclick="onColorBtnClick('#38bdf8', this)" title="밝은 파란색"></button>
+    <button class="color-btn c-green" onclick="onColorBtnClick('#4ade80', this)" title="밝은 초록색"></button>
+
+    <!-- 글자 크기 조절기 -->
+    <div class="size-control">
+      <button class="btn-step" onclick="stepFontSize(-1)" title="글자 작게">&lt;</button>
+      <span id="size-val">30</span>
+      <button class="btn-step" onclick="stepFontSize(1)" title="글자 크게">&gt;</button>
+    </div>
+  </div>
+  <div class="btn-group">
+    <button class="btn-play" onclick="startSermonMode()" title="시작">▶</button>
+  </div>
+</div>
+
+<div id="editor-container">
+  <div id="card-list" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
+</div>
+
+<div id="reader-container">
+  <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
+  <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
+  <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
+  <div id="reader-box">
+    <div id="reader-content"></div>
+  </div>
+  <div id="page-info"><span id="curr-page">1</span> / <span id="total-page">1</span></div>
+</div>
+
+<div id="toast-msg">💾 저장되었습니다</div>
+
+<div id="storage-modal">
+  <div id="storage-box">
+    <div class="modal-header">
+      <h3>📁 Yslide 문서 보관함</h3>
+      <button class="modal-close" onclick="closeStorageModal()">✕</button>
+    </div>
+    <div id="doc-grid"></div>
+    <div class="modal-footer">
+      <button onclick="document.getElementById('file-input').click(); closeStorageModal();" style="font-size: 13px;">외부 파일 불러오기 (.txt/.json)</button>
+      <span style="font-size: 12px; color: #777;">원하는 문서를 선택하면 즉시 열립니다</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+
+  let isReaderMode = false;
+  let isContinuousMode = false;
+  let isMouseDown = false;
+  let lastPaintedKey = "";
+  let activeColor = '#ef4444';
+  let currentFontSize = 30;
+  let pagesData = [];
+  let currentPageIndex = 0;
+  const cardList = document.getElementById('card-list');
+
+  let historyStack = [];
+  const MAX_HISTORY = 30;
+
+  function fixToolbarPosition() {
+    if (window.visualViewport) {
+      const offsetTop = window.visualViewport.offsetTop;
+      const toolbar = document.getElementById('toolbar');
+      toolbar.style.top = offsetTop + 'px';
+      const editor = document.getElementById('editor-container');
+      editor.style.top = (offsetTop + 60) + 'px';
+    }
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fixToolbarPosition);
+    window.visualViewport.addEventListener('scroll', fixToolbarPosition);
+  }
+
+  function pushHistory() {
+    const cards = document.querySelectorAll('.page-card');
+    const data = Array.from(cards).map(c => c.innerHTML);
+    historyStack.push(JSON.stringify(data));
+    if (historyStack.length > MAX_HISTORY) {
+      historyStack.shift();
+    }
+  }
+
+  function undoState() {
+    if (historyStack.length === 0) return;
+    const prev = historyStack.pop();
+    try {
+      const data = JSON.parse(prev);
+      cardList.innerHTML = '';
+      if (data && data.length > 0) {
+        data.forEach(html => addNewCard(html));
+      } else {
+        addNewCard('');
+      }
+      updateCardLabels();
+      saveAllCards(false);
+    } catch(e){}
+  }
+
+  window.onload = () => {
+    const savedSize = localStorage.getItem('yslide_font_size');
+    if (savedSize) {
+      currentFontSize = parseInt(savedSize, 10);
+    } else {
+      currentFontSize = 30;
+    }
+    applyFontSize(currentFontSize);
+
+    const saved = localStorage.getItem('yslide_doc_data');
+    if (saved) {
+      try {
+        const arr = JSON.parse(saved);
+        if (arr.length > 0) {
+          arr.forEach(html => addNewCard(html));
+          return;
+        }
+      } catch(e){}
+    }
+    addNewCard('');
+  };
+
+  window.addEventListener('mouseup', () => {
+    if (isContinuousMode && isMouseDown) {
+      isMouseDown = false;
+      lastPaintedKey = "";
+      saveAllCards();
+    }
+  });
+
+  window.addEventListener('touchend', () => {
+    if (isContinuousMode) {
+      isMouseDown = false;
+      lastPaintedKey = "";
+      saveAllCards();
+    }
+  });
+
+  function stepFontSize(delta) {
+    currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
+    applyFontSize(currentFontSize);
+  }
+
+  function applyFontSize(size) {
+    document.documentElement.style.setProperty('--font-size', size + 'px');
+    document.getElementById('size-val').innerText = size;
+    localStorage.setItem('yslide_font_size', size);
+  }
+
+  function normalizeHtmlToLines(html) {
+    let s = html.replace(/<br\s*[\/]?>/gi, '\n')
+                .replace(/<\/div>/gi, '\n')
+                .replace(/<div>/gi, '')
+                .replace(/<p>/gi, '')
+                .replace(/<\/p>/gi, '\n');
+    return s.split('\n');
+  }
+
+  function getVisualLinesCount(str) {
+    const temp = document.createElement('div');
+    temp.innerHTML = str;
+    const plain = temp.textContent || temp.innerText || '';
+    const MAX_CHARS = Math.max(18, Math.floor(880 / (currentFontSize * 1.05)));
+    if (plain.length === 0) return 1;
+    return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
+  }
+
+  function getTotalCardLines(card) {
+    const lines = normalizeHtmlToLines(card.innerHTML);
+    let total = 0;
+    lines.forEach(l => {
+      total += getVisualLinesCount(l);
+    });
+    return total;
+  }
+
+  function resegmentAllHtml(fullHtml) {
+    const lines = normalizeHtmlToLines(fullHtml);
+    const pages = [];
+    let currentChunk = [];
+    let currentLineCount = 0;
+
+    lines.forEach(line => {
+      const vCount = getVisualLinesCount(line);
+      if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
+        pages.push(currentChunk.join('<br>'));
+        currentChunk = [line];
+        currentLineCount = vCount;
+      } else {
+        currentChunk.push(line);
+        currentLineCount += vCount;
+      }
+    });
+
+    if (currentChunk.length > 0) {
+      pages.push(currentChunk.join('<br>'));
+    }
+
+    return pages.length > 0 ? pages : [''];
+  }
+
+  function processAllCardsTo17Lines() {
+    const cards = Array.from(document.querySelectorAll('.page-card'));
+    let combinedHtml = cards.map(c => c.innerHTML).join('<br>');
+
+    const pages = resegmentAllHtml(combinedHtml);
+    cardList.innerHTML = '';
+    pages.forEach(html => addNewCard(html));
+
+    updateCardLabels();
+    saveAllCards();
+  }
+
+  function getGlobalCaretPosition(element) {
+    let position = 0;
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preRange = range.cloneRange();
+      preRange.selectNodeContents(element);
+      preRange.setEnd(range.endContainer, range.endOffset);
+      position = preRange.toString().length;
+    }
+    return position;
+  }
+
+  function setCursorToEnd(el) {
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function setCursorToStart(el) {
+    el.focus();
+    const range = document.createRange();
+    range.setStart(el, 0);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function paintWordAtPoint(x, y) {
+    let range;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(x, y);
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+
+    if (!range) return;
+
+    let node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) {
+      if (node.childNodes.length > 0 && range.startOffset < node.childNodes.length) {
+        node = node.childNodes[range.startOffset];
+        while (node && node.nodeType !== Node.TEXT_NODE && node.firstChild) {
+          node = node.firstChild;
+        }
+      }
+    }
+
+    if (node && node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      const offset = range.startOffset;
+
+      let start = Math.min(offset, text.length > 0 ? text.length - 1 : 0);
+      while (start > 0 && !/\s/.test(text[start - 1])) {
+        start--;
+      }
+      let end = offset;
+      while (end < text.length && !/\s/.test(text[end])) {
+        end++;
+      }
+
+      if (start < end) {
+        const currentKey = `${node.textContent}_${start}_${end}`;
+        if (lastPaintedKey === currentKey) return;
+        lastPaintedKey = currentKey;
+
+        const wordRange = document.createRange();
+        wordRange.setStart(node, start);
+        wordRange.setEnd(node, end);
+
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(wordRange);
+
+        document.execCommand('foreColor', false, activeColor);
+        sel.removeAllRanges();
+      }
+    }
+  }
+
+  function cascadeOverflow(startWrapper) {
+    let currentWrapper = startWrapper;
+
+    while (currentWrapper) {
+      const card = currentWrapper.querySelector('.page-card');
+      const lines = normalizeHtmlToLines(card.innerHTML);
+      
+      let totalLines = 0;
+      let splitIdx = -1;
+
+      for (let i = 0; i < lines.length; i++) {
+        const vCount = getVisualLinesCount(lines[i]);
+        if (totalLines + vCount > 17) {
+          splitIdx = i;
+          break;
+        }
+        totalLines += vCount;
+      }
+
+      if (splitIdx !== -1) {
+        const keepLines = lines.slice(0, splitIdx);
+        const overflowLines = lines.slice(splitIdx);
+
+        card.innerHTML = keepLines.join('<br>');
+
+        let nextWrapper = currentWrapper.nextElementSibling;
+        const overflowHtml = overflowLines.join('<br>');
+
+        if (!nextWrapper) {
+          nextWrapper = createCardElement(overflowHtml);
+          currentWrapper.after(nextWrapper);
+          break;
+        } else {
+          const nextCard = nextWrapper.querySelector('.page-card');
+          const nextHtml = nextCard.innerHTML.trim();
+          nextCard.innerHTML = overflowHtml + (nextHtml ? '<br>' + nextHtml : '');
+          currentWrapper = nextWrapper;
+        }
+      } else {
+        break;
+      }
+    }
+    updateCardLabels();
+    saveAllCards();
+  }
+
+  function handleEnterAtCard(card, cardWrapper, e) {
+    const currentLines = getTotalCardLines(card);
+
+    if (currentLines >= 17) {
+      e.preventDefault();
+      pushHistory();
+
+      const sel = window.getSelection();
+      let headHtml = '';
+      let tailHtml = '';
+
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        
+        const preRange = range.cloneRange();
+        preRange.selectNodeContents(card);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const headContainer = document.createElement('div');
+        headContainer.appendChild(preRange.cloneContents());
+        headHtml = headContainer.innerHTML;
+
+        const postRange = range.cloneRange();
+        postRange.selectNodeContents(card);
+        postRange.setStart(range.endContainer, range.endOffset);
+        const tailContainer = document.createElement('div');
+        tailContainer.appendChild(postRange.cloneContents());
+        tailHtml = tailContainer.innerHTML;
+      }
+
+      card.innerHTML = headHtml;
+
+      let nextWrapper = cardWrapper.nextElementSibling;
+      let nextCard;
+
+      if (!nextWrapper) {
+        nextWrapper = createCardElement(tailHtml);
+        cardWrapper.after(nextWrapper);
+        nextCard = nextWrapper.querySelector('.page-card');
+      } else {
+        nextCard = nextWrapper.querySelector('.page-card');
+        const prevNextHtml = nextCard.innerHTML.trim();
+        nextCard.innerHTML = tailHtml + (tailHtml && prevNextHtml ? '<br>' : '') + prevNextHtml;
+      }
+
+      cascadeOverflow(nextWrapper);
+
+      setTimeout(() => {
+        setCursorToStart(nextCard);
+      }, 10);
+      return true;
+    }
+    return false;
+  }
+
+  function createCardElement(initialHtml = '') {
+    const cardWrapper = document.createElement('div');
+    cardWrapper.className = 'card-wrapper';
+
+    const card = document.createElement('div');
+    card.className = 'page-card';
+    card.contentEditable = 'true';
+    card.innerHTML = initialHtml;
+
+    card.addEventListener('touchstart', (e) => {
+      if (isContinuousMode) {
+        pushHistory();
+        isMouseDown = true;
+        const touch = e.touches[0];
+        paintWordAtPoint(touch.clientX, touch.clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    card.addEventListener('touchmove', (e) => {
+      if (isContinuousMode && isMouseDown) {
+        const touch = e.touches[0];
+        paintWordAtPoint(touch.clientX, touch.clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    card.addEventListener('mousedown', (e) => {
+      if (isContinuousMode) {
+        pushHistory();
+        isMouseDown = true;
+        paintWordAtPoint(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    card.addEventListener('mousemove', (e) => {
+      if (isContinuousMode && isMouseDown) {
+        paintWordAtPoint(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    card.addEventListener('keydown', (e) => {
+      if (isContinuousMode) return;
+
+      const allCards = Array.from(document.querySelectorAll('.page-card'));
+      const cardIndex = allCards.indexOf(card);
+
+      const isAtStart = (getGlobalCaretPosition(card) === 0);
+      const isAtEnd = (getGlobalCaretPosition(card) === card.textContent.length);
+
+      if (e.key === 'Enter') {
+        if (handleEnterAtCard(card, cardWrapper, e)) {
+          return;
+        }
+      }
+
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && isAtStart) {
+        if (cardIndex > 0) {
+          e.preventDefault();
+          setCursorToEnd(allCards[cardIndex - 1]);
+          return;
+        }
+      }
+
+      if ((e.key === 'ArrowRight' || e.key === 'ArrowDown') && isAtEnd) {
+        if (cardIndex < allCards.length - 1) {
+          e.preventDefault();
+          setCursorToStart(allCards[cardIndex + 1]);
+          return;
+        }
+      }
+
+      if (e.key === 'Backspace' && isAtStart) {
+        if (cardIndex > 0) {
+          e.preventDefault();
+          pushHistory();
+
+          const prevCard = allCards[cardIndex - 1];
+          const prevHtml = prevCard.innerHTML.trim();
+          const currentHtml = card.innerHTML.trim();
+
+          prevCard.innerHTML = prevHtml ? (prevHtml + (currentHtml ? '<br>' + currentHtml : '')) : currentHtml;
+          cardWrapper.remove();
+          updateCardLabels();
+          saveAllCards();
+
+          setCursorToEnd(prevCard);
+        }
+      }
+    });
+
+    card.addEventListener('paste', (e) => {
+      e.preventDefault();
+      pushHistory();
+
+      const clipboardData = e.clipboardData || window.clipboardData;
+      const text = clipboardData.getData('text/plain') || clipboardData.getData('text') || '';
+      if (!text.trim()) return;
+
+      const pages = resegmentAllHtml(text.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
+      card.innerHTML = pages[0];
+
+      let lastWrapper = cardWrapper;
+      for (let i = 1; i < pages.length; i++) {
+        const newWrapper = createCardElement(pages[i]);
+        lastWrapper.after(newWrapper);
+        lastWrapper = newWrapper;
+      }
+
+      updateCardLabels();
+      saveAllCards();
+    });
+
+    card.addEventListener('input', () => {
+      saveAllCards();
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'card-delete-btn';
+    delBtn.innerHTML = '✕';
+    delBtn.title = '이 페이지 삭제';
+    delBtn.onclick = () => {
+      pushHistory();
+      const allCards = document.querySelectorAll('.page-card');
+      if (allCards.length > 1) {
+        cardWrapper.remove();
+        updateCardLabels();
+        saveAllCards();
+      } else {
+        card.innerHTML = '';
+        saveAllCards();
+      }
+    };
+
+    const label = document.createElement('span');
+    label.className = 'page-card-label';
+
+    cardWrapper.appendChild(delBtn);
+    cardWrapper.appendChild(label);
+    cardWrapper.appendChild(card);
+
+    return cardWrapper;
+  }
+
+  function addNewCard(initialHtml = '') {
+    const cardWrapper = createCardElement(initialHtml);
+    cardList.appendChild(cardWrapper);
+    updateCardLabels();
+    saveAllCards();
+    return cardWrapper.querySelector('.page-card');
+  }
+
+  function updateCardLabels() {
+    const labels = document.querySelectorAll('.page-card-label');
+    labels.forEach((lbl, idx) => {
+      lbl.innerText = `[ ${idx + 1} 페이지 ]`;
+    });
+  }
+
+  function saveAllCards(shouldSave = true) {
+    const cards = document.querySelectorAll('.page-card');
+    const data = Array.from(cards).map(c => c.innerHTML);
+    if (shouldSave) {
+      localStorage.setItem('yslide_doc_data', JSON.stringify(data));
+    }
+  }
+
+  let toastTimer = null;
+  function showQuickToast(msg = "💾 저장되었습니다") {
+    const toast = document.getElementById('toast-msg');
+    toast.innerText = msg;
+    toast.classList.add('show');
+    
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 900);
+  }
+
+  /* 인쇄 실행 함수 */
+  function printSermonDocument() {
+    const cards = document.querySelectorAll('.page-card');
+    const hasContent = Array.from(cards).some(c => c.innerText.trim() !== '');
+
+    if (!hasContent) {
+      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
+      return;
+    }
+    window.print();
+  }
+
+  function getStoredDocuments() {
+    try {
+      const stored = localStorage.getItem('yslide_saved_archive');
+      return stored ? JSON.parse(stored) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveDocumentToArchive(data) {
+    const archive = getStoredDocuments();
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = data[0] || '';
+    const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
+    const title = firstLine.substring(0, 30);
+
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    const newDoc = {
+      id: 'doc_' + Date.now(),
+      title: title,
+      preview: (tempDiv.textContent || '').substring(0, 80),
+      date: timeStr,
+      pages: data.length,
+      data: data
+    };
+
+    archive.unshift(newDoc);
+    if (archive.length > 50) archive.pop();
+    localStorage.setItem('yslide_saved_archive', JSON.stringify(archive));
+  }
+
+  function openStorageModal() {
+    renderDocumentGrid();
+    document.getElementById('storage-modal').style.display = 'flex';
+  }
+
+  function closeStorageModal() {
+    document.getElementById('storage-modal').style.display = 'none';
+  }
+
+  function renderDocumentGrid() {
+    const grid = document.getElementById('doc-grid');
+    const docs = getStoredDocuments();
+
+    if (docs.length === 0) {
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 60px 0;">보관된 문서가 없습니다.<br>상단 💾 버튼을 누르면 이 보관함에 자동 저장됩니다.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    docs.forEach(doc => {
+      const card = document.createElement('div');
+      card.className = 'doc-card';
+      card.innerHTML = `
+        <button class="doc-del-btn" title="삭제" onclick="deleteStoredDoc('${doc.id}', event)">✕</button>
+        <div>
+          <div class="doc-title">${doc.title}</div>
+          <div class="doc-preview">${doc.preview}</div>
+        </div>
+        <div class="doc-footer">
+          <span>${doc.date}</span>
+          <span>${doc.pages} 페이지</span>
+        </div>
+      `;
+      card.onclick = () => loadDocumentFromArchive(doc.id);
+      grid.appendChild(card);
+    });
+  }
+
+  function loadDocumentFromArchive(docId) {
+    const docs = getStoredDocuments();
+    const target = docs.find(d => d.id === docId);
+    if (!target) return;
+
+    pushHistory();
+    cardList.innerHTML = '';
+    target.data.forEach(html => addNewCard(html));
+    updateCardLabels();
+    saveAllCards();
+    closeStorageModal();
+    showQuickToast("📂 문서를 불러왔습니다");
+  }
+
+  function deleteStoredDoc(docId, e) {
+    e.stopPropagation();
+    let docs = getStoredDocuments();
+    docs = docs.filter(d => d.id !== docId);
+    localStorage.setItem('yslide_saved_archive', JSON.stringify(docs));
+    renderDocumentGrid();
+  }
+
+  async function saveToFile() {
+    const cards = document.querySelectorAll('.page-card');
+    const data = Array.from(cards).map(c => c.innerHTML);
+
+    if (data.length === 0 || (data.length === 1 && data[0].trim() === '')) {
+      showQuickToast("⚠️ 저장할 내용이 없습니다.");
+      return;
+    }
+
+    saveDocumentToArchive(data);
+
+    const jsonString = JSON.stringify(data, null, 2);
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const defaultFilename = `Yslide_${dateStr}.txt`;
+
+    if (window.showSaveFilePicker) {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFilename,
+          types: [{
+            description: '텍스트 파일 (.txt, .json)',
+            accept: {
+              'text/plain': ['.txt', '.json']
+            }
+          }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(jsonString);
+        await writable.close();
+        showQuickToast("💾 파일이 저장되었습니다");
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    const blob = new Blob([jsonString], { type: "application/json;charset=utf-8" });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = defaultFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showQuickToast("💾 파일이 저장되었습니다");
+  }
+
+  function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    pushHistory();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      cardList.innerHTML = '';
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed.forEach(html => addNewCard(html));
+          saveDocumentToArchive(parsed);
+          showQuickToast("📂 파일을 불러왔습니다");
+          return;
+        }
+      } catch (err) {
+        const pages = resegmentAllHtml(raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
+        if (pages.length > 0) {
+          pages.forEach(chunk => addNewCard(chunk));
+          saveDocumentToArchive(pages);
+        } else {
+          addNewCard('');
+        }
+        showQuickToast("📂 텍스트를 불러왔습니다");
+      }
+    };
+    reader.readAsText(files[0], 'utf-8');
+  }
+
+  function toggleContinuousMode() {
+    isContinuousMode = !isContinuousMode;
+    const btn = document.getElementById('btn-continuous');
+
+    if (isContinuousMode) {
+      btn.classList.add('active');
+      document.body.classList.add('paint-mode');
+    } else {
+      btn.classList.remove('active');
+      document.body.classList.remove('paint-mode');
+    }
+  }
+
+  function onColorBtnClick(color, el) {
+    activeColor = color;
+    clearSelectedColorIndicator();
+    el.classList.add('selected');
+
+    if (!isContinuousMode) {
+      pushHistory();
+      applyColor(color);
+    }
+  }
+
+  function clearSelectedColorIndicator() {
+    document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+  }
+
+  function applyColor(color) { document.execCommand('foreColor', false, color); saveAllCards(); }
+
+  function startSermonMode() {
+    const cards = document.querySelectorAll('.page-card');
+    pagesData = Array.from(cards)
+      .map(c => c.innerHTML)
+      .filter(html => html.trim() !== '');
+
+    if (pagesData.length === 0) return;
+
+    currentPageIndex = 0;
+    updateReader();
+
+    document.getElementById('reader-container').style.display = 'block';
+    isReaderMode = true;
+
+    const docEl = document.documentElement;
+    if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
+    else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+  }
+
+  function exitSermonMode() {
+    document.getElementById('reader-container').style.display = 'none';
+    isReaderMode = false;
+
+    if (document.exitFullscreen && document.fullscreenElement) {
+      document.exitFullscreen().catch(()=>{});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+
+  function updateReader() {
+    document.getElementById('reader-content').innerHTML = pagesData[currentPageIndex] || '';
+    document.getElementById('curr-page').innerText = currentPageIndex + 1;
+    document.getElementById('total-page').innerText = pagesData.length;
+  }
+
+  function nextPage() {
+    if (currentPageIndex < pagesData.length - 1) {
+      currentPageIndex++;
+      updateReader();
+    }
+  }
+  function prevPage() {
+    if (currentPageIndex > 0) {
+      currentPageIndex--;
+      updateReader();
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!isReaderMode) return;
+    if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) nextPage();
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) prevPage();
+    if (e.key === 'Escape') exitSermonMode();
+  });
+</script>
+</body>
+</html>
