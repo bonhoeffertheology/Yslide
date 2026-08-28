@@ -136,6 +136,7 @@
     min-height: 100%;
   }
 
+  /* 17줄 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -172,6 +173,7 @@
     pointer-events: none !important;
   }
 
+  /* 에디터 본문 스타일 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -267,10 +269,12 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
+    /* 상단 3줄 여백 확보 */
     padding-top: calc(var(--font-size) * var(--line-height) * 3);
     pointer-events: none;
   }
 
+  /* 17줄 완전 출력 뷰포트 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
@@ -616,7 +620,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_17th_line_fixed_v18');
+      const saved = localStorage.getItem('yslide_exact_line_v19');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -882,7 +886,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_17th_line_fixed_v18', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_exact_line_v19', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1018,7 +1022,7 @@ ${content}`;
       const title = firstLine.substring(0, 30);
 
       const now = new Date();
-      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0 Sha')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
       const newDoc = {
         id: 'doc_' + Date.now(),
@@ -1164,30 +1168,36 @@ ${content}`;
     reader.readAsText(files[0], 'utf-8');
   }
 
+  /* 입력창의 중복 빈줄 및 div 구조를 완벽 정규화하여 1줄을 1줄로 정확 분리 */
   function extractLinesPreservingBreaks(html) {
     if (!html) return [];
-    let formatted = html
-      .replace(/<div[^>]*>/gi, '\n')
+    
+    // div와 br이 중복되어 빈줄이 2배로 늘어나는 현상 제거
+    let normalized = html
+      .replace(/<div><br\s*[\/]?>/gi, '\n')
+      .replace(/<br\s*[\/]?>/gi, '\n')
+      .replace(/<div>/gi, '\n')
       .replace(/<\/div>/gi, '')
       .replace(/<p[^>]*>/gi, '\n')
-      .replace(/<\/p>/gi, '')
-      .replace(/<br\s*[\/]?>/gi, '\n');
+      .replace(/<\/p>/gi, '');
 
-    return formatted.split('\n');
+    // 연속된 빈줄 태그가 단일 개행으로 보정된 리스트 반환
+    return normalized.split('\n');
   }
 
-  /* 입력창 실제 한 줄 렌더링에 일치하도록 글자 수 판정 보정 */
+  /* 입력창과 1:1 일치하는 시각적 실제 줄 수(Visual Line Count) 측정 */
   function getVisualLinesCount(lineHtml) {
     const temp = document.createElement('div');
     temp.innerHTML = lineHtml;
     const text = temp.textContent || '';
-    if (!text || text.trim() === '') return 1;
+    if (!text || text.trim() === '') return 1; // 빈 줄은 정확히 1줄로 계산
 
-    const MAX_CHARS = Math.max(20, Math.floor(936 / (currentFontSize * 0.98)));
+    // 1000px 컨테이너 기준 실제 한 줄 수용 글자수
+    const MAX_CHARS = Math.max(22, Math.floor(936 / (currentFontSize * 0.95)));
     return Math.max(1, Math.ceil(text.length / MAX_CHARS));
   }
 
-  /* 17줄까지 온전히 포함하고 18줄부터 분할 */
+  /* 17번째 줄까지 온전히 1슬라이드에 포함하는 분할 엔진 */
   function calculateSlides() {
     const rawLines = extractLinesPreservingBreaks(editor.innerHTML);
     if (editor.innerText.trim() === '') return [];
@@ -1199,8 +1209,8 @@ ${content}`;
     rawLines.forEach((line) => {
       const vCount = getVisualLinesCount(line);
 
-      // 정확히 17줄까지 채우고 18번째 줄부터 분할
-      if (currentLineCount + vCount >= 18 && currentSlideLines.length > 0) {
+      // 정확히 17줄까지 꽉 채우고 18번째 줄부터 분할
+      if (currentLineCount + vCount > 17 && currentSlideLines.length > 0) {
         slides.push(currentSlideLines.join('<br>'));
         currentSlideLines = [line];
         currentLineCount = vCount;
