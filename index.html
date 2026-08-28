@@ -110,7 +110,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 편집 스크롤 영역 (태블릿 베젤 확보) */
+  /* 편집 스크롤 영역 (태블릿 베젤 배경) */
   #editor-container {
     position: absolute;
     top: 60px;
@@ -122,7 +122,7 @@
     background-color: #121212;
     display: flex;
     justify-content: center;
-    padding: 24px 16px 120px 16px;
+    padding: 24px 16px 140px 16px;
   }
   #editor-container::-webkit-scrollbar { display: none; }
 
@@ -130,18 +130,11 @@
     position: relative;
     width: 100%;
     max-width: var(--content-max-width);
-    min-height: 100%;
-    background-color: #000000;
-    border: 1px solid #282828;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
-    padding: 20px 28px;
   }
 
-  /* 단일 에디터 캔버스 */
+  /* 단일 에디터 캔버스 (한글 HWP 페이지 레이아웃) */
   #main-editor {
     width: 100%;
-    min-height: 80vh;
     outline: none;
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -152,18 +145,33 @@
     white-space: pre-wrap;
   }
 
-  /* 눈금선 구분선 스타일 (17줄 경계 표시) */
-  .slide-divider {
-    display: block;
-    user-select: none;
-    -webkit-user-select: none;
-    border-bottom: 2px dashed rgba(255, 255, 255, 0.28);
-    margin: 22px 0 16px 0;
-    text-align: right;
-    color: #a3a3a3;
-    font-size: 13px;
+  /* ================= 한글 HWP 스타일 17줄 '용지(Page Sheet)' 카드 ================= */
+  .hwp-page-sheet {
+    position: relative;
+    background-color: #000000;
+    border: 1px solid #282828;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+    padding: 24px 28px 36px 28px;
+    margin-bottom: 28px;
+    min-height: calc(var(--font-size) * var(--line-height) * 17 + 60px);
+  }
+
+  /* 용지 하단 17줄 경계선 및 쪽 번호 */
+  .hwp-page-footer {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 10px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 4px;
+    color: #777777;
+    font-size: 12px;
     font-weight: bold;
-    padding-bottom: 4px;
+    user-select: none;
     pointer-events: none;
   }
 
@@ -248,7 +256,7 @@
     pointer-events: none;
   }
 
-  /* 눈금과 눈금 사이의 내용이 그대로 나타나는 텍스트 본문 */
+  /* 해당 쪽(Page)의 내용이 온전히 1:1로 나타나는 본문 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
@@ -468,6 +476,9 @@
       </svg>
     </button>
 
+    <!-- 17줄 용지 자동 정렬 버튼 -->
+    <button onclick="formatTo17LinePages(true)" title="17줄 용지 단위로 자동 재정렬">17</button>
+
     <button class="btn-icon" onclick="undoState()" title="되돌리기 (실행 취소)">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M3 7v6h6"></path>
@@ -510,9 +521,9 @@
 <div id="quick-scrollbar-track">
   <div id="quick-scrollbar-thumb"></div>
 </div>
-<div id="quick-scroll-badge">1 슬라이드</div>
+<div id="quick-scroll-badge">1 쪽</div>
 
-<!-- 전체화면 & 미리보기 (1:1 데이터 뷰어) -->
+<!-- 전체화면 & 미리보기 (1:1 데이터 출력 뷰어) -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
@@ -596,9 +607,11 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_direct_data_v28');
+      const saved = localStorage.getItem('yslide_hwp_pages_v29');
       if (saved) {
         editor.innerHTML = saved;
+      } else {
+        formatTo17LinePages(false);
       }
     } catch(e){}
 
@@ -626,67 +639,98 @@
     if (sizeVal) sizeVal.innerText = size;
     
     try { localStorage.setItem('yslide_font_size', size); } catch(e){}
-    // 글자 크기가 바뀌면 17줄 눈금선 위치 자동 재계산
-    formatSlidesWithDividers(false);
+    formatTo17LinePages(false);
     updateScrollThumbPosition();
   }
 
   /* 
-   * [핵심] 눈금선 생성 및 슬라이드 파싱 엔진
-   * 17줄 단위로 에디터 내부에 눈금선(`--- [ N ] ---`)을 정렬합니다.
+   * [핵심] 한글 HWP 스타일 17줄 '용지(Page Sheet)' 자동 배치 엔진
+   * 17줄 분량마다 독립된 용지 카드를 만들어 글이 어디서 끊기는지 완벽히 시각화합니다.
    */
-  function formatSlidesWithDividers(shouldPushHistory = true) {
+  function formatTo17LinePages(shouldNotify = false) {
     if (!editor) return;
-    if (shouldPushHistory) pushHistory();
+    pushHistory();
 
     const rawHtml = editor.innerHTML;
-    if (editor.innerText.trim() === '') return;
+    if (editor.innerText.trim() === '') {
+      editor.innerHTML = '<div class="hwp-page-sheet" data-page="1"><div class="hwp-page-footer"><span>Yslide</span><span>[ 1 쪽 ]</span></div><br></div>';
+      return;
+    }
 
-    // 기존 눈금선 제거 후 순수 텍스트 줄 추출
-    let clean = rawHtml.replace(/<div class="slide-divider"[^>]*>[\s\S]*?<\/div>/gi, '\n---SPLIT---\n');
-    let lines = clean.replace(/<br\s*[\/]?>/gi, '\n')
-                     .replace(/<\/div>/gi, '\n')
-                     .replace(/<div>/gi, '')
-                     .replace(/<p>/gi, '')
-                     .replace(/<\/p>/gi, '\n')
-                     .split('\n')
-                     .filter(l => !l.includes('---SPLIT---'));
+    // 기존 푸터 제거 후 순수 텍스트 라인 추출
+    let clean = rawHtml.replace(/<div class="hwp-page-footer"[^>]*>[\s\S]*?<\/div>/gi, '');
+    let sheets = clean.split(/<div class="hwp-page-sheet"[^>]*>/gi).filter(s => s.trim() !== '');
 
-    let result = [];
+    let allLines = [];
+    if (sheets.length > 0) {
+      sheets.forEach(sheet => {
+        let s = sheet.replace(/<\/div>/gi, '');
+        let lines = s.split(/<br\s*[\/]?>|\n/gi);
+        allLines.push(...lines);
+      });
+    } else {
+      allLines = clean.split(/<br\s*[\/]?>|\n/gi);
+    }
+
+    let pages = [];
+    let currentPage = [];
     let currentLineCount = 0;
-    let pageNum = 1;
 
-    lines.forEach((line) => {
+    allLines.forEach(line => {
       let temp = document.createElement('div');
       temp.innerHTML = line;
       let text = temp.textContent || '';
       let MAX_CHARS = Math.max(18, Math.floor(864 / (currentFontSize * 1.05)));
       let vCount = text.length === 0 ? 1 : Math.max(1, Math.ceil(text.length / MAX_CHARS));
 
-      if (currentLineCount + vCount > 17 && result.length > 0) {
-        result.push(`<div class="slide-divider" contenteditable="false">--- [ ${pageNum} ] ---</div>`);
-        pageNum++;
-        result.push(line);
+      if (currentLineCount + vCount > 17 && currentPage.length > 0) {
+        pages.push(currentPage.join('<br>'));
+        currentPage = [line];
         currentLineCount = vCount;
       } else {
-        result.push(line);
+        currentPage.push(line);
         currentLineCount += vCount;
       }
     });
 
-    editor.innerHTML = result.join('<br>');
+    if (currentPage.length > 0) {
+      pages.push(currentPage.join('<br>'));
+    }
+
+    let builtHtml = '';
+    pages.forEach((pHtml, idx) => {
+      builtHtml += `<div class="hwp-page-sheet" data-page="${idx + 1}">${pHtml}<div class="hwp-page-footer"><span>17줄 규격</span><span>[ ${idx + 1} 쪽 ]</span></div></div>`;
+    });
+
+    editor.innerHTML = builtHtml;
     saveEditorContent();
+
+    if (shouldNotify) {
+      showQuickToast("✂️ 17줄 용지 단위로 자동 재정렬되었습니다");
+    }
   }
 
   /* 
-   * [1:1 데이터 추출] 눈금선 사이의 내용을 그대로 슬라이드 배열로 추출 (오차 0.00%)
+   * [1:1 데이터 추출] 각 용지(Sheet)에 있는 내용을 그대로 추출 (오차 0.00%)
    */
-  function getSlidesDirect() {
-    const rawHtml = editor.innerHTML;
-    if (editor.innerText.trim() === '') return [];
+  function getPagesDirect() {
+    if (!editor || editor.innerText.trim() === '') return [];
+    const sheets = Array.from(editor.querySelectorAll('.hwp-page-sheet'));
 
-    const sections = rawHtml.split(/<div class="slide-divider"[^>]*>[\s\S]*?<\/div>/gi);
-    return sections.map(s => s.trim()).filter(s => s !== '' && s !== '<br>');
+    if (sheets.length === 0) {
+      return [editor.innerHTML];
+    }
+
+    return sheets.map(sheet => {
+      let clone = sheet.cloneNode(true);
+      let footer = clone.querySelector('.hwp-page-footer');
+      if (footer) footer.remove();
+      return clone.innerHTML.trim();
+    }).filter(html => {
+      let temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.innerText.trim() !== '' || html.includes('<br>');
+    });
   }
 
   function updateScrollThumbPosition() {
@@ -807,7 +851,7 @@
     editor.addEventListener('paste', () => {
       pushHistory();
       setTimeout(() => {
-        formatSlidesWithDividers(false);
+        formatTo17LinePages(false);
         saveEditorContent();
         updateScrollThumbPosition();
       }, 10);
@@ -842,10 +886,16 @@
     editorContainer.scrollTop = progress * maxScroll;
     scrollThumb.style.top = `${offsetY}px`;
 
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
-    const currentSlide = Math.floor(editorContainer.scrollTop / slideHeight) + 1;
-    scrollBadge.innerText = `${currentSlide} 슬라이드`;
+    const sheets = Array.from(editor.querySelectorAll('.hwp-page-sheet'));
+    let currentSlide = 1;
+    if (sheets.length > 0) {
+      for (let i = 0; i < sheets.length; i++) {
+        if (sheets[i].offsetTop <= editorContainer.scrollTop + 60) {
+          currentSlide = i + 1;
+        }
+      }
+    }
+    scrollBadge.innerText = `${currentSlide} 쪽`;
   }
 
   function onScrollDragEnd() {
@@ -911,7 +961,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave && editor) {
-      try { localStorage.setItem('yslide_direct_data_v28', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_hwp_pages_v29', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1018,7 +1068,7 @@ ${content}`;
         translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
         pushHistory();
         editor.innerHTML = translatedHtml;
-        formatSlidesWithDividers(false);
+        formatTo17LinePages(false);
         saveEditorContent();
         updateScrollThumbPosition();
         showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
@@ -1108,6 +1158,7 @@ ${content}`;
 
     pushHistory();
     editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
+    formatTo17LinePages(false);
     saveEditorContent();
     updateScrollThumbPosition();
     closeStorageModal();
@@ -1175,7 +1226,7 @@ ${content}`;
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           editor.innerHTML = parsed.join('<br>');
-          formatSlidesWithDividers(false);
+          formatTo17LinePages(false);
           saveEditorContent();
           updateScrollThumbPosition();
           saveDocumentToArchive(editor.innerHTML);
@@ -1184,7 +1235,7 @@ ${content}`;
         }
       } catch (err) {}
       editor.innerHTML = raw.replace(/\n/g, '<br>');
-      formatSlidesWithDividers(false);
+      formatTo17LinePages(false);
       saveEditorContent();
       updateScrollThumbPosition();
       saveDocumentToArchive(editor.innerHTML);
@@ -1194,8 +1245,8 @@ ${content}`;
   }
 
   function printSermonDocument() {
-    const slides = getSlidesDirect();
-    if (slides.length === 0) {
+    const pages = getPagesDirect();
+    if (pages.length === 0) {
       showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
       return;
     }
@@ -1203,17 +1254,17 @@ ${content}`;
     const printContainer = document.getElementById('print-container');
     printContainer.innerHTML = '';
 
-    slides.forEach((slideHtml, index) => {
+    pages.forEach((pageHtml, index) => {
       const pageDiv = document.createElement('div');
       pageDiv.className = 'print-slide-page';
 
       const headerDiv = document.createElement('div');
       headerDiv.className = 'print-slide-header';
-      headerDiv.innerText = `[ ${index + 1} / ${slides.length} ]`;
+      headerDiv.innerText = `[ ${index + 1} / ${pages.length} ]`;
 
       const bodyDiv = document.createElement('div');
       bodyDiv.className = 'print-slide-body';
-      bodyDiv.innerHTML = slideHtml;
+      bodyDiv.innerHTML = pageHtml;
 
       pageDiv.appendChild(headerDiv);
       pageDiv.appendChild(bodyDiv);
@@ -1223,9 +1274,9 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 데이터 직접 매칭 전체모드 시작 */
+  /* 1:1 데이터 출력 전체모드 */
   function startSermonMode(targetPageIndex = 0) {
-    pagesData = getSlidesDirect();
+    pagesData = getPagesDirect();
     if (pagesData.length === 0) return;
 
     currentPageIndex = Math.min(Math.max(0, targetPageIndex), pagesData.length - 1);
@@ -1243,13 +1294,18 @@ ${content}`;
 
   /* 현재 편집 위치 기준 1:1 미리보기 */
   function startPreviewCurrentSlide() {
-    pagesData = getSlidesDirect();
+    pagesData = getPagesDirect();
     if (pagesData.length === 0) return;
 
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
-    const currentViewY = editorContainer.scrollTop;
-    const currentSlideIndex = Math.max(0, Math.floor((currentViewY + 30) / slideHeight));
+    const sheets = Array.from(editor.querySelectorAll('.hwp-page-sheet'));
+    let currentSlideIndex = 0;
+    if (sheets.length > 0) {
+      for (let i = 0; i < sheets.length; i++) {
+        if (sheets[i].offsetTop <= editorContainer.scrollTop + 80) {
+          currentSlideIndex = i;
+        }
+      }
+    }
     startSermonMode(currentSlideIndex);
   }
 
@@ -1266,7 +1322,7 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 눈금선 사이의 내용을 그대로 출력 */
+  /* 해당 쪽(Page)의 내용을 1:1로 렌더링 */
   function updateReaderContent() {
     readerContent.innerHTML = pagesData[currentPageIndex] || '';
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
