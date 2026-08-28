@@ -196,7 +196,7 @@
     -webkit-user-select: none;
   }
 
-  /* 고속 퀵스크롤러 */
+  /* 퀵스크롤러 */
   #quick-scrollbar-track {
     position: fixed;
     top: 70px;
@@ -267,12 +267,10 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    /* 상단 정확히 3줄 여백 확보 */
     padding-top: calc(var(--font-size) * var(--line-height) * 3);
     pointer-events: none;
   }
 
-  /* 17줄 온전 표시 및 입력창 너비 1:1 일치 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
@@ -618,7 +616,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_perfect_margin_v17');
+      const saved = localStorage.getItem('yslide_17th_line_fixed_v18');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -884,7 +882,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_perfect_margin_v17', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_17th_line_fixed_v18', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1166,7 +1164,6 @@ ${content}`;
     reader.readAsText(files[0], 'utf-8');
   }
 
-  /* HTML 태그 구조를 보존하면서 개별 문단 및 엔터 줄바꿈을 완벽히 분리 */
   function extractLinesPreservingBreaks(html) {
     if (!html) return [];
     let formatted = html
@@ -1179,19 +1176,18 @@ ${content}`;
     return formatted.split('\n');
   }
 
-  /* 입력창 텍스트 래핑 기반 시각적 실제 줄 수(Visual Line Count) 측정 */
+  /* 입력창 실제 한 줄 렌더링에 일치하도록 글자 수 판정 보정 */
   function getVisualLinesCount(lineHtml) {
     const temp = document.createElement('div');
     temp.innerHTML = lineHtml;
     const text = temp.textContent || '';
     if (!text || text.trim() === '') return 1;
 
-    // 입력창 1줄 수용 글자수 (한글 기준 약 28자)
-    const MAX_CHARS = Math.max(16, Math.floor(936 / (currentFontSize * 1.05)));
+    const MAX_CHARS = Math.max(20, Math.floor(936 / (currentFontSize * 0.98)));
     return Math.max(1, Math.ceil(text.length / MAX_CHARS));
   }
 
-  /* 17줄 경계선 1:1 완벽 일치 분할 엔진 (짧은 줄 병합 방지) */
+  /* 17줄까지 온전히 포함하고 18줄부터 분할 */
   function calculateSlides() {
     const rawLines = extractLinesPreservingBreaks(editor.innerHTML);
     if (editor.innerText.trim() === '') return [];
@@ -1203,8 +1199,8 @@ ${content}`;
     rawLines.forEach((line) => {
       const vCount = getVisualLinesCount(line);
 
-      // 17줄 초과 시 다음 슬라이드로 분할
-      if (currentLineCount + vCount > 17 && currentSlideLines.length > 0) {
+      // 정확히 17줄까지 채우고 18번째 줄부터 분할
+      if (currentLineCount + vCount >= 18 && currentSlideLines.length > 0) {
         slides.push(currentSlideLines.join('<br>'));
         currentSlideLines = [line];
         currentLineCount = vCount;
@@ -1272,7 +1268,6 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 현재 편집 위치 기준 슬라이드 미리보기 */
   function startPreviewCurrentSlide() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
