@@ -173,6 +173,7 @@
     pointer-events: none !important;
   }
 
+  /* 에디터 본문 스타일 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -262,6 +263,7 @@
     overflow: hidden;
   }
 
+  /* 상단 3줄 여백 아래에 정확히 17줄 높이 뷰포트 창 배치 */
   #reader-box {
     width: 100%;
     height: 100%;
@@ -272,9 +274,18 @@
     pointer-events: none;
   }
 
-  #reader-content {
+  /* 17줄 높이 고정 뷰포트 (초과분 차단) */
+  #reader-viewport {
     width: 100%;
     max-width: var(--content-max-width);
+    height: var(--slide-block-height);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* 1:1 복제 캔버스 */
+  #reader-canvas {
+    width: 100%;
     padding: 0 var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -284,6 +295,9 @@
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
+    position: absolute;
+    top: 0;
+    left: 0;
   }
 
   .touch-zone {
@@ -536,13 +550,15 @@
 </div>
 <div id="quick-scroll-badge">1 슬라이드</div>
 
-<!-- 전체모드 & 미리보기 -->
+<!-- 전체모드 & 미리보기 (1:1 복제 뷰포트) -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
   <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
   <div id="reader-box">
-    <div id="reader-content"></div>
+    <div id="reader-viewport">
+      <div id="reader-canvas"></div>
+    </div>
   </div>
   <div id="page-info"><span id="curr-page">1</span> / <span id="total-page">1</span></div>
 </div>
@@ -577,7 +593,7 @@
   let lastPaintedKey = "";
   let activeColor = '#ef4444';
   let currentFontSize = 30;
-  let pagesData = [];
+  let totalSlideCount = 1;
   let currentPageIndex = 0;
   let savedSelectionRange = null;
 
@@ -587,6 +603,7 @@
   const scrollTrack = document.getElementById('quick-scrollbar-track');
   const scrollThumb = document.getElementById('quick-scrollbar-thumb');
   const scrollBadge = document.getElementById('quick-scroll-badge');
+  const readerCanvas = document.getElementById('reader-canvas');
 
   let historyStack = [];
   const MAX_HISTORY = 30;
@@ -617,7 +634,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_clean_sync_v20');
+      const saved = localStorage.getItem('yslide_viewport_clone_v21');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -670,16 +687,16 @@
     updateScrollThumbPosition();
   }
 
-  /* 17줄 눈금선 및 슬라이드 번호 뱃지 생성 */
+  /* 17줄 눈금선 및 총 슬라이드 수 계산 */
   function updateSlideIndicators() {
     try {
       const singleLineHeight = currentFontSize * 1.45;
       const slideHeight = singleLineHeight * 17;
-      const editorHeight = Math.max(editor.scrollHeight, window.innerHeight || 800);
-      const totalSlides = Math.max(1, Math.ceil(editorHeight / slideHeight));
+      const textActualHeight = Math.max(editor.scrollHeight - (window.innerHeight - 120), 10);
+      totalSlideCount = Math.max(1, Math.ceil(textActualHeight / slideHeight));
 
       indicatorsLayer.innerHTML = '';
-      for (let i = 1; i <= totalSlides; i++) {
+      for (let i = 1; i <= totalSlideCount; i++) {
         const boundary = document.createElement('div');
         boundary.className = 'slide-boundary';
         boundary.style.top = `${slideHeight * i}px`;
@@ -884,7 +901,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_clean_sync_v20', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_viewport_clone_v21', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1166,77 +1183,57 @@ ${content}`;
     reader.readAsText(files[0], 'utf-8');
   }
 
-  /* 입력창 줄바꿈을 완벽하게 추출하는 파서 */
-  function extractLinesPreservingBreaks(html) {
-    if (!html) return [];
-    let formatted = html
-      .replace(/<div[^>]*>/gi, '\n')
-      .replace(/<\/div>/gi, '')
-      .replace(/<p[^>]*>/gi, '\n')
-      .replace(/<\/p>/gi, '')
-      .replace(/<br\s*[\/]?>/gi, '\n');
-
-    return formatted.split('\n');
-  }
-
-  /* 17줄 슬라이드 안정 분할 엔진 (페이지 과증식 완전 차단) */
-  function calculateSlides() {
-    const rawLines = extractLinesPreservingBreaks(editor.innerHTML);
-    if (!editor.innerText.trim()) return [];
-
-    const slides = [];
-    const LINES_PER_SLIDE = 17; // 한 슬라이드당 17줄 고정
-
-    for (let i = 0; i < rawLines.length; i += LINES_PER_SLIDE) {
-      const chunk = rawLines.slice(i, i + LINES_PER_SLIDE);
-      const slideHtml = chunk.join('<br>');
-      if (slideHtml.trim() !== '' || slideHtml.includes('<br>')) {
-        slides.push(slideHtml);
-      }
-    }
-
-    return slides.filter(html => {
-      const temp = document.createElement('div');
-      temp.innerHTML = html;
-      return temp.innerText.trim() !== '' || html.includes('<br>');
-    });
-  }
-
   function printSermonDocument() {
-    const slides = calculateSlides();
-    if (slides.length === 0) {
+    if (editor.innerText.trim() === '') {
       showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
       return;
     }
 
+    updateSlideIndicators();
     const printContainer = document.getElementById('print-container');
     printContainer.innerHTML = '';
 
-    slides.forEach((slideHtml, index) => {
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+
+    for (let i = 0; i < totalSlideCount; i++) {
       const pageDiv = document.createElement('div');
       pageDiv.className = 'print-slide-page';
 
       const headerDiv = document.createElement('div');
       headerDiv.className = 'print-slide-header';
-      headerDiv.innerText = `[ ${index + 1} / ${slides.length} ]`;
+      headerDiv.innerText = `[ ${i + 1} / ${totalSlideCount} ]`;
 
-      const bodyDiv = document.createElement('div');
-      bodyDiv.className = 'print-slide-body';
-      bodyDiv.innerHTML = slideHtml;
+      const viewWrap = document.createElement('div');
+      viewWrap.style.height = `${slideHeight}px`;
+      viewWrap.style.overflow = 'hidden';
+      viewWrap.style.position = 'relative';
 
+      const canvasCopy = document.createElement('div');
+      canvasCopy.className = 'print-slide-body';
+      canvasCopy.innerHTML = editor.innerHTML;
+      canvasCopy.style.position = 'absolute';
+      canvasCopy.style.top = `-${slideHeight * i}px`;
+      canvasCopy.style.left = '0';
+      canvasCopy.style.width = '100%';
+
+      viewWrap.appendChild(canvasCopy);
       pageDiv.appendChild(headerDiv);
-      pageDiv.appendChild(bodyDiv);
+      pageDiv.appendChild(viewWrap);
       printContainer.appendChild(pageDiv);
-    });
+    }
 
     window.print();
   }
 
+  /* 1:1 완벽 뷰포트 전체모드 실행 */
   function startSermonMode(targetPageIndex = 0) {
-    pagesData = calculateSlides();
-    if (pagesData.length === 0) return;
+    if (editor.innerText.trim() === '') return;
 
-    currentPageIndex = Math.min(Math.max(0, targetPageIndex), pagesData.length - 1);
+    updateSlideIndicators();
+    readerCanvas.innerHTML = editor.innerHTML; // 입력창 내용 1:1 복제
+
+    currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlideCount - 1);
     updateReader();
 
     document.getElementById('reader-container').style.display = 'block';
@@ -1249,11 +1246,11 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 현재 편집 위치 기준 슬라이드 미리보기 */
+  /* 현재 보고 있는 스크롤 위치의 눈금선 기준 미리보기 */
   function startPreviewCurrentSlide() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
-    const currentViewY = editorContainer.scrollTop + 30;
+    const currentViewY = editorContainer.scrollTop + 20;
     const currentSlideIndex = Math.max(0, Math.floor(currentViewY / slideHeight));
     startSermonMode(currentSlideIndex);
   }
@@ -1271,14 +1268,20 @@ ${content}`;
     } catch(e){}
   }
 
+  /* 17줄 높이 단위로 정확히 위로 이동시켜 눈금선 내용만 노출 */
   function updateReader() {
-    document.getElementById('reader-content').innerHTML = pagesData[currentPageIndex] || '';
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+
+    // N번째 슬라이드에 해당하는 높이만큼 캔버스를 위로 이동
+    readerCanvas.style.top = `-${slideHeight * currentPageIndex}px`;
+
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
-    document.getElementById('total-page').innerText = pagesData.length;
+    document.getElementById('total-page').innerText = totalSlideCount;
   }
 
   function nextPage() {
-    if (currentPageIndex < pagesData.length - 1) {
+    if (currentPageIndex < totalSlideCount - 1) {
       currentPageIndex++;
       updateReader();
     }
