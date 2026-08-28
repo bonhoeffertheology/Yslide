@@ -17,14 +17,9 @@
 <style>
   :root {
     --font-size: 30px;
-    /* 모든 줄 높이를 48px 정수 픽셀로 완전 고정 (누적 오차 0.00px) */
-    --single-line-height: 48px;
-    /* 정확히 17줄 = 816px */
-    --slide-block-height: calc(var(--single-line-height) * 17);
+    --line-height: 1.45;
     --color-yellow: #ffb703;
-    /* 스크롤바 유무와 무관하게 가로 줄바꿈을 100% 동일하게 만드는 고정 폭 */
-    --content-fixed-width: 920px;
-    --content-padding-x: 20px;
+    --content-max-width: 920px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
@@ -33,7 +28,7 @@
     height: 100%;
     position: fixed;
     overflow: hidden;
-    background-color: #000000;
+    background-color: #121212;
     color: #f3f4f6;
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
   }
@@ -115,7 +110,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 편집 스크롤 영역 */
+  /* 편집 스크롤 영역 (태블릿 베젤 확보) */
   #editor-container {
     position: absolute;
     top: 60px;
@@ -124,90 +119,52 @@
     right: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background-color: #000000;
+    background-color: #121212;
     display: flex;
     justify-content: center;
-    padding: 0;
+    padding: 24px 16px 120px 16px;
   }
   #editor-container::-webkit-scrollbar { display: none; }
 
-  /* 가로폭 완전 고정 래퍼 */
   #editor-wrapper {
     position: relative;
-    width: var(--content-fixed-width) !important;
-    min-width: var(--content-fixed-width) !important;
-    max-width: var(--content-fixed-width) !important;
-    min-height: 100%;
-    margin: 0 auto;
-    padding: 0;
-  }
-
-  /* 17줄 눈금선 레이어 (0px 오차 절대 고정) */
-  #slide-indicators-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none !important;
-    user-select: none;
-    z-index: 1;
-  }
-
-  .slide-boundary {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 1px;
-    border-bottom: 2px dashed rgba(255, 255, 255, 0.28);
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    pointer-events: none !important;
-  }
-
-  .slide-boundary-badge {
-    background-color: #1a1a1a;
-    border: 1px solid #555;
-    color: #b0b0b0;
-    font-size: 13px;
-    font-weight: bold;
-    padding: 2px 10px;
-    border-radius: 10px;
-    transform: translateY(-50%);
-    margin-right: 10px;
-    pointer-events: none !important;
-  }
-
-  /* 단일 무한 에디터 캔버스 (정수 라인 높이 적용) */
-  #main-editor {
-    position: relative;
-    z-index: 2;
     width: 100%;
+    max-width: var(--content-max-width);
     min-height: 100%;
-    background-color: transparent;
-    padding: 0 var(--content-padding-x) calc(100vh - 100px) var(--content-padding-x);
+    background-color: #000000;
+    border: 1px solid #282828;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+    padding: 20px 28px;
+  }
+
+  /* 단일 에디터 캔버스 */
+  #main-editor {
+    width: 100%;
+    min-height: 80vh;
     outline: none;
     font-size: var(--font-size);
-    line-height: var(--single-line-height) !important;
+    line-height: var(--line-height);
     font-weight: 500;
     word-break: keep-all;
     letter-spacing: normal;
     color: #ffffff;
     white-space: pre-wrap;
-    box-sizing: border-box;
   }
 
-  /* 엔터로 생기는 빈 줄 및 모든 자식 요소의 줄 높이를 완벽하게 48px로 강제 */
-  #main-editor *, #reader-camera-stage * {
-    line-height: var(--single-line-height) !important;
-    font-size: var(--font-size) !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  #main-editor div, #reader-camera-stage div,
-  #main-editor p, #reader-camera-stage p {
-    min-height: var(--single-line-height) !important;
+  /* 눈금선 구분선 스타일 (17줄 경계 표시) */
+  .slide-divider {
+    display: block;
+    user-select: none;
+    -webkit-user-select: none;
+    border-bottom: 2px dashed rgba(255, 255, 255, 0.28);
+    margin: 22px 0 16px 0;
+    text-align: right;
+    color: #a3a3a3;
+    font-size: 13px;
+    font-weight: bold;
+    padding-bottom: 4px;
+    pointer-events: none;
   }
 
   body.paint-mode #main-editor {
@@ -267,7 +224,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* ================= 전체화면 & 미리보기 (100% 무오차 뷰포트) ================= */
+  /* ================= 전체화면 & 미리보기 (1:1 데이터 출력 뷰어) ================= */
   #reader-container {
     display: none;
     height: 100vh;
@@ -278,38 +235,32 @@
     background-color: #000000;
     z-index: 10000000;
     user-select: none;
-    overflow: hidden;
   }
 
-  /* 상단 정확히 3줄 여백(144px) 확보 뷰포트 액자 */
-  #reader-viewport {
-    position: absolute;
-    top: calc(var(--single-line-height) * 3);
-    left: 50%;
-    transform: translateX(-50%);
-    width: var(--content-fixed-width) !important;
-    min-width: var(--content-fixed-width) !important;
-    max-width: var(--content-fixed-width) !important;
-    height: var(--slide-block-height) !important; /* 정확히 17줄 높이 816px */
-    overflow: hidden !important;
+  /* 상단 3줄 여백 확보 */
+  #reader-box {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: calc(var(--font-size) * var(--line-height) * 3);
     pointer-events: none;
   }
 
-  /* 원본 텍스트 1:1 카메라 무대 */
-  #reader-camera-stage {
-    width: var(--content-fixed-width) !important;
-    min-width: var(--content-fixed-width) !important;
-    max-width: var(--content-fixed-width) !important;
-    padding: 0 var(--content-padding-x);
+  /* 눈금과 눈금 사이의 내용이 그대로 나타나는 텍스트 본문 */
+  #reader-content {
+    width: 100%;
+    max-width: var(--content-max-width);
+    padding: 0 28px;
     font-size: var(--font-size);
-    line-height: var(--single-line-height) !important;
+    line-height: var(--line-height);
     font-weight: 500;
     word-break: keep-all;
     letter-spacing: normal;
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
-    transform: translateY(0px);
   }
 
   .touch-zone {
@@ -552,7 +503,6 @@
 
 <div id="editor-container">
   <div id="editor-wrapper">
-    <div id="slide-indicators-layer"></div>
     <div id="main-editor" contenteditable="true" spellcheck="false"></div>
   </div>
 </div>
@@ -562,14 +512,14 @@
 </div>
 <div id="quick-scroll-badge">1 슬라이드</div>
 
-<!-- 전체화면 & 미리보기 -->
+<!-- 전체화면 & 미리보기 (1:1 데이터 뷰어) -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
   <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
   
-  <div id="reader-viewport">
-    <div id="reader-camera-stage"></div>
+  <div id="reader-box">
+    <div id="reader-content"></div>
   </div>
   
   <div id="page-info"><span id="curr-page">1</span> / <span id="total-page">1</span></div>
@@ -605,12 +555,11 @@
   let lastPaintedKey = "";
   let activeColor = '#ef4444';
   let currentFontSize = 30;
-  let currentSingleLineHeight = 48; // 고정 정수 픽셀
-  let totalSlidesCount = 1;
+  let pagesData = [];
   let currentPageIndex = 0;
   let savedSelectionRange = null;
 
-  let editor, editorContainer, indicatorsLayer, cameraStage, scrollTrack, scrollThumb, scrollBadge;
+  let editor, editorContainer, readerContent, scrollTrack, scrollThumb, scrollBadge;
   let historyStack = [];
   const MAX_HISTORY = 30;
 
@@ -627,15 +576,13 @@
     const prev = historyStack.pop();
     editor.innerHTML = prev;
     saveEditorContent();
-    updateSlideIndicators();
     updateScrollThumbPosition();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     editor = document.getElementById('main-editor');
     editorContainer = document.getElementById('editor-container');
-    indicatorsLayer = document.getElementById('slide-indicators-layer');
-    cameraStage = document.getElementById('reader-camera-stage');
+    readerContent = document.getElementById('reader-content');
     scrollTrack = document.getElementById('quick-scrollbar-track');
     scrollThumb = document.getElementById('quick-scrollbar-thumb');
     scrollBadge = document.getElementById('quick-scroll-badge');
@@ -649,14 +596,13 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_perfect_zero_error_v26');
+      const saved = localStorage.getItem('yslide_direct_data_v28');
       if (saved) {
         editor.innerHTML = saved;
       }
     } catch(e){}
 
     initEventListeners();
-    updateSlideIndicators();
     updateScrollThumbPosition();
   });
 
@@ -675,43 +621,72 @@
   }
 
   function applyFontSize(size) {
-    // 폰트 크기에 맞는 정수 line-height 계산
-    currentSingleLineHeight = Math.round(size * 1.55);
-    const slideBlockHeight = currentSingleLineHeight * 17;
-
     document.documentElement.style.setProperty('--font-size', size + 'px');
-    document.documentElement.style.setProperty('--single-line-height', currentSingleLineHeight + 'px');
-    document.documentElement.style.setProperty('--slide-block-height', slideBlockHeight + 'px');
     const sizeVal = document.getElementById('size-val');
     if (sizeVal) sizeVal.innerText = size;
     
     try { localStorage.setItem('yslide_font_size', size); } catch(e){}
-    updateSlideIndicators();
+    // 글자 크기가 바뀌면 17줄 눈금선 위치 자동 재계산
+    formatSlidesWithDividers(false);
     updateScrollThumbPosition();
   }
 
-  /* 17줄 높이 단위로 에디터 위에 정밀 눈금선 생성 */
-  function updateSlideIndicators() {
-    try {
-      if (!editor || !indicatorsLayer) return;
-      const slideHeight = currentSingleLineHeight * 17;
-      const editorHeight = Math.max(editor.scrollHeight, window.innerHeight || 800);
-      totalSlidesCount = Math.max(1, Math.ceil(editorHeight / slideHeight));
+  /* 
+   * [핵심] 눈금선 생성 및 슬라이드 파싱 엔진
+   * 17줄 단위로 에디터 내부에 눈금선(`--- [ N ] ---`)을 정렬합니다.
+   */
+  function formatSlidesWithDividers(shouldPushHistory = true) {
+    if (!editor) return;
+    if (shouldPushHistory) pushHistory();
 
-      indicatorsLayer.innerHTML = '';
-      for (let i = 1; i <= totalSlidesCount; i++) {
-        const boundary = document.createElement('div');
-        boundary.className = 'slide-boundary';
-        boundary.style.top = `${slideHeight * i}px`;
+    const rawHtml = editor.innerHTML;
+    if (editor.innerText.trim() === '') return;
 
-        const badge = document.createElement('div');
-        badge.className = 'slide-boundary-badge';
-        badge.innerText = `[ ${i} ]`;
+    // 기존 눈금선 제거 후 순수 텍스트 줄 추출
+    let clean = rawHtml.replace(/<div class="slide-divider"[^>]*>[\s\S]*?<\/div>/gi, '\n---SPLIT---\n');
+    let lines = clean.replace(/<br\s*[\/]?>/gi, '\n')
+                     .replace(/<\/div>/gi, '\n')
+                     .replace(/<div>/gi, '')
+                     .replace(/<p>/gi, '')
+                     .replace(/<\/p>/gi, '\n')
+                     .split('\n')
+                     .filter(l => !l.includes('---SPLIT---'));
 
-        boundary.appendChild(badge);
-        indicatorsLayer.appendChild(boundary);
+    let result = [];
+    let currentLineCount = 0;
+    let pageNum = 1;
+
+    lines.forEach((line) => {
+      let temp = document.createElement('div');
+      temp.innerHTML = line;
+      let text = temp.textContent || '';
+      let MAX_CHARS = Math.max(18, Math.floor(864 / (currentFontSize * 1.05)));
+      let vCount = text.length === 0 ? 1 : Math.max(1, Math.ceil(text.length / MAX_CHARS));
+
+      if (currentLineCount + vCount > 17 && result.length > 0) {
+        result.push(`<div class="slide-divider" contenteditable="false">--- [ ${pageNum} ] ---</div>`);
+        pageNum++;
+        result.push(line);
+        currentLineCount = vCount;
+      } else {
+        result.push(line);
+        currentLineCount += vCount;
       }
-    } catch(e){}
+    });
+
+    editor.innerHTML = result.join('<br>');
+    saveEditorContent();
+  }
+
+  /* 
+   * [1:1 데이터 추출] 눈금선 사이의 내용을 그대로 슬라이드 배열로 추출 (오차 0.00%)
+   */
+  function getSlidesDirect() {
+    const rawHtml = editor.innerHTML;
+    if (editor.innerText.trim() === '') return [];
+
+    const sections = rawHtml.split(/<div class="slide-divider"[^>]*>[\s\S]*?<\/div>/gi);
+    return sections.map(s => s.trim()).filter(s => s !== '' && s !== '<br>');
   }
 
   function updateScrollThumbPosition() {
@@ -826,15 +801,14 @@
 
     editor.addEventListener('input', () => {
       saveEditorContent();
-      updateSlideIndicators();
       updateScrollThumbPosition();
     });
 
     editor.addEventListener('paste', () => {
       pushHistory();
       setTimeout(() => {
+        formatSlidesWithDividers(false);
         saveEditorContent();
-        updateSlideIndicators();
         updateScrollThumbPosition();
       }, 10);
     });
@@ -868,7 +842,8 @@
     editorContainer.scrollTop = progress * maxScroll;
     scrollThumb.style.top = `${offsetY}px`;
 
-    const slideHeight = currentSingleLineHeight * 17;
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
     const currentSlide = Math.floor(editorContainer.scrollTop / slideHeight) + 1;
     scrollBadge.innerText = `${currentSlide} 슬라이드`;
   }
@@ -936,7 +911,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave && editor) {
-      try { localStorage.setItem('yslide_perfect_zero_error_v26', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_direct_data_v28', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1043,8 +1018,8 @@ ${content}`;
         translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
         pushHistory();
         editor.innerHTML = translatedHtml;
+        formatSlidesWithDividers(false);
         saveEditorContent();
-        updateSlideIndicators();
         updateScrollThumbPosition();
         showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
       } else {
@@ -1134,7 +1109,6 @@ ${content}`;
     pushHistory();
     editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
     saveEditorContent();
-    updateSlideIndicators();
     updateScrollThumbPosition();
     closeStorageModal();
     showQuickToast("📂 문서를 불러왔습니다");
@@ -1201,8 +1175,8 @@ ${content}`;
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           editor.innerHTML = parsed.join('<br>');
+          formatSlidesWithDividers(false);
           saveEditorContent();
-          updateSlideIndicators();
           updateScrollThumbPosition();
           saveDocumentToArchive(editor.innerHTML);
           showQuickToast("📂 파일을 불러왔습니다");
@@ -1210,8 +1184,8 @@ ${content}`;
         }
       } catch (err) {}
       editor.innerHTML = raw.replace(/\n/g, '<br>');
+      formatSlidesWithDividers(false);
       saveEditorContent();
-      updateSlideIndicators();
       updateScrollThumbPosition();
       saveDocumentToArchive(editor.innerHTML);
       showQuickToast("📂 텍스트를 불러왔습니다");
@@ -1220,7 +1194,8 @@ ${content}`;
   }
 
   function printSermonDocument() {
-    if (editor.innerText.trim() === '') {
+    const slides = getSlidesDirect();
+    if (slides.length === 0) {
       showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
       return;
     }
@@ -1228,48 +1203,33 @@ ${content}`;
     const printContainer = document.getElementById('print-container');
     printContainer.innerHTML = '';
 
-    const slideHeight = currentSingleLineHeight * 17;
-    const totalSlides = totalSlidesCount;
-
-    for (let i = 0; i < totalSlides; i++) {
+    slides.forEach((slideHtml, index) => {
       const pageDiv = document.createElement('div');
       pageDiv.className = 'print-slide-page';
 
       const headerDiv = document.createElement('div');
       headerDiv.className = 'print-slide-header';
-      headerDiv.innerText = `[ ${i + 1} / ${totalSlides} ]`;
-
-      const maskBox = document.createElement('div');
-      maskBox.style.height = `${slideHeight}px`;
-      maskBox.style.overflow = 'hidden';
-      maskBox.style.position = 'relative';
+      headerDiv.innerText = `[ ${index + 1} / ${slides.length} ]`;
 
       const bodyDiv = document.createElement('div');
       bodyDiv.className = 'print-slide-body';
-      bodyDiv.innerHTML = editor.innerHTML;
-      bodyDiv.style.transform = `translateY(-${slideHeight * i}px)`;
+      bodyDiv.innerHTML = slideHtml;
 
-      maskBox.appendChild(bodyDiv);
       pageDiv.appendChild(headerDiv);
-      pageDiv.appendChild(maskBox);
+      pageDiv.appendChild(bodyDiv);
       printContainer.appendChild(pageDiv);
-    }
+    });
 
     window.print();
   }
 
-  /* 
-   * [100% 무오차 뷰포트 스냅 뷰] 
-   * 원본 에디터 내용을 그대로 복제하고, 17줄 블록 높이만큼 카메라를 스냅 이동합니다.
-   */
+  /* 1:1 데이터 직접 매칭 전체모드 시작 */
   function startSermonMode(targetPageIndex = 0) {
-    if (!editor || editor.innerText.trim() === '') return;
+    pagesData = getSlidesDirect();
+    if (pagesData.length === 0) return;
 
-    updateSlideIndicators();
-    cameraStage.innerHTML = editor.innerHTML; // 원본 1:1 복제
-
-    currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlidesCount - 1);
-    updateReaderCamera();
+    currentPageIndex = Math.min(Math.max(0, targetPageIndex), pagesData.length - 1);
+    updateReaderContent();
 
     document.getElementById('reader-container').style.display = 'block';
     isReaderMode = true;
@@ -1283,9 +1243,13 @@ ${content}`;
 
   /* 현재 편집 위치 기준 1:1 미리보기 */
   function startPreviewCurrentSlide() {
-    const slideHeight = currentSingleLineHeight * 17;
+    pagesData = getSlidesDirect();
+    if (pagesData.length === 0) return;
+
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
     const currentViewY = editorContainer.scrollTop;
-    const currentSlideIndex = Math.max(0, Math.floor((currentViewY + 20) / slideHeight));
+    const currentSlideIndex = Math.max(0, Math.floor((currentViewY + 30) / slideHeight));
     startSermonMode(currentSlideIndex);
   }
 
@@ -1302,27 +1266,24 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 카메라의 Y축 위치를 정확히 [17줄 높이 * 슬라이드 인덱스]만큼 스냅 이동 */
-  function updateReaderCamera() {
-    const slideHeight = currentSingleLineHeight * 17;
-    const offsetY = slideHeight * currentPageIndex;
-
-    cameraStage.style.transform = `translateY(-${offsetY}px)`;
+  /* 눈금선 사이의 내용을 그대로 출력 */
+  function updateReaderContent() {
+    readerContent.innerHTML = pagesData[currentPageIndex] || '';
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
-    document.getElementById('total-page').innerText = totalSlidesCount;
+    document.getElementById('total-page').innerText = pagesData.length;
   }
 
   function nextPage() {
-    if (currentPageIndex < totalSlidesCount - 1) {
+    if (currentPageIndex < pagesData.length - 1) {
       currentPageIndex++;
-      updateReaderCamera();
+      updateReaderContent();
     }
   }
 
   function prevPage() {
     if (currentPageIndex > 0) {
       currentPageIndex--;
-      updateReaderCamera();
+      updateReaderContent();
     }
   }
 </script>
