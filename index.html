@@ -45,7 +45,7 @@
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
   }
 
-  /* 상단 고정 툴바 (최상위 레이어) */
+  /* 상단 고정 툴바 */
   #toolbar {
     position: fixed;
     top: 0;
@@ -59,7 +59,6 @@
     padding: 0 16px;
     border-bottom: 1px solid #333;
     z-index: 999999;
-    pointer-events: auto;
   }
   .btn-group { display: flex; gap: 8px; align-items: center; }
   
@@ -127,7 +126,6 @@
     display: flex;
     justify-content: center;
     padding: 0;
-    z-index: 10;
   }
   #editor-container::-webkit-scrollbar { display: none; }
 
@@ -136,16 +134,16 @@
     width: 100%;
     max-width: var(--content-max-width);
     min-height: 100%;
-    pointer-events: none;
   }
 
+  /* 17줄 눈금선 레이어 (완전 투과) */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
     left: 0;
     right: 0;
     bottom: 0;
-    pointer-events: none;
+    pointer-events: none !important;
     user-select: none;
     z-index: 1;
   }
@@ -155,26 +153,27 @@
     left: 0;
     right: 0;
     height: 1px;
-    border-bottom: 2px dashed rgba(255, 255, 255, 0.25);
+    border-bottom: 2px dashed rgba(255, 255, 255, 0.28);
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    pointer-events: none;
+    pointer-events: none !important;
   }
 
   .slide-boundary-badge {
     background-color: #1a1a1a;
-    border: 1px solid #444;
-    color: #a3a3a3;
+    border: 1px solid #555;
+    color: #b0b0b0;
     font-size: 13px;
     font-weight: bold;
     padding: 2px 10px;
     border-radius: 10px;
     transform: translateY(-50%);
     margin-right: 20px;
-    pointer-events: none;
+    pointer-events: none !important;
   }
 
+  /* 에디터 본문 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -191,7 +190,6 @@
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
-    pointer-events: auto;
   }
 
   body.paint-mode #main-editor {
@@ -200,19 +198,18 @@
     -webkit-user-select: none;
   }
 
-  /* 고속 퀵스크롤러 (최상위 레이어) */
+  /* 고속 퀵스크롤러 */
   #quick-scrollbar-track {
     position: fixed;
     top: 70px;
     right: 6px;
     bottom: 20px;
     width: 36px;
-    z-index: 999998;
+    z-index: 99998;
     display: flex;
     justify-content: center;
     user-select: none;
     touch-action: none;
-    pointer-events: auto;
   }
   #quick-scrollbar-thumb {
     position: absolute;
@@ -244,7 +241,7 @@
     border-radius: 20px;
     font-size: 15px;
     font-weight: bold;
-    z-index: 999999;
+    z-index: 99999;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -425,6 +422,7 @@
     align-items: center;
   }
 
+  /* 인쇄 전용 스타일 */
   #print-container { display: none; }
 
   @media print {
@@ -478,7 +476,7 @@
       </svg>
     </button>
 
-    <button class="btn-icon" onclick="printSermonDocument()" title="전체화면 슬라이드 기준 인쇄 (1장씩 출력)">
+    <button class="btn-icon" onclick="printSermonDocument()" title="전체화면 슬라이드 기준 인쇄">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <polyline points="6 9 6 2 18 2 18 9"></polyline>
         <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -539,7 +537,7 @@
 </div>
 <div id="quick-scroll-badge">1 슬라이드</div>
 
-<!-- 전체모드 & 미리보기 -->
+<!-- 전체모드 -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
@@ -596,10 +594,10 @@
   const MAX_HISTORY = 30;
 
   function pushHistory() {
-    historyStack.push(editor.innerHTML);
-    if (historyStack.length > MAX_HISTORY) {
-      historyStack.shift();
-    }
+    try {
+      historyStack.push(editor.innerHTML);
+      if (historyStack.length > MAX_HISTORY) historyStack.shift();
+    } catch(e){}
   }
 
   function undoState() {
@@ -612,27 +610,31 @@
   }
 
   window.onload = () => {
-    const savedSize = localStorage.getItem('yslide_font_size');
-    if (savedSize) {
-      currentFontSize = parseInt(savedSize, 10);
-    } else {
-      currentFontSize = 30;
-    }
-    applyFontSize(currentFontSize);
+    try {
+      const savedSize = localStorage.getItem('yslide_font_size');
+      if (savedSize) {
+        currentFontSize = parseInt(savedSize, 10);
+      } else {
+        currentFontSize = 30;
+      }
+      applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_final_fix_v13');
-    if (saved) {
-      editor.innerHTML = saved;
-    }
+      const saved = localStorage.getItem('yslide_stable_v14');
+      if (saved) {
+        editor.innerHTML = saved;
+      }
+    } catch(e){}
     updateSlideIndicators();
     updateScrollThumbPosition();
   };
 
   function saveCurrentSelection() {
-    const sel = window.getSelection();
-    if (sel.rangeCount > 0) {
-      savedSelectionRange = sel.getRangeAt(0);
-    }
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        savedSelectionRange = sel.getRangeAt(0);
+      }
+    } catch(e){}
   }
 
   document.addEventListener('selectionchange', () => {
@@ -665,42 +667,47 @@
   function applyFontSize(size) {
     document.documentElement.style.setProperty('--font-size', size + 'px');
     document.getElementById('size-val').innerText = size;
-    localStorage.setItem('yslide_font_size', size);
+    try { localStorage.setItem('yslide_font_size', size); } catch(e){}
     updateSlideIndicators();
     updateScrollThumbPosition();
   }
 
+  /* 17줄 슬라이드 눈금선 안정화 렌더러 */
   function updateSlideIndicators() {
-    const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17;
-    const editorHeight = Math.max(editor.scrollHeight, window.innerHeight);
-    const totalSlides = Math.max(1, Math.ceil(editorHeight / slideHeight));
+    try {
+      const singleLineHeight = currentFontSize * 1.45;
+      const slideHeight = singleLineHeight * 17;
+      const editorHeight = Math.max(editor.scrollHeight, window.innerHeight || 800);
+      const totalSlides = Math.max(1, Math.ceil(editorHeight / slideHeight));
 
-    indicatorsLayer.innerHTML = '';
-    for (let i = 1; i <= totalSlides; i++) {
-      const boundary = document.createElement('div');
-      boundary.className = 'slide-boundary';
-      boundary.style.top = `${slideHeight * i}px`;
+      indicatorsLayer.innerHTML = '';
+      for (let i = 1; i <= totalSlides; i++) {
+        const boundary = document.createElement('div');
+        boundary.className = 'slide-boundary';
+        boundary.style.top = `${slideHeight * i}px`;
 
-      const badge = document.createElement('div');
-      badge.className = 'slide-boundary-badge';
-      badge.innerText = `[ ${i} ]`;
+        const badge = document.createElement('div');
+        badge.className = 'slide-boundary-badge';
+        badge.innerText = `[ ${i} ]`;
 
-      boundary.appendChild(badge);
-      indicatorsLayer.appendChild(boundary);
-    }
+        boundary.appendChild(badge);
+        indicatorsLayer.appendChild(boundary);
+      }
+    } catch(e){}
   }
 
   function updateScrollThumbPosition() {
-    const scrollHeight = editorContainer.scrollHeight - editorContainer.clientHeight;
-    if (scrollHeight <= 0) {
-      scrollThumb.style.display = 'none';
-      return;
-    }
-    scrollThumb.style.display = 'block';
-    const trackHeight = scrollTrack.clientHeight - scrollThumb.offsetHeight;
-    const progress = editorContainer.scrollTop / scrollHeight;
-    scrollThumb.style.top = `${progress * trackHeight}px`;
+    try {
+      const scrollHeight = editorContainer.scrollHeight - editorContainer.clientHeight;
+      if (scrollHeight <= 0) {
+        scrollThumb.style.display = 'none';
+        return;
+      }
+      scrollThumb.style.display = 'block';
+      const trackHeight = scrollTrack.clientHeight - scrollThumb.offsetHeight;
+      const progress = editorContainer.scrollTop / scrollHeight;
+      scrollThumb.style.top = `${progress * trackHeight}px`;
+    } catch(e){}
   }
 
   editorContainer.addEventListener('scroll', () => {
@@ -879,7 +886,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_final_fix_v13', editor.innerHTML);
+      try { localStorage.setItem('yslide_stable_v14', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -982,4 +989,304 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
+        pushHistory();
+        editor.innerHTML = translatedHtml;
+        saveEditorContent();
+        updateSlideIndicators();
+        updateScrollThumbPosition();
+        showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
+      } else {
+        showQuickToast("⚠️ 번역 결과를 받지 못했습니다.");
+      }
+    } catch (err) {
+      alert("네트워크 오류로 번역에 실패했습니다: " + err.message);
+    }
+  }
+
+  function getStoredDocuments() {
+    try {
+      const stored = localStorage.getItem('yslide_saved_archive');
+      return stored ? JSON.parse(stored) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveDocumentToArchive(contentHtml) {
+    try {
+      const archive = getStoredDocuments();
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = contentHtml;
+      const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
+      const title = firstLine.substring(0, 30);
+
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      const newDoc = {
+        id: 'doc_' + Date.now(),
+        title: title,
+        preview: (tempDiv.textContent || '').substring(0, 80),
+        date: timeStr,
+        html: contentHtml
+      };
+
+      archive.unshift(newDoc);
+      if (archive.length > 50) archive.pop();
+      localStorage.setItem('yslide_saved_archive', JSON.stringify(archive));
+    } catch(e){}
+  }
+
+  function openStorageModal() {
+    renderDocumentGrid();
+    document.getElementById('storage-modal').style.display = 'flex';
+  }
+
+  function closeStorageModal() {
+    document.getElementById('storage-modal').style.display = 'none';
+  }
+
+  function renderDocumentGrid() {
+    const grid = document.getElementById('doc-grid');
+    const docs = getStoredDocuments();
+
+    if (docs.length === 0) {
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 60px 0;">보관된 문서가 없습니다.<br>상단 💾 버튼을 누르면 이 보관함에 자동 저장됩니다.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    docs.forEach(doc => {
+      const card = document.createElement('div');
+      card.className = 'doc-card';
+      card.innerHTML = `
+        <button class="doc-del-btn" title="삭제" onclick="deleteStoredDoc('${doc.id}', event)">✕</button>
+        <div>
+          <div class="doc-title">${doc.title}</div>
+          <div class="doc-preview">${doc.preview}</div>
+        </div>
+        <div class="doc-footer">
+          <span>${doc.date}</span>
+        </div>
+      `;
+      card.onclick = () => loadDocumentFromArchive(doc.id);
+      grid.appendChild(card);
+    });
+  }
+
+  function loadDocumentFromArchive(docId) {
+    const docs = getStoredDocuments();
+    const target = docs.find(d => d.id === docId);
+    if (!target) return;
+
+    pushHistory();
+    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
+    saveEditorContent();
+    updateSlideIndicators();
+    updateScrollThumbPosition();
+    closeStorageModal();
+    showQuickToast("📂 문서를 불러왔습니다");
+  }
+
+  function deleteStoredDoc(docId, e) {
+    e.stopPropagation();
+    let docs = getStoredDocuments();
+    docs = docs.filter(d => d.id !== docId);
+    try { localStorage.setItem('yslide_saved_archive', JSON.stringify(docs)); } catch(err){}
+    renderDocumentGrid();
+  }
+
+  async function saveToFile() {
+    const content = editor.innerHTML;
+    if (editor.innerText.trim() === '') {
+      showQuickToast("⚠️ 저장할 내용이 없습니다.");
+      return;
+    }
+
+    saveDocumentToArchive(content);
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const defaultFilename = `Yslide_${dateStr}.txt`;
+
+    if (window.showSaveFilePicker) {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFilename,
+          types: [{
+            description: '텍스트 파일 (.txt, .json)',
+            accept: { 'text/plain': ['.txt', '.json'] }
+          }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        showQuickToast("💾 파일이 저장되었습니다");
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = defaultFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showQuickToast("💾 파일이 저장되었습니다");
+  }
+
+  function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    pushHistory();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          editor.innerHTML = parsed.join('<br>');
+          saveEditorContent();
+          updateSlideIndicators();
+          updateScrollThumbPosition();
+          saveDocumentToArchive(editor.innerHTML);
+          showQuickToast("📂 파일을 불러왔습니다");
+          return;
+        }
+      } catch (err) {}
+      editor.innerHTML = raw.replace(/\n/g, '<br>');
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+      saveDocumentToArchive(editor.innerHTML);
+      showQuickToast("📂 텍스트를 불러왔습니다");
+    };
+    reader.readAsText(files[0], 'utf-8');
+  }
+
+  function normalizeHtmlToLines(html) {
+    let s = html.replace(/<br\s*[\/]?>/gi, '\n')
+                .replace(/<\/div>/gi, '\n')
+                .replace(/<div>/gi, '')
+                .replace(/<p>/gi, '')
+                .replace(/<\/p>/gi, '\n');
+    return s.split('\n');
+  }
+
+  function calculateSlides() {
+    const rawLines = normalizeHtmlToLines(editor.innerHTML);
+    if (editor.innerText.trim() === '') return [];
+
+    const slides = [];
+    const LINES_PER_SLIDE = 17;
+
+    for (let i = 0; i < rawLines.length; i += LINES_PER_SLIDE) {
+      const slideChunk = rawLines.slice(i, i + LINES_PER_SLIDE);
+      const slideHtml = slideChunk.join('<br>');
+      if (slideHtml.trim() !== '') {
+        slides.push(slideHtml);
+      }
+    }
+    return slides;
+  }
+
+  function printSermonDocument() {
+    const slides = calculateSlides();
+    if (slides.length === 0) {
+      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
+      return;
+    }
+
+    const printContainer = document.getElementById('print-container');
+    printContainer.innerHTML = '';
+
+    slides.forEach((slideHtml, index) => {
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'print-slide-page';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'print-slide-header';
+      headerDiv.innerText = `[ ${index + 1} / ${slides.length} ]`;
+
+      const bodyDiv = document.createElement('div');
+      bodyDiv.className = 'print-slide-body';
+      bodyDiv.innerHTML = slideHtml;
+
+      pageDiv.appendChild(headerDiv);
+      pageDiv.appendChild(bodyDiv);
+      printContainer.appendChild(pageDiv);
+    });
+
+    window.print();
+  }
+
+  function startSermonMode(targetPageIndex = 0) {
+    pagesData = calculateSlides();
+    if (pagesData.length === 0) return;
+
+    currentPageIndex = Math.min(Math.max(0, targetPageIndex), pagesData.length - 1);
+    updateReader();
+
+    document.getElementById('reader-container').style.display = 'block';
+    isReaderMode = true;
+
+    try {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
+      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+    } catch(e){}
+  }
+
+  function startPreviewCurrentSlide() {
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+    const currentViewY = editorContainer.scrollTop + 50;
+    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / slideHeight));
+    startSermonMode(currentSlideIndex);
+  }
+
+  function exitSermonMode() {
+    document.getElementById('reader-container').style.display = 'none';
+    isReaderMode = false;
+
+    try {
+      if (document.exitFullscreen && document.fullscreenElement) {
+        document.exitFullscreen().catch(()=>{});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    } catch(e){}
+  }
+
+  function updateReader() {
+    document.getElementById('reader-content').innerHTML = pagesData[currentPageIndex] || '';
+    document.getElementById('curr-page').innerText = currentPageIndex + 1;
+    document.getElementById('total-page').innerText = pagesData.length;
+  }
+
+  function nextPage() {
+    if (currentPageIndex < pagesData.length - 1) {
+      currentPageIndex++;
+      updateReader();
+    }
+  }
+  function prevPage() {
+    if (currentPageIndex > 0) {
+      currentPageIndex--;
+      updateReader();
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!isReaderMode) return;
+    if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) nextPage();
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) prevPage();
+    if (e.key === 'Escape') exitSermonMode();
+  });
+</script>
+</body>
+</html>
