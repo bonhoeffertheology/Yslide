@@ -19,7 +19,7 @@
     --font-size: 30px;
     --line-height: 1.45;
     --single-line-height: calc(var(--font-size) * var(--line-height));
-    /* 전체화면 기준 17줄 분량의 슬라이드 높이 */
+    /* 정확히 17줄 분량의 슬라이드 높이 */
     --slide-block-height: calc(var(--single-line-height) * 17);
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -138,7 +138,7 @@
     padding: 0;
   }
 
-  /* 뷰어 기준 눈금선 오버레이 레이어 (전체화면 한 화면 크기와 1:1 완벽 일치) */
+  /* 17줄 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 0;
@@ -251,7 +251,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* ================= 전체화면 & 미리보기 (100% 뷰포트 스냅 뷰) ================= */
+  /* 전체화면 & 미리보기 */
   #reader-container {
     display: none;
     height: 100vh;
@@ -265,7 +265,6 @@
     overflow: hidden;
   }
 
-  /* 상단 3줄 여백 확보 뷰포트 액자 */
   #reader-viewport {
     position: absolute;
     top: calc(var(--font-size) * var(--line-height) * 3);
@@ -273,12 +272,11 @@
     transform: translateX(-50%);
     width: 100%;
     max-width: var(--content-max-width);
-    height: var(--slide-block-height); /* 눈금선 간격과 1:1 일치 */
+    height: var(--slide-block-height);
     overflow: hidden;
     pointer-events: none;
   }
 
-  /* 원본 텍스트를 그대로 비추는 무대 */
   #reader-camera-stage {
     width: 100%;
     padding: 0 var(--content-padding-x);
@@ -543,7 +541,7 @@
 </div>
 <div id="quick-scroll-badge">1 슬라이드</div>
 
-<!-- 전체화면 & 미리보기 (100% 뷰포트 스냅 뷰) -->
+<!-- 전체화면 & 미리보기 -->
 <div id="reader-container">
   <button id="exit-btn" onclick="exitSermonMode()" title="종료">✕</button>
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
@@ -590,19 +588,13 @@
   let currentPageIndex = 0;
   let savedSelectionRange = null;
 
-  const editor = document.getElementById('main-editor');
-  const editorContainer = document.getElementById('editor-container');
-  const indicatorsLayer = document.getElementById('slide-indicators-layer');
-  const cameraStage = document.getElementById('reader-camera-stage');
-  const scrollTrack = document.getElementById('quick-scrollbar-track');
-  const scrollThumb = document.getElementById('quick-scrollbar-thumb');
-  const scrollBadge = document.getElementById('quick-scroll-badge');
-
+  let editor, editorContainer, indicatorsLayer, cameraStage, scrollTrack, scrollThumb, scrollBadge;
   let historyStack = [];
   const MAX_HISTORY = 30;
 
   function pushHistory() {
     try {
+      if (!editor) return;
       historyStack.push(editor.innerHTML);
       if (historyStack.length > MAX_HISTORY) historyStack.shift();
     } catch(e){}
@@ -617,7 +609,15 @@
     updateScrollThumbPosition();
   }
 
-  window.onload = () => {
+  document.addEventListener('DOMContentLoaded', () => {
+    editor = document.getElementById('main-editor');
+    editorContainer = document.getElementById('editor-container');
+    indicatorsLayer = document.getElementById('slide-indicators-layer');
+    cameraStage = document.getElementById('reader-camera-stage');
+    scrollTrack = document.getElementById('quick-scrollbar-track');
+    scrollThumb = document.getElementById('quick-scrollbar-thumb');
+    scrollBadge = document.getElementById('quick-scroll-badge');
+
     try {
       const savedSize = localStorage.getItem('yslide_font_size');
       if (savedSize) {
@@ -627,14 +627,16 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_viewport_master_v24');
+      const saved = localStorage.getItem('yslide_clean_stable_v25');
       if (saved) {
         editor.innerHTML = saved;
       }
     } catch(e){}
+
+    initEventListeners();
     updateSlideIndicators();
     updateScrollThumbPosition();
-  };
+  });
 
   function saveCurrentSelection() {
     try {
@@ -645,56 +647,32 @@
     } catch(e){}
   }
 
-  document.addEventListener('selectionchange', () => {
-    if (!isContinuousMode && document.activeElement === editor) {
-      saveCurrentSelection();
-    }
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (isContinuousMode && isMouseDown) {
-      isMouseDown = false;
-      lastPaintedKey = "";
-      saveEditorContent();
-    }
-  });
-
-  window.addEventListener('touchend', () => {
-    if (isContinuousMode) {
-      isMouseDown = false;
-      lastPaintedKey = "";
-      saveEditorContent();
-    }
-  });
-
   function stepFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     applyFontSize(currentFontSize);
   }
 
-  /* 글자 크기 변경 시 눈금선과 전체화면 뷰포트 높이 실시간 동기화 */
   function applyFontSize(size) {
     const singleLineHeight = size * 1.45;
     const slideBlockHeight = singleLineHeight * 17;
 
     document.documentElement.style.setProperty('--font-size', size + 'px');
     document.documentElement.style.setProperty('--slide-block-height', slideBlockHeight + 'px');
-    document.getElementById('size-val').innerText = size;
+    const sizeVal = document.getElementById('size-val');
+    if (sizeVal) sizeVal.innerText = size;
     
     try { localStorage.setItem('yslide_font_size', size); } catch(e){}
     updateSlideIndicators();
     updateScrollThumbPosition();
   }
 
-  /* 
-   * [핵심] 전체화면 1슬라이드 뷰포트 높이 기준으로 눈금선 생성 
-   * 글자 크기를 바꾸더라도 항상 전체화면에 담기는 정확한 분량마다 눈금선이 배치됩니다.
-   */
+  /* 17줄 뷰포트 높이 기준 실시간 눈금선 생성 */
   function updateSlideIndicators() {
     try {
+      if (!editor || !indicatorsLayer) return;
       const singleLineHeight = currentFontSize * 1.45;
       const slideHeight = singleLineHeight * 17;
-      const editorHeight = Math.max(editor.scrollHeight, 0);
+      const editorHeight = Math.max(editor.scrollHeight, window.innerHeight || 800);
       totalSlidesCount = Math.max(1, Math.ceil(editorHeight / slideHeight));
 
       indicatorsLayer.innerHTML = '';
@@ -715,6 +693,7 @@
 
   function updateScrollThumbPosition() {
     try {
+      if (!editorContainer || !scrollTrack || !scrollThumb) return;
       const scrollHeight = editorContainer.scrollHeight - editorContainer.clientHeight;
       if (scrollHeight <= 0) {
         scrollThumb.style.display = 'none';
@@ -727,15 +706,123 @@
     } catch(e){}
   }
 
-  editorContainer.addEventListener('scroll', () => {
-    if (!isDraggingScroll) {
-      updateScrollThumbPosition();
-    }
-  });
-
   let isDraggingScroll = false;
   let startDragY = 0;
   let startScrollTop = 0;
+
+  function initEventListeners() {
+    document.addEventListener('selectionchange', () => {
+      if (!isContinuousMode && document.activeElement === editor) {
+        saveCurrentSelection();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isContinuousMode && isMouseDown) {
+        isMouseDown = false;
+        lastPaintedKey = "";
+        saveEditorContent();
+      }
+    });
+
+    window.addEventListener('touchend', () => {
+      if (isContinuousMode) {
+        isMouseDown = false;
+        lastPaintedKey = "";
+        saveEditorContent();
+      }
+    });
+
+    editorContainer.addEventListener('scroll', () => {
+      if (!isDraggingScroll) {
+        updateScrollThumbPosition();
+      }
+    });
+
+    scrollTrack.addEventListener('touchstart', (e) => {
+      onScrollDragStart(e.touches[0].clientY);
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (isDraggingScroll) {
+        onScrollDragMove(e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', onScrollDragEnd);
+
+    scrollTrack.addEventListener('mousedown', (e) => {
+      onScrollDragStart(e.clientY);
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isDraggingScroll) {
+        onScrollDragMove(e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('mouseup', onScrollDragEnd);
+
+    editor.addEventListener('touchstart', (e) => {
+      if (isContinuousMode) {
+        pushHistory();
+        isMouseDown = true;
+        const touch = e.touches[0];
+        paintWordAtPoint(touch.clientX, touch.clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    editor.addEventListener('touchmove', (e) => {
+      if (isContinuousMode && isMouseDown) {
+        const touch = e.touches[0];
+        paintWordAtPoint(touch.clientX, touch.clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    editor.addEventListener('mousedown', (e) => {
+      if (isContinuousMode) {
+        pushHistory();
+        isMouseDown = true;
+        paintWordAtPoint(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    editor.addEventListener('mousemove', (e) => {
+      if (isContinuousMode && isMouseDown) {
+        paintWordAtPoint(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    editor.addEventListener('input', () => {
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+    });
+
+    editor.addEventListener('paste', () => {
+      pushHistory();
+      setTimeout(() => {
+        saveEditorContent();
+        updateSlideIndicators();
+        updateScrollThumbPosition();
+      }, 10);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (!isReaderMode) return;
+      if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) nextPage();
+      if (['ArrowLeft', 'PageUp'].includes(e.key)) prevPage();
+      if (e.key === 'Escape') exitSermonMode();
+    });
+  }
 
   function onScrollDragStart(clientY) {
     isDraggingScroll = true;
@@ -771,34 +858,6 @@
       scrollBadge.classList.remove('show');
     }
   }
-
-  scrollTrack.addEventListener('touchstart', (e) => {
-    onScrollDragStart(e.touches[0].clientY);
-    e.preventDefault();
-  }, { passive: false });
-
-  window.addEventListener('touchmove', (e) => {
-    if (isDraggingScroll) {
-      onScrollDragMove(e.touches[0].clientY);
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  window.addEventListener('touchend', onScrollDragEnd);
-
-  scrollTrack.addEventListener('mousedown', (e) => {
-    onScrollDragStart(e.clientY);
-    e.preventDefault();
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (isDraggingScroll) {
-      onScrollDragMove(e.clientY);
-      e.preventDefault();
-    }
-  });
-
-  window.addEventListener('mouseup', onScrollDragEnd);
 
   function paintWordAtPoint(x, y) {
     let range;
@@ -853,64 +912,16 @@
     }
   }
 
-  editor.addEventListener('touchstart', (e) => {
-    if (isContinuousMode) {
-      pushHistory();
-      isMouseDown = true;
-      const touch = e.touches[0];
-      paintWordAtPoint(touch.clientX, touch.clientY);
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  editor.addEventListener('touchmove', (e) => {
-    if (isContinuousMode && isMouseDown) {
-      const touch = e.touches[0];
-      paintWordAtPoint(touch.clientX, touch.clientY);
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  editor.addEventListener('mousedown', (e) => {
-    if (isContinuousMode) {
-      pushHistory();
-      isMouseDown = true;
-      paintWordAtPoint(e.clientX, e.clientY);
-      e.preventDefault();
-    }
-  });
-
-  editor.addEventListener('mousemove', (e) => {
-    if (isContinuousMode && isMouseDown) {
-      paintWordAtPoint(e.clientX, e.clientY);
-      e.preventDefault();
-    }
-  });
-
-  editor.addEventListener('input', () => {
-    saveEditorContent();
-    updateSlideIndicators();
-    updateScrollThumbPosition();
-  });
-
-  editor.addEventListener('paste', () => {
-    pushHistory();
-    setTimeout(() => {
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
-    }, 10);
-  });
-
   function saveEditorContent(shouldSave = true) {
-    if (shouldSave) {
-      try { localStorage.setItem('yslide_viewport_master_v24', editor.innerHTML); } catch(e){}
+    if (shouldSave && editor) {
+      try { localStorage.setItem('yslide_clean_stable_v25', editor.innerHTML); } catch(e){}
     }
   }
 
   let toastTimer = null;
   function showQuickToast(msg = "💾 저장되었습니다") {
     const toast = document.getElementById('toast-msg');
+    if (!toast) return;
     toast.innerText = msg;
     toast.classList.add('show');
     
@@ -1007,4 +1018,291 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
+        pushHistory();
+        editor.innerHTML = translatedHtml;
+        saveEditorContent();
+        updateSlideIndicators();
+        updateScrollThumbPosition();
+        showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
+      } else {
+        showQuickToast("⚠️ 번역 결과를 받지 못했습니다.");
+      }
+    } catch (err) {
+      alert("네트워크 오류로 번역에 실패했습니다: " + err.message);
+    }
+  }
+
+  function getStoredDocuments() {
+    try {
+      const stored = localStorage.getItem('yslide_saved_archive');
+      return stored ? JSON.parse(stored) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveDocumentToArchive(contentHtml) {
+    try {
+      const archive = getStoredDocuments();
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = contentHtml;
+      const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
+      const title = firstLine.substring(0, 30);
+
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      const newDoc = {
+        id: 'doc_' + Date.now(),
+        title: title,
+        preview: (tempDiv.textContent || '').substring(0, 80),
+        date: timeStr,
+        html: contentHtml
+      };
+
+      archive.unshift(newDoc);
+      if (archive.length > 50) archive.pop();
+      localStorage.setItem('yslide_saved_archive', JSON.stringify(archive));
+    } catch(e){}
+  }
+
+  function openStorageModal() {
+    renderDocumentGrid();
+    document.getElementById('storage-modal').style.display = 'flex';
+  }
+
+  function closeStorageModal() {
+    document.getElementById('storage-modal').style.display = 'none';
+  }
+
+  function renderDocumentGrid() {
+    const grid = document.getElementById('doc-grid');
+    const docs = getStoredDocuments();
+
+    if (docs.length === 0) {
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 60px 0;">보관된 문서가 없습니다.<br>상단 💾 버튼을 누르면 이 보관함에 자동 저장됩니다.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    docs.forEach(doc => {
+      const card = document.createElement('div');
+      card.className = 'doc-card';
+      card.innerHTML = `
+        <button class="doc-del-btn" title="삭제" onclick="deleteStoredDoc('${doc.id}', event)">✕</button>
+        <div>
+          <div class="doc-title">${doc.title}</div>
+          <div class="doc-preview">${doc.preview}</div>
+        </div>
+        <div class="doc-footer">
+          <span>${doc.date}</span>
+        </div>
+      `;
+      card.onclick = () => loadDocumentFromArchive(doc.id);
+      grid.appendChild(card);
+    });
+  }
+
+  function loadDocumentFromArchive(docId) {
+    const docs = getStoredDocuments();
+    const target = docs.find(d => d.id === docId);
+    if (!target) return;
+
+    pushHistory();
+    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
+    saveEditorContent();
+    updateSlideIndicators();
+    updateScrollThumbPosition();
+    closeStorageModal();
+    showQuickToast("📂 문서를 불러왔습니다");
+  }
+
+  function deleteStoredDoc(docId, e) {
+    e.stopPropagation();
+    let docs = getStoredDocuments();
+    docs = docs.filter(d => d.id !== docId);
+    try { localStorage.setItem('yslide_saved_archive', JSON.stringify(docs)); } catch(err){}
+    renderDocumentGrid();
+  }
+
+  async function saveToFile() {
+    const content = editor.innerHTML;
+    if (editor.innerText.trim() === '') {
+      showQuickToast("⚠️ 저장할 내용이 없습니다.");
+      return;
+    }
+
+    saveDocumentToArchive(content);
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const defaultFilename = `Yslide_${dateStr}.txt`;
+
+    if (window.showSaveFilePicker) {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFilename,
+          types: [{
+            description: '텍스트 파일 (.txt, .json)',
+            accept: { 'text/plain': ['.txt', '.json'] }
+          }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        showQuickToast("💾 파일이 저장되었습니다");
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = defaultFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showQuickToast("💾 파일이 저장되었습니다");
+  }
+
+  function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    pushHistory();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          editor.innerHTML = parsed.join('<br>');
+          saveEditorContent();
+          updateSlideIndicators();
+          updateScrollThumbPosition();
+          saveDocumentToArchive(editor.innerHTML);
+          showQuickToast("📂 파일을 불러왔습니다");
+          return;
+        }
+      } catch (err) {}
+      editor.innerHTML = raw.replace(/\n/g, '<br>');
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+      saveDocumentToArchive(editor.innerHTML);
+      showQuickToast("📂 텍스트를 불러왔습니다");
+    };
+    reader.readAsText(files[0], 'utf-8');
+  }
+
+  function printSermonDocument() {
+    if (editor.innerText.trim() === '') {
+      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
+      return;
+    }
+
+    const printContainer = document.getElementById('print-container');
+    printContainer.innerHTML = '';
+
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+    const totalSlides = totalSlidesCount;
+
+    for (let i = 0; i < totalSlides; i++) {
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'print-slide-page';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'print-slide-header';
+      headerDiv.innerText = `[ ${i + 1} / ${totalSlides} ]`;
+
+      const maskBox = document.createElement('div');
+      maskBox.style.height = `${slideHeight}px`;
+      maskBox.style.overflow = 'hidden';
+      maskBox.style.position = 'relative';
+
+      const bodyDiv = document.createElement('div');
+      bodyDiv.className = 'print-slide-body';
+      bodyDiv.innerHTML = editor.innerHTML;
+      bodyDiv.style.transform = `translateY(-${slideHeight * i}px)`;
+
+      maskBox.appendChild(bodyDiv);
+      pageDiv.appendChild(headerDiv);
+      pageDiv.appendChild(maskBox);
+      printContainer.appendChild(pageDiv);
+    }
+
+    window.print();
+  }
+
+  /* 1:1 뷰포트 스냅 전체모드 시작 */
+  function startSermonMode(targetPageIndex = 0) {
+    if (!editor || editor.innerText.trim() === '') return;
+
+    updateSlideIndicators();
+    cameraStage.innerHTML = editor.innerHTML; // 원본 DOM 그대로 1:1 복제
+
+    currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlidesCount - 1);
+    updateReaderCamera();
+
+    document.getElementById('reader-container').style.display = 'block';
+    isReaderMode = true;
+
+    try {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
+      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+    } catch(e){}
+  }
+
+  /* 현재 편집 위치 기준 1:1 미리보기 */
+  function startPreviewCurrentSlide() {
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+    const currentViewY = editorContainer.scrollTop;
+    const currentSlideIndex = Math.max(0, Math.floor((currentViewY + 20) / slideHeight));
+    startSermonMode(currentSlideIndex);
+  }
+
+  function exitSermonMode() {
+    document.getElementById('reader-container').style.display = 'none';
+    isReaderMode = false;
+
+    try {
+      if (document.exitFullscreen && document.fullscreenElement) {
+        document.exitFullscreen().catch(()=>{});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    } catch(e){}
+  }
+
+  /* 카메라의 Y축 위치를 정확히 [17줄 높이 * 슬라이드 인덱스]만큼 스냅 이동 */
+  function updateReaderCamera() {
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17;
+    const offsetY = slideHeight * currentPageIndex;
+
+    cameraStage.style.transform = `translateY(-${offsetY}px)`;
+    document.getElementById('curr-page').innerText = currentPageIndex + 1;
+    document.getElementById('total-page').innerText = totalSlidesCount;
+  }
+
+  function nextPage() {
+    if (currentPageIndex < totalSlidesCount - 1) {
+      currentPageIndex++;
+      updateReaderCamera();
+    }
+  }
+
+  function prevPage() {
+    if (currentPageIndex > 0) {
+      currentPageIndex--;
+      updateReaderCamera();
+    }
+  }
+</script>
+</body>
+</html>
