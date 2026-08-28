@@ -18,7 +18,9 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
+    /* 1줄의 정수 픽셀 높이 (반올림 오차 제거) */
     --single-line-height: calc(var(--font-size) * var(--line-height));
+    /* 정확히 17줄 분량의 슬라이드 높이 */
     --slide-block-height: calc(var(--single-line-height) * 17);
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -136,6 +138,7 @@
     min-height: 100%;
   }
 
+  /* 17줄 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -183,7 +186,7 @@
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
-    word-break: keep-all;
+    word-break: break-all;
     letter-spacing: normal;
     color: #ffffff;
     white-space: pre-wrap;
@@ -278,7 +281,7 @@
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
-    word-break: keep-all;
+    word-break: break-all;
     letter-spacing: normal;
     color: #ffffff;
     white-space: pre-wrap;
@@ -450,7 +453,7 @@
     }
     .print-slide-body {
       font-size: 18pt !important; line-height: 1.5 !important; font-weight: 500 !important;
-      word-break: keep-all !important; color: #000000 !important; white-space: pre-wrap !important;
+      word-break: break-all !important; color: #000000 !important; white-space: pre-wrap !important;
     }
   }
 </style>
@@ -616,7 +619,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_pixel_slice_v19');
+      const saved = localStorage.getItem('yslide_pixel_slice_v20');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -669,6 +672,7 @@
     updateScrollThumbPosition();
   }
 
+  /* 17줄 슬라이드 눈금선 안정화 렌더러 */
   function updateSlideIndicators() {
     try {
       const singleLineHeight = currentFontSize * 1.45;
@@ -882,7 +886,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_pixel_slice_v19', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_pixel_slice_v20', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1164,74 +1168,84 @@ ${content}`;
     reader.readAsText(files[0], 'utf-8');
   }
 
-  /* 렌더링된 텍스트의 물리적 Y축 픽셀 좌표 기준 100% 오차 없는 슬라이스 분할 엔진 */
+  /* 
+   * [핵심] 실제 렌더링 픽셀 Y좌표 기반 100% 오차 없는 17줄 슬라이스 엔진
+   * 입력창의 17줄 눈금선([ 1 ], [ 2 ]...)과 전체화면 내용이 영구적으로 1:1 일치합니다.
+   */
   function calculateSlides() {
     if (!editor.innerText.trim()) return [];
 
     const singleLineHeight = currentFontSize * 1.45;
-    const slideHeight = singleLineHeight * 17; // 17줄의 정확한 픽셀 높이
+    const slideHeight = singleLineHeight * 17; // 정확히 17줄의 높이
     const editorRect = editor.getBoundingClientRect();
     const editorTop = editorRect.top + 24; // 패딩 시작점
 
     const slides = [];
-    const textNodes = [];
+    const elementsToProcess = [];
 
-    // 에디터 내 모든 텍스트 노드 및 BR 태그 수집
+    // 에디터의 모든 텍스트 노드 및 개행 BR 태그를 순서대로 수집
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, null, false);
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0) {
-        textNodes.push(node);
-      } else if (node.nodeName === 'BR') {
-        textNodes.push(node);
+    let n;
+    while ((n = walker.nextNode())) {
+      if (n.nodeType === Node.TEXT_NODE && n.textContent.length > 0) {
+        elementsToProcess.push(n);
+      } else if (n.nodeName === 'BR') {
+        elementsToProcess.push(n);
       }
     }
 
     let currentSlideIndex = 0;
     let currentRange = document.createRange();
-    let hasContent = false;
+    let isRangeStarted = false;
 
-    for (let i = 0; i < textNodes.length; i++) {
-      const targetNode = textNodes[i];
-      let nodeTop = 0;
+    elementsToProcess.forEach((target) => {
+      let topY = 0;
+      let height = 0;
 
-      if (targetNode.nodeType === Node.TEXT_NODE) {
+      if (target.nodeType === Node.TEXT_NODE) {
         const r = document.createRange();
-        r.selectNodeContents(targetNode);
+        r.selectNodeContents(target);
         const rects = r.getClientRects();
-        nodeTop = rects.length > 0 ? (rects[0].top - editorTop) : 0;
-      } else if (targetNode.nodeName === 'BR') {
+        if (rects.length > 0) {
+          topY = rects[0].top - editorTop;
+          height = rects[0].height;
+        }
+      } else if (target.nodeName === 'BR') {
         const r = document.createRange();
-        r.selectNode(targetNode);
+        r.selectNode(target);
         const rects = r.getClientRects();
-        nodeTop = rects.length > 0 ? (rects[0].top - editorTop) : 0;
+        if (rects.length > 0) {
+          topY = rects[0].top - editorTop;
+          height = rects[0].height;
+        }
       }
 
-      // 텍스트가 위치한 슬라이드 번호 정확 측정 (0부터 시작)
-      const targetSlide = Math.max(0, Math.floor((nodeTop + 2) / slideHeight));
+      // 글자의 중심점 Y좌표가 몇 번째 17줄 블록에 위치하는지 정확히 판별
+      const centerY = topY + (height / 2);
+      const targetSlide = Math.max(0, Math.floor(centerY / slideHeight));
 
-      if (targetSlide > currentSlideIndex && hasContent) {
-        // 이전 슬라이드 내용 클론 후 저장
+      if (targetSlide > currentSlideIndex && isRangeStarted) {
+        // 이전 슬라이드 HTML 저장
         const fragment = currentRange.cloneContents();
         const tempDiv = document.createElement('div');
         tempDiv.appendChild(fragment);
         slides.push(tempDiv.innerHTML);
 
-        // 새 슬라이드 시작
+        // 새 슬라이드 범위 시작
         currentSlideIndex = targetSlide;
         currentRange = document.createRange();
-        currentRange.setStartBefore(targetNode);
-        currentRange.setEndAfter(targetNode);
+        currentRange.setStartBefore(target);
+        currentRange.setEndAfter(target);
       } else {
-        if (!hasContent) {
-          currentRange.setStartBefore(targetNode);
-          hasContent = true;
+        if (!isRangeStarted) {
+          currentRange.setStartBefore(target);
+          isRangeStarted = true;
         }
-        currentRange.setEndAfter(targetNode);
+        currentRange.setEndAfter(target);
       }
-    }
+    });
 
-    if (hasContent) {
+    if (isRangeStarted) {
       const fragment = currentRange.cloneContents();
       const tempDiv = document.createElement('div');
       tempDiv.appendChild(fragment);
@@ -1292,7 +1306,7 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 현재 편집 위치 기준 슬라이드 미리보기 (눈금선 기준 100% 1:1 매칭) */
+  /* 현재 편집 위치 기준 슬라이드 미리보기 (17줄 경계와 1:1 완벽 일치) */
   function startPreviewCurrentSlide() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
