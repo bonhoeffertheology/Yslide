@@ -136,7 +136,6 @@
     min-height: 100%;
   }
 
-  /* 17줄 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -173,7 +172,6 @@
     pointer-events: none !important;
   }
 
-  /* 에디터 본문 스타일 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -198,7 +196,7 @@
     -webkit-user-select: none;
   }
 
-  /* 퀵스크롤러 */
+  /* 고속 퀵스크롤러 */
   #quick-scrollbar-track {
     position: fixed;
     top: 70px;
@@ -269,15 +267,16 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 0;
+    /* 상단 정확히 3줄 여백 확보 */
+    padding-top: calc(var(--font-size) * var(--line-height) * 3);
     pointer-events: none;
   }
 
-  /* 입력창과 1:1 완벽 일치 규격 */
+  /* 17줄 온전 표시 및 입력창 너비 1:1 일치 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
-    padding: 24px var(--content-padding-x) 0 var(--content-padding-x);
+    padding: 0 var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -619,7 +618,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_final_perfect_v16');
+      const saved = localStorage.getItem('yslide_perfect_margin_v17');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -885,7 +884,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_perfect_v16', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_perfect_margin_v17', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1167,55 +1166,62 @@ ${content}`;
     reader.readAsText(files[0], 'utf-8');
   }
 
-  function normalizeHtmlToLines(html) {
-    let s = html.replace(/<br\s*[\/]?>/gi, '\n')
-                .replace(/<\/div>/gi, '\n')
-                .replace(/<div>/gi, '')
-                .replace(/<p>/gi, '')
-                .replace(/<\/p>/gi, '\n');
-    return s.split('\n');
+  /* HTML 태그 구조를 보존하면서 개별 문단 및 엔터 줄바꿈을 완벽히 분리 */
+  function extractLinesPreservingBreaks(html) {
+    if (!html) return [];
+    let formatted = html
+      .replace(/<div[^>]*>/gi, '\n')
+      .replace(/<\/div>/gi, '')
+      .replace(/<p[^>]*>/gi, '\n')
+      .replace(/<\/p>/gi, '')
+      .replace(/<br\s*[\/]?>/gi, '\n');
+
+    return formatted.split('\n');
   }
 
-  /* 입력창 렌더링 너비(1000px - 64px) 기준 실제 줄 수 계산 */
-  function getVisualLinesCount(str) {
+  /* 입력창 텍스트 래핑 기반 시각적 실제 줄 수(Visual Line Count) 측정 */
+  function getVisualLinesCount(lineHtml) {
     const temp = document.createElement('div');
-    temp.innerHTML = str;
-    const plain = temp.textContent || temp.innerText || '';
-    const MAX_CHARS = Math.max(18, Math.floor(936 / (currentFontSize * 1.05)));
-    if (plain.length === 0) return 1;
-    return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
+    temp.innerHTML = lineHtml;
+    const text = temp.textContent || '';
+    if (!text || text.trim() === '') return 1;
+
+    // 입력창 1줄 수용 글자수 (한글 기준 약 28자)
+    const MAX_CHARS = Math.max(16, Math.floor(936 / (currentFontSize * 1.05)));
+    return Math.max(1, Math.ceil(text.length / MAX_CHARS));
   }
 
-  /* 17줄 완전 일치 슬라이드 분할 엔진 */
+  /* 17줄 경계선 1:1 완벽 일치 분할 엔진 (짧은 줄 병합 방지) */
   function calculateSlides() {
-    const rawLines = normalizeHtmlToLines(editor.innerHTML);
+    const rawLines = extractLinesPreservingBreaks(editor.innerHTML);
     if (editor.innerText.trim() === '') return [];
 
     const slides = [];
-    let currentChunk = [];
+    let currentSlideLines = [];
     let currentLineCount = 0;
 
     rawLines.forEach((line) => {
       const vCount = getVisualLinesCount(line);
 
-      if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
-        slides.push(currentChunk.join('<br>'));
-        currentChunk = [line];
+      // 17줄 초과 시 다음 슬라이드로 분할
+      if (currentLineCount + vCount > 17 && currentSlideLines.length > 0) {
+        slides.push(currentSlideLines.join('<br>'));
+        currentSlideLines = [line];
         currentLineCount = vCount;
       } else {
-        currentChunk.push(line);
+        currentSlideLines.push(line);
         currentLineCount += vCount;
       }
     });
 
-    if (currentChunk.length > 0) {
-      slides.push(currentChunk.join('<br>'));
+    if (currentSlideLines.length > 0) {
+      slides.push(currentSlideLines.join('<br>'));
     }
 
     return slides.filter(html => {
       const temp = document.createElement('div');
       temp.innerHTML = html;
-      return temp.innerText.trim() !== '';
+      return temp.innerText.trim() !== '' || html.includes('<br>');
     });
   }
 
@@ -1266,6 +1272,7 @@ ${content}`;
     } catch(e){}
   }
 
+  /* 현재 편집 위치 기준 슬라이드 미리보기 */
   function startPreviewCurrentSlide() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
