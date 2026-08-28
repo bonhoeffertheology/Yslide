@@ -127,7 +127,7 @@
     min-height: 100%;
   }
 
-  /* 17줄 눈금선 오버레이 레이어 */
+  /* 17줄 눈금선 및 번호 뱃지 오버레이 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -511,7 +511,7 @@
     }
     applyFontSize(currentFontSize);
 
-    const saved = localStorage.getItem('yslide_slide_badges_v5');
+    const saved = localStorage.getItem('yslide_pixel_perfect_v6');
     if (saved) {
       editor.innerHTML = saved;
     }
@@ -546,7 +546,6 @@
     updateSlideIndicators();
   }
 
-  // 17줄마다 슬라이드 눈금선 및 번호 뱃지([ 1 ], [ 2 ]...) 생성
   function updateSlideIndicators() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
@@ -561,20 +560,11 @@
 
       const badge = document.createElement('div');
       badge.className = 'slide-boundary-badge';
-      badge.innerText = `[ ${i} ]`; // '슬라이드' 글자 제거 후 번호만 표기
+      badge.innerText = `[ ${i} ]`;
 
       boundary.appendChild(badge);
       indicatorsLayer.appendChild(boundary);
     }
-  }
-
-  function normalizeHtmlToLines(html) {
-    let s = html.replace(/<br\s*[\/]?>/gi, '\n')
-                .replace(/<\/div>/gi, '\n')
-                .replace(/<div>/gi, '')
-                .replace(/<p>/gi, '')
-                .replace(/<\/p>/gi, '\n');
-    return s.split('\n');
   }
 
   function paintWordAtPoint(x, y) {
@@ -679,7 +669,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      localStorage.setItem('yslide_slide_badges_v5', editor.innerHTML);
+      localStorage.setItem('yslide_pixel_perfect_v6', editor.innerHTML);
     }
   }
 
@@ -890,21 +880,57 @@
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   }
 
-  // 전체모드 실행 시 정확히 17줄 단위로 완벽 분할
+  // 실제 화면 렌더링 픽셀 좌표 기준 17줄 단위 슬라이드 분할 엔진 (경계선 위치와 100% 일치)
   function startSermonMode() {
-    const rawLines = normalizeHtmlToLines(editor.innerHTML);
     if (editor.innerText.trim() === '') return;
 
-    pagesData = [];
-    const LINES_PER_SLIDE = 17;
+    const singleLineHeight = currentFontSize * 1.45;
+    const slideHeight = singleLineHeight * 17; // 정확히 17줄 높이
+    const editorRect = editor.getBoundingClientRect();
+    const editorTop = editorRect.top + 24; // 패딩 보정
 
-    for (let i = 0; i < rawLines.length; i += LINES_PER_SLIDE) {
-      const slideChunk = rawLines.slice(i, i + LINES_PER_SLIDE);
-      const slideHtml = slideChunk.join('<br>');
-      if (slideHtml.trim() !== '') {
-        pagesData.push(slideHtml);
+    // 캔버스 내의 모든 자식 블록 요소를 순회하며 픽셀 위치 측정
+    const childNodes = Array.from(editor.childNodes);
+    pagesData = [];
+    let currentSlideNodes = [];
+    let currentSlideIndex = 0;
+
+    childNodes.forEach(node => {
+      let nodeTop = 0;
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        nodeTop = node.getBoundingClientRect().top - editorTop;
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const rect = range.getBoundingClientRect();
+        nodeTop = (rect.top || editorTop) - editorTop;
       }
+
+      const targetSlide = Math.max(0, Math.floor(nodeTop / slideHeight));
+
+      if (targetSlide > currentSlideIndex && currentSlideNodes.length > 0) {
+        const container = document.createElement('div');
+        currentSlideNodes.forEach(n => container.appendChild(n.cloneNode(true)));
+        pagesData.push(container.innerHTML);
+        currentSlideNodes = [node];
+        currentSlideIndex = targetSlide;
+      } else {
+        currentSlideNodes.push(node);
+      }
+    });
+
+    if (currentSlideNodes.length > 0) {
+      const container = document.createElement('div');
+      currentSlideNodes.forEach(n => container.appendChild(n.cloneNode(true)));
+      pagesData.push(container.innerHTML);
     }
+
+    // 빈 페이지 제거
+    pagesData = pagesData.filter(html => {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.innerText.trim() !== '';
+    });
 
     if (pagesData.length === 0) return;
 
