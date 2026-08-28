@@ -136,6 +136,7 @@
     min-height: 100%;
   }
 
+  /* 17줄 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -172,6 +173,7 @@
     pointer-events: none !important;
   }
 
+  /* 에디터 본문 스타일 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -196,7 +198,7 @@
     -webkit-user-select: none;
   }
 
-  /* 고속 퀵스크롤러 */
+  /* 퀵스크롤러 */
   #quick-scrollbar-track {
     position: fixed;
     top: 70px;
@@ -267,18 +269,15 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding-top: calc(var(--font-size) * var(--line-height) * 1.5);
+    padding: 0;
     pointer-events: none;
   }
 
-  /* 17줄 초과분 절대 차단: 높이 17줄 물리적 잠금 */
+  /* 입력창과 1:1 완벽 일치 규격 */
   #reader-content {
     width: 100%;
     max-width: var(--content-max-width);
-    height: var(--slide-block-height) !important;
-    max-height: var(--slide-block-height) !important;
-    overflow: hidden !important;
-    padding: 0 var(--content-padding-x);
+    padding: 24px var(--content-padding-x) 0 var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -620,7 +619,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_perfect_slide_v15');
+      const saved = localStorage.getItem('yslide_final_perfect_v16');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -886,7 +885,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_perfect_slide_v15', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_perfect_v16', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1177,18 +1176,17 @@ ${content}`;
     return s.split('\n');
   }
 
-  /* 문단별 시각적 실제 줄 수(Visual Line Count) 측정 */
+  /* 입력창 렌더링 너비(1000px - 64px) 기준 실제 줄 수 계산 */
   function getVisualLinesCount(str) {
     const temp = document.createElement('div');
     temp.innerHTML = str;
     const plain = temp.textContent || temp.innerText || '';
-    // 1000px 컨테이너 기준 한 줄 최대 수용 글자수
-    const MAX_CHARS = Math.max(16, Math.floor(936 / (currentFontSize * 1.05)));
+    const MAX_CHARS = Math.max(18, Math.floor(936 / (currentFontSize * 1.05)));
     if (plain.length === 0) return 1;
     return Math.max(1, Math.ceil(plain.length / MAX_CHARS));
   }
 
-  /* 17줄 슬라이드 경계선 100% 일치 분할 엔진 */
+  /* 17줄 완전 일치 슬라이드 분할 엔진 */
   function calculateSlides() {
     const rawLines = normalizeHtmlToLines(editor.innerHTML);
     if (editor.innerText.trim() === '') return [];
@@ -1200,7 +1198,6 @@ ${content}`;
     rawLines.forEach((line) => {
       const vCount = getVisualLinesCount(line);
 
-      // 17줄을 초과하는 순간 정확히 다음 슬라이드로 분리
       if (currentLineCount + vCount > 17 && currentChunk.length > 0) {
         slides.push(currentChunk.join('<br>'));
         currentChunk = [line];
@@ -1269,7 +1266,6 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 현재 편집 위치 기준 슬라이드 미리보기 (17줄 경계 1:1 매칭) */
   function startPreviewCurrentSlide() {
     const singleLineHeight = currentFontSize * 1.45;
     const slideHeight = singleLineHeight * 17;
