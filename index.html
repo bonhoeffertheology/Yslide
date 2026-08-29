@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 캐시 방지 메타태그 -->
-<link rel="manifest" href="manifest.json?v=2026_scroll_fixed">
+<link rel="manifest" href="manifest.json?v=2026_rapid_click">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -73,7 +73,6 @@
     height: 40px;
   }
 
-  /* 1단 전용 툴바 줄 */
   .toolbar-row-top {
     justify-content: flex-start;
     gap: 10px;
@@ -519,9 +518,8 @@
 </head>
 <body>
 
-<!-- 상단 2단 고정 툴바 -->
 <div id="toolbar">
-  <!-- 1단 (첫 번째 줄): 자간 및 줄간격 조절 -->
+  <!-- 1단: 자간 및 줄간격 연속 조절 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="선택 영역 자간 좁게">AV -</button>
@@ -534,7 +532,7 @@
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="선택 영역 줄간격 넓게">↕ +</button>
   </div>
 
-  <!-- 2단 (두 번째 줄): 주요 기능 및 조작 버튼 -->
+  <!-- 2단: 기본 제어 기능 -->
   <div class="toolbar-row">
     <div class="btn-group" id="edit-tools">
       <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
@@ -610,7 +608,6 @@
   </div>
 </div>
 
-<!-- 플로팅 퀵스크롤러 -->
 <div id="quick-scrollbar-track">
   <div id="quick-scrollbar-thumb"></div>
 </div>
@@ -716,7 +713,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_noscroll_v25');
+      const saved = localStorage.getItem('yslide_rapid_click_v26');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -726,7 +723,6 @@
     updateScrollThumbPosition();
   };
 
-  /* 현재 선택 영역 기억 (드래그 유지) */
   function saveCurrentSelection() {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
@@ -740,67 +736,87 @@
     }
   });
 
-  /* 1단 자간 조절 (화면 스크롤 고정 & 드래그 영역 유지) */
+  /* 자간 연속 연타 조절 엔진 */
   function adjustLetterSpacing(delta) {
-    if (!savedSelectionRange) {
+    const sel = window.getSelection();
+    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
+    if (!range) {
       showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
       return;
     }
-    const currentScroll = editorContainer.scrollTop; // 현재 스크롤 위치 보존
 
+    const currentScroll = editorContainer.scrollTop;
     pushHistory();
-    const span = document.createElement('span');
-    const fragment = savedSelectionRange.extractContents();
-    span.appendChild(fragment);
 
-    let current = parseFloat(span.style.letterSpacing) || 0;
-    span.style.letterSpacing = `${current + delta}px`;
+    let targetEl = null;
+    let container = range.commonAncestorContainer;
+    if (container.nodeType === Node.TEXT_NODE) container = container.parentNode;
 
-    savedSelectionRange.insertNode(span);
+    // 이미 감싸진 span 태그가 단독 선택되어 있는지 판별
+    if (container && container !== editor && container.tagName === 'SPAN') {
+      targetEl = container;
+      let current = parseFloat(targetEl.style.letterSpacing) || 0;
+      targetEl.style.letterSpacing = `${(current + delta).toFixed(1)}px`;
+    } else {
+      targetEl = document.createElement('span');
+      let current = parseFloat(getComputedStyle(container).letterSpacing) || 0;
+      targetEl.style.letterSpacing = `${(current + delta).toFixed(1)}px`;
+      const fragment = range.extractContents();
+      targetEl.appendChild(fragment);
+      range.insertNode(targetEl);
+    }
 
-    // 변경된 span 태그를 다시 드래그(선택) 상태로 복구
-    const sel = window.getSelection();
-    sel.removeAllRanges();
+    // 선택 영역을 갱신하여 연속 클릭 지원
     const newRange = document.createRange();
-    newRange.selectNodeContents(span);
+    newRange.selectNodeContents(targetEl);
+    sel.removeAllRanges();
     sel.addRange(newRange);
     savedSelectionRange = newRange.cloneRange();
 
-    editorContainer.scrollTop = currentScroll; // 스크롤 원위치 강제 고정
-    pushHistory();
+    editorContainer.scrollTop = currentScroll;
     saveEditorContent();
     updateSlideIndicators();
   }
 
-  /* 1단 줄간격 조절 (화면 스크롤 고정 & 드래그 영역 유지) */
+  /* 줄간격 연속 연타 조절 엔진 */
   function adjustLineHeight(delta) {
-    if (!savedSelectionRange) {
+    const sel = window.getSelection();
+    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
+    if (!range) {
       showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
       return;
     }
-    const currentScroll = editorContainer.scrollTop; // 현재 스크롤 위치 보존
 
+    const currentScroll = editorContainer.scrollTop;
     pushHistory();
-    const span = document.createElement('span');
-    span.style.display = 'inline-block';
-    const fragment = savedSelectionRange.extractContents();
-    span.appendChild(fragment);
 
-    let current = parseFloat(span.style.lineHeight) || 1.45;
-    span.style.lineHeight = `${Math.max(1.0, current + delta)}`;
+    let targetEl = null;
+    let container = range.commonAncestorContainer;
+    if (container.nodeType === Node.TEXT_NODE) container = container.parentNode;
 
-    savedSelectionRange.insertNode(span);
+    if (container && container !== editor && container.tagName === 'SPAN') {
+      targetEl = container;
+      targetEl.style.display = 'inline-block';
+      let current = parseFloat(targetEl.style.lineHeight) || 1.45;
+      targetEl.style.lineHeight = `${Math.max(0.8, current + delta).toFixed(2)}`;
+    } else {
+      targetEl = document.createElement('span');
+      targetEl.style.display = 'inline-block';
+      let current = parseFloat(getComputedStyle(container).lineHeight) || 1.45;
+      if (current > 10) current = 1.45;
+      targetEl.style.lineHeight = `${Math.max(0.8, current + delta).toFixed(2)}`;
+      const fragment = range.extractContents();
+      targetEl.appendChild(fragment);
+      range.insertNode(targetEl);
+    }
 
-    // 변경된 span 태그를 다시 드래그(선택) 상태로 복구
-    const sel = window.getSelection();
-    sel.removeAllRanges();
     const newRange = document.createRange();
-    newRange.selectNodeContents(span);
+    newRange.selectNodeContents(targetEl);
+    sel.removeAllRanges();
     sel.addRange(newRange);
     savedSelectionRange = newRange.cloneRange();
 
-    editorContainer.scrollTop = currentScroll; // 스크롤 원위치 강제 고정
-    pushHistory();
+    editorContainer.scrollTop = currentScroll;
     saveEditorContent();
     updateSlideIndicators();
   }
@@ -1058,7 +1074,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_noscroll_v25', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_rapid_click_v26', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1164,292 +1180,4 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
-        pushHistory();
-        editor.innerHTML = translatedHtml;
-        pushHistory();
-        saveEditorContent();
-        updateSlideIndicators();
-        updateScrollThumbPosition();
-        showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
-      } else {
-        showQuickToast("⚠️ 번역 결과를 받지 못했습니다.");
-      }
-    } catch (err) {
-      alert("네트워크 오류로 번역에 실패했습니다: " + err.message);
-    }
-  }
-
-  function getStoredDocuments() {
-    try {
-      const stored = localStorage.getItem('yslide_saved_archive');
-      return stored ? JSON.parse(stored) : [];
-    } catch(e) {
-      return [];
-    }
-  }
-
-  function saveDocumentToArchive(contentHtml) {
-    try {
-      const archive = getStoredDocuments();
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = contentHtml;
-      const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
-      const title = firstLine.substring(0, 30);
-
-      const now = new Date();
-      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0 Cortical')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-      const newDoc = {
-        id: 'doc_' + Date.now(),
-        title: title,
-        preview: (tempDiv.textContent || '').substring(0, 80),
-        date: timeStr,
-        html: contentHtml
-      };
-
-      archive.unshift(newDoc);
-      if (archive.length > 50) archive.pop();
-      localStorage.setItem('yslide_saved_archive', JSON.stringify(archive));
-    } catch(e){}
-  }
-
-  function openStorageModal() {
-    renderDocumentGrid();
-    document.getElementById('storage-modal').style.display = 'flex';
-  }
-
-  function closeStorageModal() {
-    document.getElementById('storage-modal').style.display = 'none';
-  }
-
-  function renderDocumentGrid() {
-    const grid = document.getElementById('doc-grid');
-    const docs = getStoredDocuments();
-
-    if (docs.length === 0) {
-      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 60px 0;">보관된 문서가 없습니다.<br>상단 💾 버튼을 누르면 이 보관함에 자동 저장됩니다.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    docs.forEach(doc => {
-      const card = document.createElement('div');
-      card.className = 'doc-card';
-      card.innerHTML = `
-        <button class="doc-del-btn" title="삭제" onclick="deleteStoredDoc('${doc.id}', event)">✕</button>
-        <div>
-          <div class="doc-title">${doc.title}</div>
-          <div class="doc-preview">${doc.preview}</div>
-        </div>
-        <div class="doc-footer">
-          <span>${doc.date}</span>
-        </div>
-      `;
-      card.onclick = () => loadDocumentFromArchive(doc.id);
-      grid.appendChild(card);
-    });
-  }
-
-  function loadDocumentFromArchive(docId) {
-    const docs = getStoredDocuments();
-    const target = docs.find(d => d.id === docId);
-    if (!target) return;
-
-    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
-    pushHistory();
-    saveEditorContent();
-    updateSlideIndicators();
-    updateScrollThumbPosition();
-    closeStorageModal();
-    showQuickToast("📂 문서를 불러왔습니다");
-  }
-
-  function deleteStoredDoc(docId, e) {
-    e.stopPropagation();
-    let docs = getStoredDocuments();
-    docs = docs.filter(d => d.id !== docId);
-    try { localStorage.setItem('yslide_saved_archive', JSON.stringify(docs)); } catch(err){}
-    renderDocumentGrid();
-  }
-
-  async function saveToFile() {
-    const content = editor.innerHTML;
-    if (editor.innerText.trim() === '') {
-      showQuickToast("⚠️ 저장할 내용이 없습니다.");
-      return;
-    }
-
-    saveDocumentToArchive(content);
-
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-    const defaultFilename = `Yslide_${dateStr}.txt`;
-
-    if (window.showSaveFilePicker) {
-      try {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFilename,
-          types: [{
-            description: '텍스트 파일 (.txt, .json)',
-            accept: { 'text/plain': ['.txt', '.json'] }
-          }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        showQuickToast("💾 파일이 저장되었습니다");
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-      }
-    }
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = defaultFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    showQuickToast("💾 파일이 저장되었습니다");
-  }
-
-  function handleFiles(files) {
-    if (!files || files.length === 0) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const raw = e.target.result;
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          editor.innerHTML = parsed.join('<br>');
-          pushHistory();
-          saveEditorContent();
-          updateSlideIndicators();
-          updateScrollThumbPosition();
-          saveDocumentToArchive(editor.innerHTML);
-          showQuickToast("📂 파일을 불러왔습니다");
-          return;
-        }
-      } catch (err) {}
-      editor.innerHTML = raw.replace(/\n/g, '<br>');
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
-      saveDocumentToArchive(editor.innerHTML);
-      showQuickToast("📂 텍스트를 불러왔습니다");
-    };
-    reader.readAsText(files[0], 'utf-8');
-  }
-
-  function printSermonDocument() {
-    if (editor.innerText.trim() === '') {
-      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
-      return;
-    }
-
-    updateSlideIndicators();
-    const printContainer = document.getElementById('print-container');
-    printContainer.innerHTML = '';
-
-    const { slideHeight, count } = getAccurateSlideMetrics();
-
-    for (let i = 0; i < count; i++) {
-      const pageDiv = document.createElement('div');
-      pageDiv.className = 'print-slide-page';
-
-      const headerDiv = document.createElement('div');
-      headerDiv.className = 'print-slide-header';
-      headerDiv.innerText = `[ ${i + 1} / ${count} ]`;
-
-      const viewWrap = document.createElement('div');
-      viewWrap.style.height = `${slideHeight}px`;
-      viewWrap.style.overflow = 'hidden';
-      viewWrap.style.position = 'relative';
-
-      const canvasCopy = document.createElement('div');
-      canvasCopy.className = 'print-slide-body';
-      canvasCopy.innerHTML = editor.innerHTML;
-      canvasCopy.style.position = 'absolute';
-      canvasCopy.style.top = `-${slideHeight * i}px`;
-      canvasCopy.style.left = '0';
-      canvasCopy.style.width = '100%';
-
-      viewWrap.appendChild(canvasCopy);
-      pageDiv.appendChild(headerDiv);
-      pageDiv.appendChild(viewWrap);
-      printContainer.appendChild(pageDiv);
-    }
-
-    window.print();
-  }
-
-  function startSermonMode(targetPageIndex = 0) {
-    if (editor.innerText.trim() === '') return;
-
-    updateSlideIndicators();
-    readerCanvas.innerHTML = editor.innerHTML;
-
-    currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlideCount - 1);
-    updateReader();
-
-    document.getElementById('reader-container').style.display = 'block';
-    isReaderMode = true;
-
-    try {
-      const docEl = document.documentElement;
-      if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
-      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-    } catch(e){}
-  }
-
-  function startPreviewCurrentSlide() {
-    const currentViewY = editorContainer.scrollTop;
-    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / FIXED_SLIDE_HEIGHT));
-    startSermonMode(currentSlideIndex);
-  }
-
-  function exitSermonMode() {
-    document.getElementById('reader-container').style.display = 'none';
-    isReaderMode = false;
-
-    try {
-      if (document.exitFullscreen && document.fullscreenElement) {
-        document.exitFullscreen().catch(()=>{});
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      }
-    } catch(e){}
-  }
-
-  function updateReader() {
-    readerCanvas.style.top = `-${FIXED_SLIDE_HEIGHT * currentPageIndex}px`;
-    document.getElementById('curr-page').innerText = currentPageIndex + 1;
-    document.getElementById('total-page').innerText = totalSlideCount;
-  }
-
-  function nextPage() {
-    if (currentPageIndex < totalSlideCount - 1) {
-      currentPageIndex++;
-      updateReader();
-    }
-  }
-  function prevPage() {
-    if (currentPageIndex > 0) {
-      currentPageIndex--;
-      updateReader();
-    }
-  }
-
-  window.addEventListener('keydown', (e) => {
-    if (!isReaderMode) return;
-    if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) nextPage();
-    if (['ArrowLeft', 'PageUp'].includes(e.key)) prevPage();
-    if (e.key === 'Escape') exitSermonMode();
-  });
-</script>
-</body>
-</html>
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*
