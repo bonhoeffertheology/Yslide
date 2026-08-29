@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>Yslide</title>
 
-<!-- PWA 설정 및 캐시 방지 메타태그 -->
-<link rel="manifest" href="manifest.json?v=2026_rapid_click">
+<!-- PWA 설정 및 캐시 무효화 메타태그 -->
+<link rel="manifest" href="manifest.json?v=2026_stable_v27">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -48,7 +48,7 @@
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
   }
 
-  /* 상단 2단 고정 툴바 */
+  /* 상단 2단 고정 툴바 (최상위 터치 레이어) */
   #toolbar {
     position: fixed;
     top: 0;
@@ -61,8 +61,9 @@
     justify-content: center;
     padding: 0 16px;
     border-bottom: 1px solid #333;
-    z-index: 999999;
+    z-index: 9999999;
     gap: 6px;
+    pointer-events: auto;
   }
 
   .toolbar-row {
@@ -169,6 +170,7 @@
     display: flex;
     justify-content: center;
     padding: 0;
+    z-index: 10;
   }
   #editor-container::-webkit-scrollbar { display: none; }
 
@@ -177,9 +179,10 @@
     width: 100%;
     max-width: var(--content-max-width);
     min-height: 100%;
+    pointer-events: none;
   }
 
-  /* 눈금선 레이어 (740px 절대 픽셀 고정) */
+  /* 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -233,6 +236,7 @@
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
+    pointer-events: auto;
   }
 
   #editor-bottom-spacer {
@@ -253,7 +257,7 @@
     right: 6px;
     bottom: 20px;
     width: 28px;
-    z-index: 99998;
+    z-index: 9999998;
     display: flex;
     justify-content: center;
     user-select: none;
@@ -290,7 +294,7 @@
     border-radius: 20px;
     font-size: 15px;
     font-weight: bold;
-    z-index: 99999;
+    z-index: 9999999;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -519,7 +523,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 및 줄간격 연속 조절 -->
+  <!-- 1단: 자간/줄간격 연타 버튼 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="선택 영역 자간 좁게">AV -</button>
@@ -532,7 +536,7 @@
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="선택 영역 줄간격 넓게">↕ +</button>
   </div>
 
-  <!-- 2단: 기본 제어 기능 -->
+  <!-- 2단: 기본 기능 버튼 -->
   <div class="toolbar-row">
     <div class="btn-group" id="edit-tools">
       <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
@@ -713,7 +717,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_rapid_click_v26');
+      const saved = localStorage.getItem('yslide_stable_fix_v27');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -724,10 +728,12 @@
   };
 
   function saveCurrentSelection() {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-      savedSelectionRange = sel.getRangeAt(0).cloneRange();
-    }
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        savedSelectionRange = sel.getRangeAt(0).cloneRange();
+      }
+    } catch(e){}
   }
 
   document.addEventListener('selectionchange', () => {
@@ -736,89 +742,93 @@
     }
   });
 
-  /* 자간 연속 연타 조절 엔진 */
+  /* 1단 자간 연타 조절 엔진 (안전성 보강) */
   function adjustLetterSpacing(delta) {
-    const sel = window.getSelection();
-    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
-    if (!range) {
-      showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
-      return;
+    try {
+      const sel = window.getSelection();
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
+      if (!range) {
+        showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
+        return;
+      }
+
+      const currentScroll = editorContainer.scrollTop;
+      pushHistory();
+
+      let targetEl = null;
+      let node = range.commonAncestorContainer;
+      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+      if (node && node !== editor && node.tagName === 'SPAN') {
+        targetEl = node;
+        let cur = parseFloat(targetEl.style.letterSpacing) || 0;
+        targetEl.style.letterSpacing = `${(cur + delta).toFixed(1)}px`;
+      } else {
+        targetEl = document.createElement('span');
+        targetEl.style.letterSpacing = `${delta.toFixed(1)}px`;
+        const fragment = range.extractContents();
+        targetEl.appendChild(fragment);
+        range.insertNode(targetEl);
+      }
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(targetEl);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedSelectionRange = newRange.cloneRange();
+
+      editorContainer.scrollTop = currentScroll;
+      saveEditorContent();
+      updateSlideIndicators();
+    } catch(err) {
+      console.error(err);
     }
-
-    const currentScroll = editorContainer.scrollTop;
-    pushHistory();
-
-    let targetEl = null;
-    let container = range.commonAncestorContainer;
-    if (container.nodeType === Node.TEXT_NODE) container = container.parentNode;
-
-    // 이미 감싸진 span 태그가 단독 선택되어 있는지 판별
-    if (container && container !== editor && container.tagName === 'SPAN') {
-      targetEl = container;
-      let current = parseFloat(targetEl.style.letterSpacing) || 0;
-      targetEl.style.letterSpacing = `${(current + delta).toFixed(1)}px`;
-    } else {
-      targetEl = document.createElement('span');
-      let current = parseFloat(getComputedStyle(container).letterSpacing) || 0;
-      targetEl.style.letterSpacing = `${(current + delta).toFixed(1)}px`;
-      const fragment = range.extractContents();
-      targetEl.appendChild(fragment);
-      range.insertNode(targetEl);
-    }
-
-    // 선택 영역을 갱신하여 연속 클릭 지원
-    const newRange = document.createRange();
-    newRange.selectNodeContents(targetEl);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    savedSelectionRange = newRange.cloneRange();
-
-    editorContainer.scrollTop = currentScroll;
-    saveEditorContent();
-    updateSlideIndicators();
   }
 
-  /* 줄간격 연속 연타 조절 엔진 */
+  /* 1단 줄간격 연타 조절 엔진 (안전성 보강) */
   function adjustLineHeight(delta) {
-    const sel = window.getSelection();
-    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
-    if (!range) {
-      showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
-      return;
+    try {
+      const sel = window.getSelection();
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
+      if (!range) {
+        showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
+        return;
+      }
+
+      const currentScroll = editorContainer.scrollTop;
+      pushHistory();
+
+      let targetEl = null;
+      let node = range.commonAncestorContainer;
+      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+      if (node && node !== editor && node.tagName === 'SPAN') {
+        targetEl = node;
+        targetEl.style.display = 'inline-block';
+        let cur = parseFloat(targetEl.style.lineHeight) || 1.45;
+        targetEl.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
+      } else {
+        targetEl = document.createElement('span');
+        targetEl.style.display = 'inline-block';
+        let cur = 1.45;
+        targetEl.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
+        const fragment = range.extractContents();
+        targetEl.appendChild(fragment);
+        range.insertNode(targetEl);
+      }
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(targetEl);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedSelectionRange = newRange.cloneRange();
+
+      editorContainer.scrollTop = currentScroll;
+      saveEditorContent();
+      updateSlideIndicators();
+    } catch(err) {
+      console.error(err);
     }
-
-    const currentScroll = editorContainer.scrollTop;
-    pushHistory();
-
-    let targetEl = null;
-    let container = range.commonAncestorContainer;
-    if (container.nodeType === Node.TEXT_NODE) container = container.parentNode;
-
-    if (container && container !== editor && container.tagName === 'SPAN') {
-      targetEl = container;
-      targetEl.style.display = 'inline-block';
-      let current = parseFloat(targetEl.style.lineHeight) || 1.45;
-      targetEl.style.lineHeight = `${Math.max(0.8, current + delta).toFixed(2)}`;
-    } else {
-      targetEl = document.createElement('span');
-      targetEl.style.display = 'inline-block';
-      let current = parseFloat(getComputedStyle(container).lineHeight) || 1.45;
-      if (current > 10) current = 1.45;
-      targetEl.style.lineHeight = `${Math.max(0.8, current + delta).toFixed(2)}`;
-      const fragment = range.extractContents();
-      targetEl.appendChild(fragment);
-      range.insertNode(targetEl);
-    }
-
-    const newRange = document.createRange();
-    newRange.selectNodeContents(targetEl);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    savedSelectionRange = newRange.cloneRange();
-
-    editorContainer.scrollTop = currentScroll;
-    saveEditorContent();
-    updateSlideIndicators();
   }
 
   window.addEventListener('mouseup', () => {
@@ -1074,7 +1084,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_rapid_click_v26', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_stable_fix_v27', editor.innerHTML); } catch(e){}
     }
   }
 
