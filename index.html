@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>Yslide</title>
 
-<!-- PWA 설정 -->
-<link rel="manifest" href="manifest.json">
+<!-- PWA 설정 및 캐시 방지 메타태그 -->
+<link rel="manifest" href="manifest.json?v=2026">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,7 +21,7 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
-    /* 글자 크기/줄간격과 무관한 '절대 고정 슬라이드 픽셀 높이' */
+    /* 고정 픽셀 슬라이드 높이 */
     --slide-fixed-height: 740px;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -113,7 +116,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 3. 인체공학적 플로팅 서식 미니 툴바 (드래그 시 표시) */
+  /* 플로팅 서식 미니 툴바 */
   #floating-format-bar {
     position: fixed;
     display: none;
@@ -166,7 +169,7 @@
     min-height: 100%;
   }
 
-  /* 2. 절대 픽셀 높이 고정 눈금선 레이어 (740px 고정) */
+  /* 눈금선 레이어 (740px 절대 픽셀 고정) */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -203,7 +206,7 @@
     pointer-events: none !important;
   }
 
-  /* 에디터 본문 스타일 */
+  /* 에디터 본문 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -233,7 +236,7 @@
     -webkit-user-select: none;
   }
 
-  /* 1. 삼성노트 스타일 공간 비점유 플로팅 퀵스크롤러 */
+  /* 삼성노트 스타일 퀵스크롤러 (공간 0px) */
   #quick-scrollbar-track {
     position: fixed;
     top: 70px;
@@ -309,7 +312,6 @@
     pointer-events: none;
   }
 
-  /* 고정 높이 뷰포트 (740px 절대 고정) */
   #reader-viewport {
     width: 100%;
     max-width: var(--content-max-width);
@@ -469,7 +471,7 @@
     align-items: center;
   }
 
-  /* 인쇄 전용 스타일 */
+  /* 인쇄 스타일 */
   #print-container { display: none; }
 
   @media print {
@@ -539,6 +541,7 @@
       </svg>
     </button>
 
+    <!-- 이전 상태 (되돌리기 / Undo) 버튼 -->
     <button class="btn-icon" onclick="undoState()" title="되돌리기 (실행 취소)">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M3 7v6h6"></path>
@@ -580,13 +583,13 @@
   </div>
 </div>
 
-<!-- 1. 삼성노트 스타일 퀵스크롤러 (공간 0px 차지) -->
+<!-- 플로팅 퀵스크롤러 -->
 <div id="quick-scrollbar-track">
   <div id="quick-scrollbar-thumb"></div>
 </div>
 <div id="quick-scroll-badge">1 슬라이드</div>
 
-<!-- 3. 드래그 시 즉각 나타나는 인체공학적 인라인 서식 툴바 -->
+<!-- 플로팅 자간/줄간격 서식 툴바 -->
 <div id="floating-format-bar">
   <button class="fmt-btn" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">AV -</button>
   <button class="fmt-btn" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">AV +</button>
@@ -626,13 +629,16 @@
 </div>
 
 <script>
+  // PWA Service Worker 등록
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=' + Date.now()).then(reg => {
+        reg.update();
+      }).catch(() => {});
     });
   }
 
-  const FIXED_SLIDE_HEIGHT = 740; // 2. 고정 픽셀 높이 (불변)
+  const FIXED_SLIDE_HEIGHT = 740;
 
   let isReaderMode = false;
   let isContinuousMode = false;
@@ -653,23 +659,37 @@
   const readerCanvas = document.getElementById('reader-canvas');
   const floatingBar = document.getElementById('floating-format-bar');
 
+  // 이중 Undo 안전 스택
   let historyStack = [];
-  const MAX_HISTORY = 30;
+  const MAX_HISTORY = 40;
 
   function pushHistory() {
     try {
-      historyStack.push(editor.innerHTML);
-      if (historyStack.length > MAX_HISTORY) historyStack.shift();
+      const current = editor.innerHTML;
+      if (historyStack.length === 0 || historyStack[historyStack.length - 1] !== current) {
+        historyStack.push(current);
+        if (historyStack.length > MAX_HISTORY) historyStack.shift();
+      }
     } catch(e){}
   }
 
+  // 되돌리기(Undo) 엔진
   function undoState() {
-    if (historyStack.length === 0) return;
-    const prev = historyStack.pop();
-    editor.innerHTML = prev;
-    saveEditorContent();
-    updateSlideIndicators();
-    updateScrollThumbPosition();
+    try {
+      if (historyStack.length > 1) {
+        historyStack.pop(); // 현재 상태 제거
+        const prev = historyStack[historyStack.length - 1];
+        editor.innerHTML = prev;
+        saveEditorContent();
+        updateSlideIndicators();
+        updateScrollThumbPosition();
+        showQuickToast("↶ 되돌리기가 적용되었습니다");
+      } else if (document.execCommand) {
+        document.execCommand('undo', false, null);
+        saveEditorContent();
+        updateSlideIndicators();
+      }
+    } catch(e){}
   }
 
   window.onload = () => {
@@ -682,16 +702,16 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_fixed_height_v23');
+      const saved = localStorage.getItem('yslide_v2026_release');
       if (saved) {
         editor.innerHTML = saved;
       }
+      pushHistory(); // 최초 상태 스택 저장
     } catch(e){}
     updateSlideIndicators();
     updateScrollThumbPosition();
   };
 
-  /* 3. 인라인 플로팅 서식 바 위치 및 표시 제어 */
   function updateFloatingFormatBar() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed || isContinuousMode) {
@@ -708,7 +728,6 @@
 
     savedSelectionRange = range.cloneRange();
 
-    // 선택 영역 바로 위에 자연스럽게 띄움
     floatingBar.style.display = 'flex';
     const barWidth = 240;
     let left = rect.left + (rect.width / 2) - (barWidth / 2);
@@ -726,7 +745,6 @@
     }
   });
 
-  /* 자간 미세 조절 함수 */
   function adjustLetterSpacing(delta) {
     if (!savedSelectionRange) return;
     pushHistory();
@@ -738,11 +756,11 @@
     span.style.letterSpacing = `${current + delta}px`;
 
     savedSelectionRange.insertNode(span);
+    pushHistory();
     saveEditorContent();
     updateSlideIndicators();
   }
 
-  /* 줄간격 미세 조절 함수 */
   function adjustLineHeight(delta) {
     if (!savedSelectionRange) return;
     pushHistory();
@@ -755,6 +773,7 @@
     span.style.lineHeight = `${Math.max(1.0, current + delta)}`;
 
     savedSelectionRange.insertNode(span);
+    pushHistory();
     saveEditorContent();
     updateSlideIndicators();
   }
@@ -763,6 +782,7 @@
     if (isContinuousMode && isMouseDown) {
       isMouseDown = false;
       lastPaintedKey = "";
+      pushHistory();
       saveEditorContent();
     }
   });
@@ -771,6 +791,7 @@
     if (isContinuousMode) {
       isMouseDown = false;
       lastPaintedKey = "";
+      pushHistory();
       saveEditorContent();
     }
   });
@@ -788,7 +809,6 @@
     updateScrollThumbPosition();
   }
 
-  /* 2. 절대 픽셀 높이(740px) 기준 눈금선 및 슬라이드 수 산출 */
   function getAccurateSlideMetrics() {
     const slideHeight = FIXED_SLIDE_HEIGHT;
     const textHeight = Math.max(editor.scrollHeight - 48, slideHeight);
@@ -990,15 +1010,20 @@
     }
   });
 
+  let inputDebounce = null;
   editor.addEventListener('input', () => {
-    saveEditorContent();
-    updateSlideIndicators();
-    updateScrollThumbPosition();
+    if (inputDebounce) clearTimeout(inputDebounce);
+    inputDebounce = setTimeout(() => {
+      pushHistory();
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+    }, 300);
   });
 
   editor.addEventListener('paste', () => {
-    pushHistory();
     setTimeout(() => {
+      pushHistory();
       saveEditorContent();
       updateSlideIndicators();
       updateScrollThumbPosition();
@@ -1007,7 +1032,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_fixed_height_v23', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_v2026_release', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1050,6 +1075,7 @@
       }
       pushHistory();
       document.execCommand('foreColor', false, color);
+      pushHistory();
       saveEditorContent();
     }
   }
@@ -1114,6 +1140,7 @@ ${content}`;
         translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
         pushHistory();
         editor.innerHTML = translatedHtml;
+        pushHistory();
         saveEditorContent();
         updateSlideIndicators();
         updateScrollThumbPosition();
@@ -1202,8 +1229,8 @@ ${content}`;
     const target = docs.find(d => d.id === docId);
     if (!target) return;
 
-    pushHistory();
     editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
+    pushHistory();
     saveEditorContent();
     updateSlideIndicators();
     updateScrollThumbPosition();
@@ -1264,7 +1291,6 @@ ${content}`;
 
   function handleFiles(files) {
     if (!files || files.length === 0) return;
-    pushHistory();
     const reader = new FileReader();
     reader.onload = (e) => {
       const raw = e.target.result;
@@ -1272,6 +1298,7 @@ ${content}`;
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           editor.innerHTML = parsed.join('<br>');
+          pushHistory();
           saveEditorContent();
           updateSlideIndicators();
           updateScrollThumbPosition();
@@ -1281,6 +1308,7 @@ ${content}`;
         }
       } catch (err) {}
       editor.innerHTML = raw.replace(/\n/g, '<br>');
+      pushHistory();
       saveEditorContent();
       updateSlideIndicators();
       updateScrollThumbPosition();
@@ -1332,7 +1360,7 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 완벽 뷰포트 전체모드 실행 */
+  /* 1:1 완벽 뷰포트 전체모드 */
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
@@ -1352,7 +1380,7 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 현재 에디터 스크롤 위치의 눈금선 번호와 100% 동일한 슬라이드 미리보기 */
+  /* 현재 스크롤 위치의 눈금선 번호와 100% 동일한 슬라이드 미리보기 */
   function startPreviewCurrentSlide() {
     const currentViewY = editorContainer.scrollTop;
     const currentSlideIndex = Math.max(0, Math.floor(currentViewY / FIXED_SLIDE_HEIGHT));
@@ -1372,10 +1400,8 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 절대 고정 높이(740px) 단위로 에디터와 완벽히 동일하게 뷰포트 이동 */
   function updateReader() {
     readerCanvas.style.top = `-${FIXED_SLIDE_HEIGHT * currentPageIndex}px`;
-
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
     document.getElementById('total-page').innerText = totalSlideCount;
   }
