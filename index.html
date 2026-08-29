@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 캐시 무효화 메타태그 -->
-<link rel="manifest" href="manifest.json?v=2026_clean_btn_v30">
+<link rel="manifest" href="manifest.json?v=2026_color_paste_v31">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -101,7 +101,6 @@
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
 
-  /* 간결해진 -, + 조절 버튼 스타일 */
   .btn-format {
     width: 32px;
     height: 28px;
@@ -261,7 +260,7 @@
     right: 6px;
     bottom: 20px;
     width: 28px;
-    z-index: 999998;
+    z-index: 9999998;
     display: flex;
     justify-content: center;
     user-select: none;
@@ -298,7 +297,7 @@
     border-radius: 20px;
     font-size: 15px;
     font-weight: bold;
-    z-index: 999999;
+    z-index: 9999999;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -1059,7 +1058,49 @@
     }, 300);
   });
 
-  editor.addEventListener('paste', () => {
+  /* 구글 슬라이드/PPT 글자 색상 보존 스마트 붙여넣기 엔진 */
+  editor.addEventListener('paste', (e) => {
+    e.preventDefault();
+    pushHistory();
+
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const htmlData = clipboardData ? clipboardData.getData('text/html') : '';
+    const textData = clipboardData ? clipboardData.getData('text/plain') : '';
+
+    if (htmlData) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlData, 'text/html');
+
+      // 불필요한 태그 정리 및 스타일 정제
+      doc.querySelectorAll('script, style, meta, link').forEach(el => el.remove());
+
+      // 구글 슬라이드/PPT에서 들어온 태그의 텍스트 색상 및 서식 보존
+      doc.querySelectorAll('*').forEach(el => {
+        const color = el.style.color || el.getAttribute('color');
+        const bg = el.style.backgroundColor;
+        el.removeAttribute('class');
+        el.removeAttribute('id');
+
+        let newStyle = '';
+        if (color && color !== 'inherit') newStyle += `color: ${color}; `;
+        if (bg && bg !== 'inherit' && bg !== 'transparent') newStyle += `background-color: ${bg}; `;
+        if (el.style.letterSpacing) newStyle += `letter-spacing: ${el.style.letterSpacing}; `;
+        if (el.style.lineHeight) newStyle += `line-height: ${el.style.lineHeight}; `;
+
+        if (newStyle) {
+          el.setAttribute('style', newStyle.trim());
+        } else {
+          el.removeAttribute('style');
+        }
+      });
+
+      const cleanedHtml = doc.body.innerHTML;
+      document.execCommand('insertHTML', false, cleanedHtml);
+    } else {
+      const formattedText = textData.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+      document.execCommand('insertHTML', false, formattedText);
+    }
+
     setTimeout(() => {
       pushHistory();
       saveEditorContent();
@@ -1070,7 +1111,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_clean_btn_v30', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_color_paste_v31', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1465,7 +1506,7 @@ ${content}`;
     if (e.key === 'Escape') exitSermonMode();
   });
 
-  // 자체 즉시 초기화
+  // 자체 초기화
   function initApp() {
     try {
       const savedSize = localStorage.getItem('yslide_font_size');
@@ -1476,7 +1517,7 @@ ${content}`;
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_clean_btn_v30') || localStorage.getItem('yslide_clean_v29') || localStorage.getItem('yslide_clean_v28');
+      const saved = localStorage.getItem('yslide_color_paste_v31') || localStorage.getItem('yslide_clean_btn_v30') || localStorage.getItem('yslide_clean_v29') || localStorage.getItem('yslide_clean_v28');
       if (saved) {
         editor.innerHTML = saved;
       }
