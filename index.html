@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 캐시 방지 메타태그 -->
-<link rel="manifest" href="manifest.json?v=2026_2tier">
+<link rel="manifest" href="manifest.json?v=2026_scroll_fixed">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -21,12 +21,11 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
-    /* 740px 고정 슬라이드 높이 */
     --slide-fixed-height: 740px;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
     --content-padding-x: 32px;
-    --toolbar-height: 96px; /* 2단 툴바 높이 */
+    --toolbar-height: 96px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
@@ -101,7 +100,6 @@
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
 
-  /* 1단 자간/줄간격 서식 버튼 스타일 */
   .btn-format {
     padding: 0 12px;
     height: 28px;
@@ -536,7 +534,7 @@
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="선택 영역 줄간격 넓게">↕ +</button>
   </div>
 
-  <!-- 2단 (두 번째 줄): 기존 주요 기능 및 조작 버튼 -->
+  <!-- 2단 (두 번째 줄): 주요 기능 및 조작 버튼 -->
   <div class="toolbar-row">
     <div class="btn-group" id="edit-tools">
       <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
@@ -718,7 +716,7 @@
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_2tier_v24');
+      const saved = localStorage.getItem('yslide_noscroll_v25');
       if (saved) {
         editor.innerHTML = saved;
       }
@@ -742,12 +740,14 @@
     }
   });
 
-  /* 1단 자간 조절 함수 */
+  /* 1단 자간 조절 (화면 스크롤 고정 & 드래그 영역 유지) */
   function adjustLetterSpacing(delta) {
     if (!savedSelectionRange) {
       showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
       return;
     }
+    const currentScroll = editorContainer.scrollTop; // 현재 스크롤 위치 보존
+
     pushHistory();
     const span = document.createElement('span');
     const fragment = savedSelectionRange.extractContents();
@@ -757,17 +757,29 @@
     span.style.letterSpacing = `${current + delta}px`;
 
     savedSelectionRange.insertNode(span);
+
+    // 변경된 span 태그를 다시 드래그(선택) 상태로 복구
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.addRange(newRange);
+    savedSelectionRange = newRange.cloneRange();
+
+    editorContainer.scrollTop = currentScroll; // 스크롤 원위치 강제 고정
     pushHistory();
     saveEditorContent();
     updateSlideIndicators();
   }
 
-  /* 1단 줄간격 조절 함수 */
+  /* 1단 줄간격 조절 (화면 스크롤 고정 & 드래그 영역 유지) */
   function adjustLineHeight(delta) {
     if (!savedSelectionRange) {
       showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
       return;
     }
+    const currentScroll = editorContainer.scrollTop; // 현재 스크롤 위치 보존
+
     pushHistory();
     const span = document.createElement('span');
     span.style.display = 'inline-block';
@@ -778,6 +790,16 @@
     span.style.lineHeight = `${Math.max(1.0, current + delta)}`;
 
     savedSelectionRange.insertNode(span);
+
+    // 변경된 span 태그를 다시 드래그(선택) 상태로 복구
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.addRange(newRange);
+    savedSelectionRange = newRange.cloneRange();
+
+    editorContainer.scrollTop = currentScroll; // 스크롤 원위치 강제 고정
     pushHistory();
     saveEditorContent();
     updateSlideIndicators();
@@ -1036,7 +1058,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_2tier_v24', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_noscroll_v25', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1070,6 +1092,7 @@
     el.classList.add('selected');
 
     if (!isContinuousMode) {
+      const currentScroll = editorContainer.scrollTop;
       editor.focus();
       if (savedSelectionRange) {
         const sel = window.getSelection();
@@ -1078,6 +1101,7 @@
       }
       pushHistory();
       document.execCommand('foreColor', false, color);
+      editorContainer.scrollTop = currentScroll;
       pushHistory();
       saveEditorContent();
     }
@@ -1174,7 +1198,7 @@ ${content}`;
       const title = firstLine.substring(0, 30);
 
       const now = new Date();
-      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0 Cortical')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
       const newDoc = {
         id: 'doc_' + Date.now(),
@@ -1363,7 +1387,6 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 완벽 뷰포트 전체모드 */
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
@@ -1383,7 +1406,6 @@ ${content}`;
     } catch(e){}
   }
 
-  /* 현재 스크롤 위치의 눈금선 번호와 100% 동일한 슬라이드 미리보기 */
   function startPreviewCurrentSlide() {
     const currentViewY = editorContainer.scrollTop;
     const currentSlideIndex = Math.max(0, Math.floor(currentViewY / FIXED_SLIDE_HEIGHT));
