@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_gslide_color_v33">
+<link rel="manifest" href="manifest.json?v=2026_fixed_final_v34">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -527,7 +527,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 (순수 -, + 버튼) -->
+  <!-- 1단: 자간 / 줄간격 (-, + 버튼) -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
@@ -1059,7 +1059,7 @@
     }, 300);
   });
 
-  /* 색상 유틸리티: RGB를 Hex로 변환 */
+  /* 색상 변환 유틸리티 */
   function rgbToHex(rgb) {
     if (!rgb) return '';
     if (rgb.startsWith('#')) return rgb;
@@ -1071,7 +1071,6 @@
     return `#${r}${g}${b}`;
   }
 
-  /* 기본 어두운 본문 글자인지 판별 (검은색/짙은회색 -> 흰색으로 변환 대상) */
   function isDefaultDarkColor(colorStr) {
     if (!colorStr) return true;
     const hex = rgbToHex(colorStr).toLowerCase();
@@ -1084,7 +1083,6 @@
     return false;
   }
 
-  /* DOM 안전 삽입 엔진 (슬립 복귀 후에도 커서 유지) */
   function insertHtmlAtCaret(html) {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
@@ -1119,7 +1117,7 @@
     }
   }
 
-  /* 구글 슬라이드/PPT/웹 글자 색상 100% 보존 스마트 페이스트 엔진 */
+  /* 구글 슬라이드 / PPT 글자 색상 보존 스마트 페이스트 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1134,7 +1132,6 @@
 
       doc.querySelectorAll('script, style, meta, link, svg, title').forEach(el => el.remove());
 
-      // 재귀적으로 색상을 추적하여 <font color="...">로 변환
       function processNode(node, inheritedColor = '') {
         if (node.nodeType === Node.TEXT_NODE) {
           const text = node.textContent;
@@ -1179,7 +1176,6 @@
         finalHtml += processNode(child, '');
       });
 
-      // 불필요하게 중복된 다중 줄바꿈 정리
       finalHtml = finalHtml.replace(/(<br\s*[\/]?>){3,}/gi, '<br><br>');
       insertHtmlAtCaret(finalHtml);
     } else {
@@ -1199,7 +1195,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_gslide_color_v33', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v34', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1306,8 +1302,7 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^
-```html\s*/i, '').replace(/\s*```$/i, '').trim();
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
         pushHistory();
         editor.innerHTML = translatedHtml;
         pushHistory();
@@ -1595,7 +1590,7 @@ ${content}`;
     if (e.key === 'Escape') exitSermonMode();
   });
 
-  // 자체 초기화
+  // 자체 초기화 (Failsafe Auto-init)
   function initApp() {
     try {
       const savedSize = localStorage.getItem('yslide_font_size');
@@ -1606,7 +1601,7 @@ ${content}`;
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_gslide_color_v33') || localStorage.getItem('yslide_gslide_color_v32') || localStorage.getItem('yslide_clean_btn_v30');
+      const saved = localStorage.getItem('yslide_final_v34') || localStorage.getItem('yslide_gslide_color_v33') || localStorage.getItem('yslide_gslide_color_v32');
       if (saved) {
         editor.innerHTML = saved;
       }
