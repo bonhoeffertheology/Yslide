@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_gslide_color_v32">
+<link rel="manifest" href="manifest.json?v=2026_gslide_color_v33">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1059,8 +1059,68 @@
     }, 300);
   });
 
-  /* 구글 슬라이드 / PPT 글자 색상 100% 보존 스마트 페이스트 엔진 */
-  editor.addEventListener('paste', (e) => {
+  /* 색상 유틸리티: RGB를 Hex로 변환 */
+  function rgbToHex(rgb) {
+    if (!rgb) return '';
+    if (rgb.startsWith('#')) return rgb;
+    const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (!match) return rgb;
+    const r = parseInt(match[1]).toString(16).padStart(2, '0');
+    const g = parseInt(match[2]).toString(16).padStart(2, '0');
+    const b = parseInt(match[3]).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
+  }
+
+  /* 기본 어두운 본문 글자인지 판별 (검은색/짙은회색 -> 흰색으로 변환 대상) */
+  function isDefaultDarkColor(colorStr) {
+    if (!colorStr) return true;
+    const hex = rgbToHex(colorStr).toLowerCase();
+    if (['#000000', '#111111', '#202124', '#222222', '#333333', '#1e1e1e', '#000', '#202020', 'transparent', 'inherit', 'initial'].includes(hex)) return true;
+    const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (match) {
+      const r = parseInt(match[1]), g = parseInt(match[2]), b = parseInt(match[3]);
+      if (r < 45 && g < 45 && b < 45) return true;
+    }
+    return false;
+  }
+
+  /* DOM 안전 삽입 엔진 (슬립 복귀 후에도 커서 유지) */
+  function insertHtmlAtCaret(html) {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      let range = sel.getRangeAt(0);
+      if (!editor.contains(range.commonAncestorContainer)) {
+        editor.focus();
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      range.deleteContents();
+      
+      const el = document.createElement("div");
+      el.innerHTML = html;
+      const frag = document.createDocumentFragment();
+      let node, lastNode;
+      while ((node = el.firstChild)) {
+        lastNode = frag.appendChild(node);
+      }
+      range.insertNode(frag);
+      if (lastNode) {
+        range = range.cloneRange();
+        range.setStartAfter(lastNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } else {
+      editor.innerHTML += html;
+    }
+  }
+
+  /* 구글 슬라이드/PPT/웹 글자 색상 100% 보존 스마트 페이스트 엔진 */
+  function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
 
@@ -1072,32 +1132,59 @@
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlData, 'text/html');
 
-      // 스크립트, 메타, 스타일시트 등 불필요 태그 제거
-      doc.querySelectorAll('script, style, meta, link').forEach(el => el.remove());
+      doc.querySelectorAll('script, style, meta, link, svg, title').forEach(el => el.remove());
 
-      // 구글 슬라이드 전용: 요소 트리를 순회하며 글자 색상을 확실하게 <font color="..."> 및 style 태그로 보존
-      const allElements = doc.body.querySelectorAll('*');
-      allElements.forEach(el => {
-        let colorVal = el.style.color || el.getAttribute('color');
-        
-        // 흑백/어두운 기본 텍스트나 투명 제외, 명확한 색상값 감지
-        if (colorVal && colorVal !== 'inherit' && colorVal !== 'initial') {
-          el.style.color = colorVal;
+      // 재귀적으로 색상을 추적하여 <font color="...">로 변환
+      function processNode(node, inheritedColor = '') {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent;
+          if (!text) return '';
+          if (inheritedColor && !isDefaultDarkColor(inheritedColor)) {
+            const hex = rgbToHex(inheritedColor);
+            return `<font color="${hex}">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</font>`;
+          }
+          return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
-        // 구글 슬라이드의 배경색/글꼴크기/서체 등 레이아웃 방해 스타일 제거
-        el.style.backgroundColor = '';
-        el.style.fontSize = '';
-        el.style.fontFamily = '';
-        el.removeAttribute('class');
-        el.removeAttribute('id');
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toLowerCase();
+          if (tag === 'br') return '<br>';
+
+          let curColor = node.style.color || node.getAttribute('color') || inheritedColor;
+
+          let inner = '';
+          node.childNodes.forEach(child => {
+            inner += processNode(child, curColor);
+          });
+
+          if (tag === 'p' || tag === 'div' || tag === 'li' || tag === 'tr') {
+            return inner + '<br>';
+          }
+          if (tag === 'b' || tag === 'strong' || node.style.fontWeight >= '600') {
+            return `<b>${inner}</b>`;
+          }
+          if (tag === 'i' || tag === 'em' || node.style.fontStyle === 'italic') {
+            return `<i>${inner}</i>`;
+          }
+          if (tag === 'u' || (node.style.textDecoration && node.style.textDecoration.includes('underline'))) {
+            return `<u>${inner}</u>`;
+          }
+          return inner;
+        }
+        return '';
+      }
+
+      let finalHtml = '';
+      doc.body.childNodes.forEach(child => {
+        finalHtml += processNode(child, '');
       });
 
-      const processedHtml = doc.body.innerHTML;
-      document.execCommand('insertHTML', false, processedHtml);
+      // 불필요하게 중복된 다중 줄바꿈 정리
+      finalHtml = finalHtml.replace(/(<br\s*[\/]?>){3,}/gi, '<br><br>');
+      insertHtmlAtCaret(finalHtml);
     } else {
       const formattedText = textData.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-      document.execCommand('insertHTML', false, formattedText);
+      insertHtmlAtCaret(formattedText);
     }
 
     setTimeout(() => {
@@ -1105,12 +1192,14 @@
       saveEditorContent();
       updateSlideIndicators();
       updateScrollThumbPosition();
-    }, 10);
-  });
+    }, 20);
+  }
+
+  editor.addEventListener('paste', handleSmartPaste);
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_gslide_color_v32', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_gslide_color_v33', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1217,7 +1306,8 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
+        translatedHtml = translatedHtml.replace(/^
+```html\s*/i, '').replace(/\s*```$/i, '').trim();
         pushHistory();
         editor.innerHTML = translatedHtml;
         pushHistory();
@@ -1516,7 +1606,7 @@ ${content}`;
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_gslide_color_v32') || localStorage.getItem('yslide_clean_btn_v30') || localStorage.getItem('yslide_clean_v29') || localStorage.getItem('yslide_clean_v28');
+      const saved = localStorage.getItem('yslide_gslide_color_v33') || localStorage.getItem('yslide_gslide_color_v32') || localStorage.getItem('yslide_clean_btn_v30');
       if (saved) {
         editor.innerHTML = saved;
       }
