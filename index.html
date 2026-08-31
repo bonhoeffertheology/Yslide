@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_fixed_final_v34">
+<link rel="manifest" href="manifest.json?v=2026_share_v36">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -74,7 +74,7 @@
     height: 40px;
   }
 
-  /* 1단 (자간/줄간격) */
+  /* 1단 (자간/줄간격/눈금선 3단 조절) */
   .toolbar-row-top {
     justify-content: flex-start;
     gap: 8px;
@@ -101,7 +101,6 @@
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
 
-  /* 간결한 -, + 조절 버튼 */
   .btn-format {
     width: 32px;
     height: 28px;
@@ -118,6 +117,21 @@
     color: #38bdf8;
     border-color: #38bdf8;
   }
+  
+  .btn-height-toggle {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    background-color: #282828;
+    border: 1px solid #4a4a4a;
+    color: #38bdf8;
+    border-radius: 4px;
+  }
+  .btn-height-toggle:active {
+    background-color: #38bdf8;
+    color: #000;
+  }
+
   .format-label {
     font-size: 13px;
     color: #9ca3af;
@@ -186,7 +200,7 @@
     pointer-events: none;
   }
 
-  /* 740px 고정 눈금선 레이어 */
+  /* 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 24px;
@@ -527,20 +541,25 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 (-, + 버튼) -->
+  <!-- 1단: 자간 / 줄간격 / 눈금선 3단 조절 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">+</button>
 
-    <div style="width: 1px; height: 16px; background: #444; margin: 0 6px;"></div>
+    <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
 
     <span class="format-label">줄간격:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">-</button>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">+</button>
+
+    <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
+
+    <span class="format-label">눈금:</span>
+    <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 3단계 순환 조절 (기본 740px → 중간 → Full)">📏 740px</button>
   </div>
 
-  <!-- 2단: 기본 기능 -->
+  <!-- 2단: 기본 기능 및 공유하기 -->
   <div class="toolbar-row">
     <div class="btn-group" id="edit-tools">
       <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
@@ -555,6 +574,17 @@
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
           <polyline points="17 21 17 13 7 13 7 21"></polyline>
           <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+      </button>
+
+      <!-- 공유하기 버튼 (카톡, 이메일, 페이스북, 블루투스 등) -->
+      <button class="btn-icon" onclick="shareSelectedText()" title="선택 텍스트 공유하기 (카톡/메일/페이스북/블루투스)">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
         </svg>
       </button>
 
@@ -660,7 +690,8 @@
     });
   }
 
-  const FIXED_SLIDE_HEIGHT = 740;
+  let currentSlideHeight = 740;
+  let heightStepIndex = 0;
 
   let isReaderMode = false;
   let isContinuousMode = false;
@@ -679,6 +710,7 @@
   const scrollThumb = document.getElementById('quick-scrollbar-thumb');
   const scrollBadge = document.getElementById('quick-scroll-badge');
   const readerCanvas = document.getElementById('reader-canvas');
+  const btnSlideHeight = document.getElementById('btn-slide-height');
 
   let historyStack = [];
   const MAX_HISTORY = 40;
@@ -725,6 +757,87 @@
       saveCurrentSelection();
     }
   });
+
+  /* 텍스트 공유하기 (Web Share API 및 클립보드 폴백) */
+  async function shareSelectedText() {
+    let shareText = '';
+    const sel = window.getSelection();
+    
+    if (sel && !sel.isCollapsed && sel.toString().trim() !== '') {
+      shareText = sel.toString().trim();
+    } else if (savedSelectionRange && !savedSelectionRange.collapsed) {
+      shareText = savedSelectionRange.toString().trim();
+    } else {
+      shareText = editor.innerText.trim();
+    }
+
+    if (!shareText) {
+      showQuickToast("⚠️ 공유할 텍스트가 없습니다");
+      return;
+    }
+
+    const firstLine = shareText.split('\n')[0].substring(0, 30);
+    const shareData = {
+      title: firstLine || 'Yslide 원고 공유',
+      text: shareText
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        showQuickToast("📤 공유가 완료되었습니다");
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          copyTextFallback(shareText);
+        }
+      }
+    } else {
+      copyTextFallback(shareText);
+    }
+  }
+
+  function copyTextFallback(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showQuickToast("📋 텍스트가 클립보드에 복사되었습니다");
+      }).catch(() => {
+        showQuickToast("⚠️ 복사에 실패했습니다");
+      });
+    } else {
+      showQuickToast("📋 공유 기능을 지원하지 않는 브라우저입니다");
+    }
+  }
+
+  /* 눈금선 3단계 순환 조절 */
+  function cycleSlideHeightStep() {
+    heightStepIndex = (heightStepIndex + 1) % 3;
+    applySlideHeightByStep(heightStepIndex);
+  }
+
+  function applySlideHeightByStep(step) {
+    const screenFullHeight = window.innerHeight || 1000;
+    const fullVal = Math.max(740, screenFullHeight);
+    const midVal = Math.round((740 + fullVal) / 2);
+
+    if (step === 0) {
+      currentSlideHeight = 740;
+      if (btnSlideHeight) btnSlideHeight.innerText = "📏 740px";
+      showQuickToast("📏 눈금선: 기본 모드 (740px)");
+    } else if (step === 1) {
+      currentSlideHeight = midVal;
+      if (btnSlideHeight) btnSlideHeight.innerText = `📏 중간 (${midVal}px)`;
+      showQuickToast(`📏 눈금선: 중간 모드 (${midVal}px)`);
+    } else {
+      currentSlideHeight = fullVal;
+      if (btnSlideHeight) btnSlideHeight.innerText = `📏 Full (${fullVal}px)`;
+      showQuickToast(`📏 눈금선: 전체화면 모드 (${fullVal}px)`);
+    }
+
+    document.documentElement.style.setProperty('--slide-fixed-height', currentSlideHeight + 'px');
+    try { localStorage.setItem('yslide_height_step', step); } catch(e){}
+    updateSlideIndicators();
+    updateScrollThumbPosition();
+  }
 
   /* 1단 자간 연타 조절 */
   function adjustLetterSpacing(delta) {
@@ -848,7 +961,7 @@
   }
 
   function getAccurateSlideMetrics() {
-    const slideHeight = FIXED_SLIDE_HEIGHT;
+    const slideHeight = currentSlideHeight;
     const textHeight = Math.max(editor.scrollHeight - 48, slideHeight);
     const count = Math.max(1, Math.ceil(textHeight / slideHeight));
     return { slideHeight, count };
@@ -921,7 +1034,7 @@
     editorContainer.scrollTop = progress * maxScroll;
     scrollThumb.style.top = `${offsetY}px`;
 
-    const currentSlide = Math.floor(editorContainer.scrollTop / FIXED_SLIDE_HEIGHT) + 1;
+    const currentSlide = Math.floor(editorContainer.scrollTop / currentSlideHeight) + 1;
     scrollBadge.innerText = `${currentSlide} 슬라이드`;
   }
 
@@ -1117,7 +1230,7 @@
     }
   }
 
-  /* 구글 슬라이드 / PPT 글자 색상 보존 스마트 페이스트 */
+  /* 구글 슬라이드/PPT 글자 색상 보존 스마트 붙여넣기 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1195,7 +1308,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v34', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v36', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1547,7 +1660,7 @@ ${content}`;
 
   function startPreviewCurrentSlide() {
     const currentViewY = editorContainer.scrollTop;
-    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / FIXED_SLIDE_HEIGHT));
+    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / currentSlideHeight));
     startSermonMode(currentSlideIndex);
   }
 
@@ -1565,7 +1678,7 @@ ${content}`;
   }
 
   function updateReader() {
-    readerCanvas.style.top = `-${FIXED_SLIDE_HEIGHT * currentPageIndex}px`;
+    readerCanvas.style.top = `-${currentSlideHeight * currentPageIndex}px`;
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
     document.getElementById('total-page').innerText = totalSlideCount;
   }
@@ -1590,7 +1703,7 @@ ${content}`;
     if (e.key === 'Escape') exitSermonMode();
   });
 
-  // 자체 초기화 (Failsafe Auto-init)
+  // 자체 초기화
   function initApp() {
     try {
       const savedSize = localStorage.getItem('yslide_font_size');
@@ -1601,7 +1714,13 @@ ${content}`;
       }
       applyFontSize(currentFontSize);
 
-      const saved = localStorage.getItem('yslide_final_v34') || localStorage.getItem('yslide_gslide_color_v33') || localStorage.getItem('yslide_gslide_color_v32');
+      const savedStep = localStorage.getItem('yslide_height_step');
+      if (savedStep !== null) {
+        heightStepIndex = parseInt(savedStep, 10);
+      }
+      applySlideHeightByStep(heightStepIndex);
+
+      const saved = localStorage.getItem('yslide_share_v36') || localStorage.getItem('yslide_final_v35') || localStorage.getItem('yslide_final_v34');
       if (saved) {
         editor.innerHTML = saved;
       }
