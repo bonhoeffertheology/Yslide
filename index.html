@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>Yslide</title>
 
+<!-- KoPubWorld 및 웹폰트 CDN 로드 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.0/kopubworld.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_fit_height_v38">
+<link rel="manifest" href="manifest.json?v=2026_font_step2_v39">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -22,6 +26,7 @@
     --font-size: 30px;
     --line-height: 1.45;
     --slide-fixed-height: 740px;
+    --font-family: 'KoPubWorld Dotum', 'Pretendard', sans-serif;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
     --content-padding-x: 32px;
@@ -36,7 +41,7 @@
     overflow: hidden;
     background-color: #000000;
     color: #f3f4f6;
-    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+    font-family: var(--font-family);
   }
 
   ::selection {
@@ -74,7 +79,7 @@
     height: 40px;
   }
 
-  /* 1단 (자간/줄간격/눈금선 3단 조절) */
+  /* 1단 (자간/줄간격/눈금선 2단/글꼴 선택) */
   .toolbar-row-top {
     justify-content: flex-start;
     gap: 8px;
@@ -102,7 +107,7 @@
   }
 
   .btn-format {
-    width: 32px;
+    width: 30px;
     height: 28px;
     padding: 0;
     font-size: 15px;
@@ -120,8 +125,9 @@
   
   .btn-height-toggle {
     height: 28px;
-    padding: 0 10px;
-    font-size: 12px;
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: bold;
     background-color: #282828;
     border: 1px solid #4a4a4a;
     color: #38bdf8;
@@ -130,6 +136,24 @@
   .btn-height-toggle:active {
     background-color: #38bdf8;
     color: #000;
+  }
+
+  /* 글꼴 선택 드롭다운 */
+  .font-select {
+    height: 28px;
+    background-color: #282828;
+    border: 1px solid #4a4a4a;
+    color: #e5e5e5;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 0 6px;
+    outline: none;
+    cursor: pointer;
+  }
+  .font-select option {
+    background-color: #1e1e1e;
+    color: #f3f4f6;
   }
 
   .format-label {
@@ -246,6 +270,7 @@
     background-color: transparent;
     padding: 24px var(--content-padding-x) 24px var(--content-padding-x);
     outline: none;
+    font-family: var(--font-family);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -355,6 +380,7 @@
   #reader-canvas {
     width: 100%;
     padding: 0 var(--content-padding-x);
+    font-family: var(--font-family);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -512,6 +538,7 @@
       position: static !important; overflow: visible !important;
       background-color: #ffffff !important; color: #000000 !important;
       height: auto !important; width: auto !important;
+      font-family: var(--font-family) !important;
     }
     #toolbar, #editor-container, #reader-container, #storage-modal, #toast-msg, #quick-scrollbar-track, #quick-scroll-badge {
       display: none !important;
@@ -532,6 +559,7 @@
       margin-bottom: 15px; border-bottom: 1px solid #dddddd; padding-bottom: 4px;
     }
     .print-slide-body {
+      font-family: var(--font-family) !important;
       font-size: 18pt !important; line-height: 1.5 !important; font-weight: 500 !important;
       word-break: keep-all !important; color: #000000 !important; white-space: pre-wrap !important;
     }
@@ -541,7 +569,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 / 반응형 비율 눈금선 조절 -->
+  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 글꼴 선택 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
@@ -556,7 +584,17 @@
     <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
 
     <span class="format-label">눈금:</span>
-    <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="작업표시줄을 뺀 화면 높이 기준 조절 (기본 72% → 중간 86% → 전체 100%)">📏 기본 (72%)</button>
+    <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 2단계 토글 (1: 기본 72% / 2: 중간 86%)">📏 1</button>
+
+    <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
+
+    <span class="format-label">글꼴:</span>
+    <select id="font-family-select" class="font-select" onchange="changeFontFamily(this.value)" title="글꼴 선택">
+      <option value="'KoPubWorld Dotum', 'Pretendard', sans-serif">KoPub 돋움체</option>
+      <option value="'KoPubWorld Batang', serif">KoPub 바탕체</option>
+      <option value="'Pretendard', 'Noto Sans KR', sans-serif">Pretendard 고딕</option>
+      <option value="-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif">시스템 기본체</option>
+    </select>
   </div>
 
   <!-- 2단: 기본 기능 및 공유하기 -->
@@ -689,8 +727,8 @@
     });
   }
 
-  // 상단 툴바(96px)를 제외한 실제 에디터 뷰포트 대비 비율 (0: 72% 기본, 1: 86% 중간, 2: 100% 전체)
-  const RATIO_STEPS = [0.72, 0.86, 1.0];
+  // 눈금선 2단계 설정: 0 (기본 72%), 1 (중간 86%)
+  const RATIO_STEPS = [0.72, 0.86];
   const TOOLBAR_HEIGHT = 96;
   let heightStepIndex = 0;
   let currentSlideHeight = 740;
@@ -713,6 +751,7 @@
   const scrollBadge = document.getElementById('quick-scroll-badge');
   const readerCanvas = document.getElementById('reader-canvas');
   const btnSlideHeight = document.getElementById('btn-slide-height');
+  const fontSelect = document.getElementById('font-family-select');
 
   let historyStack = [];
   const MAX_HISTORY = 40;
@@ -759,6 +798,15 @@
       saveCurrentSelection();
     }
   });
+
+  /* 글꼴 변경 엔진 */
+  function changeFontFamily(fontVal) {
+    document.documentElement.style.setProperty('--font-family', fontVal);
+    try { localStorage.setItem('yslide_font_family', fontVal); } catch(e){}
+    updateSlideIndicators();
+    updateScrollThumbPosition();
+    showQuickToast("🔤 글꼴이 변경되었습니다");
+  }
 
   /* 텍스트 공유하기 */
   async function shareSelectedText() {
@@ -810,28 +858,24 @@
     }
   }
 
-  /* 툴바 높이를 제외한 에디터 가시 화면 기준 동적 높이 계산 */
+  /* 2단계 눈금선 토글 (1 <-> 2) */
   function cycleSlideHeightStep() {
-    heightStepIndex = (heightStepIndex + 1) % 3;
+    heightStepIndex = (heightStepIndex + 1) % 2;
     applySlideHeightByStep(heightStepIndex, true);
   }
 
   function applySlideHeightByStep(step, showToast = false) {
     const vh = window.innerHeight || document.documentElement.clientHeight || 1000;
-    // 툴바 높이를 뺀 순수 에디터 표시 가능 높이
     const availableEditorHeight = Math.max(480, vh - TOOLBAR_HEIGHT);
     const ratio = RATIO_STEPS[step] || 0.72;
     currentSlideHeight = Math.round(availableEditorHeight * ratio);
 
     if (step === 0) {
-      if (btnSlideHeight) btnSlideHeight.innerText = `📏 기본 (${currentSlideHeight}px)`;
-      if (showToast) showQuickToast(`📏 눈금선: 기본 모드 (${currentSlideHeight}px / 72%)`);
-    } else if (step === 1) {
-      if (btnSlideHeight) btnSlideHeight.innerText = `📏 중간 (${currentSlideHeight}px)`;
-      if (showToast) showQuickToast(`📏 눈금선: 중간 모드 (${currentSlideHeight}px / 86%)`);
+      if (btnSlideHeight) btnSlideHeight.innerText = "📏 1";
+      if (showToast) showQuickToast(`📏 눈금선: 1단계 기본 (${currentSlideHeight}px / 72%)`);
     } else {
-      if (btnSlideHeight) btnSlideHeight.innerText = `📏 전체 (${currentSlideHeight}px)`;
-      if (showToast) showQuickToast(`📏 눈금선: 전체 화면 맞춤 (${currentSlideHeight}px / 100%)`);
+      if (btnSlideHeight) btnSlideHeight.innerText = "📏 2";
+      if (showToast) showQuickToast(`📏 눈금선: 2단계 중간 (${currentSlideHeight}px / 86%)`);
     }
 
     document.documentElement.style.setProperty('--slide-fixed-height', currentSlideHeight + 'px');
@@ -840,7 +884,6 @@
     updateScrollThumbPosition();
   }
 
-  // 화면 리사이즈/회전 시 실시간 재동기화
   window.addEventListener('resize', () => {
     applySlideHeightByStep(heightStepIndex, false);
   });
@@ -1314,7 +1357,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v38', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v39', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1721,13 +1764,19 @@ ${content}`;
       }
       applyFontSize(currentFontSize);
 
+      const savedFont = localStorage.getItem('yslide_font_family');
+      if (savedFont) {
+        document.documentElement.style.setProperty('--font-family', savedFont);
+        if (fontSelect) fontSelect.value = savedFont;
+      }
+
       const savedStep = localStorage.getItem('yslide_height_step');
       if (savedStep !== null) {
-        heightStepIndex = parseInt(savedStep, 10);
+        heightStepIndex = parseInt(savedStep, 10) % 2;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v38') || localStorage.getItem('yslide_final_v37') || localStorage.getItem('yslide_share_v36');
+      const saved = localStorage.getItem('yslide_final_v39') || localStorage.getItem('yslide_final_v38') || localStorage.getItem('yslide_final_v37');
       if (saved) {
         editor.innerHTML = saved;
       }
