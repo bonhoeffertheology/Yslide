@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_font_selection_v40">
+<link rel="manifest" href="manifest.json?v=2026_font_keep_selection_v41">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -53,7 +53,7 @@
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
   }
 
-  /* 상단 2단 고정 툴바 (UI 폰트 완전 고정) */
+  /* 상단 2단 고정 툴바 (UI 폰트 고정) */
   #toolbar {
     position: fixed;
     top: 0;
@@ -81,7 +81,7 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 1단 (자간/줄간격/눈금선 2단/선택 글꼴 변경) */
+  /* 1단 (자간/줄간격/눈금선 2단/드래그 유지 글꼴 변경) */
   .toolbar-row-top {
     justify-content: flex-start;
     gap: 8px;
@@ -141,23 +141,22 @@
     color: #000;
   }
 
-  /* 글꼴 선택 드롭다운 */
-  .font-select {
+  /* 드래그 유지 원터치 글꼴 토글 버튼 */
+  .btn-font-cycle {
     height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: bold;
     background-color: #282828;
     border: 1px solid #4a4a4a;
     color: #38bdf8;
     border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    padding: 0 6px;
-    outline: none;
     cursor: pointer;
-    font-family: var(--ui-font) !important;
+    user-select: none;
   }
-  .font-select option {
-    background-color: #1e1e1e;
-    color: #f3f4f6;
+  .btn-font-cycle:active {
+    background-color: #38bdf8;
+    color: #000;
   }
 
   .format-label {
@@ -579,7 +578,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 선택 글꼴 변경 -->
+  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 드래그 유지 원터치 글꼴 토글 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
@@ -599,13 +598,7 @@
     <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
 
     <span class="format-label">글꼴:</span>
-    <select id="font-family-select" class="font-select" onmousedown="saveCurrentSelection()" onchange="applyFontFamilyToSelection(this.value)" title="선택 텍스트 글꼴 변경">
-      <option value="" disabled selected>글꼴 선택</option>
-      <option value="'KoPubWorld Dotum', sans-serif">KoPub 돋움체</option>
-      <option value="'KoPubWorld Batang', serif">KoPub 바탕체</option>
-      <option value="'Pretendard', sans-serif">Pretendard 고딕</option>
-      <option value="-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif">시스템 기본체</option>
-    </select>
+    <button id="btn-font-cycle" class="btn-font-cycle" onmousedown="event.preventDefault()" onclick="cycleSelectedFontFamily()" title="선택 텍스트 글꼴 원터치 순환 변경 (KoPub돋움 ↔ KoPub바탕 ↔ Pretendard ↔ 시스템)">🔤 KoPub돋움</button>
   </div>
 
   <!-- 2단: 기본 기능 및 공유하기 -->
@@ -738,6 +731,15 @@
     });
   }
 
+  // 글꼴 목록 정의
+  const FONT_OPTIONS = [
+    { name: "KoPub돋움", family: "'KoPubWorld Dotum', sans-serif" },
+    { name: "KoPub바탕", family: "'KoPubWorld Batang', serif" },
+    { name: "Pretendard", family: "'Pretendard', sans-serif" },
+    { name: "시스템기본", family: "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif" }
+  ];
+  let currentFontIndex = 0;
+
   // 눈금선 2단계 설정: 0 (기본 72%), 1 (중간 86%)
   const RATIO_STEPS = [0.72, 0.86];
   const TOOLBAR_HEIGHT = 96;
@@ -762,7 +764,7 @@
   const scrollBadge = document.getElementById('quick-scroll-badge');
   const readerCanvas = document.getElementById('reader-canvas');
   const btnSlideHeight = document.getElementById('btn-slide-height');
-  const fontSelect = document.getElementById('font-family-select');
+  const btnFontCycle = document.getElementById('btn-font-cycle');
 
   let historyStack = [];
   const MAX_HISTORY = 40;
@@ -813,56 +815,41 @@
     }
   });
 
-  /* 드래그하여 선택한 텍스트만 글꼴 적용 */
-  function applyFontFamilyToSelection(fontVal) {
-    if (!fontVal) return;
+  /* 드래그를 전혀 풀지 않고 선택 영역 글꼴 변경 */
+  function cycleSelectedFontFamily() {
+    const sel = window.getSelection();
+    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+                ? sel.getRangeAt(0) 
+                : savedSelectionRange;
 
-    try {
-      const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
-                  ? sel.getRangeAt(0) 
-                  : savedSelectionRange;
-
-      if (!range || range.collapsed) {
-        showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
-        if (fontSelect) fontSelect.selectedIndex = 0;
-        return;
-      }
-
-      const currentScroll = editorContainer.scrollTop;
-      pushHistory();
-
-      let targetEl = null;
-      let node = range.commonAncestorContainer;
-      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-
-      if (node && node !== editor && node.tagName === 'SPAN') {
-        targetEl = node;
-        targetEl.style.fontFamily = fontVal;
-      } else {
-        targetEl = document.createElement('span');
-        targetEl.style.fontFamily = fontVal;
-        const fragment = range.extractContents();
-        targetEl.appendChild(fragment);
-        range.insertNode(targetEl);
-      }
-
-      const newRange = document.createRange();
-      newRange.selectNodeContents(targetEl);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-      savedSelectionRange = newRange.cloneRange();
-
-      editorContainer.scrollTop = currentScroll;
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      showQuickToast("🔤 선택한 텍스트 글꼴이 변경되었습니다");
-    } catch(err) {
-      console.error(err);
-    } finally {
-      if (fontSelect) fontSelect.selectedIndex = 0;
+    if (!range || range.collapsed) {
+      showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
+      return;
     }
+
+    currentFontIndex = (currentFontIndex + 1) % FONT_OPTIONS.length;
+    const targetFont = FONT_OPTIONS[currentFontIndex];
+    if (btnFontCycle) btnFontCycle.innerText = `🔤 ${targetFont.name}`;
+
+    const currentScroll = editorContainer.scrollTop;
+    editor.focus();
+
+    // 드래그 복원
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    pushHistory();
+    // 브라우저 네이티브 폰트 적용 커맨드로 드래그 블록 100% 유지
+    document.execCommand('fontName', false, targetFont.family);
+    
+    // 생성된 font 태그를 깔끔한 인라인 스타일로 보정 및 드래그 유지
+    savedSelectionRange = sel.getRangeAt(0).cloneRange();
+
+    editorContainer.scrollTop = currentScroll;
+    pushHistory();
+    saveEditorContent();
+    updateSlideIndicators();
+    showQuickToast(`🔤 글꼴: ${targetFont.name}`);
   }
 
   /* 텍스트 공유하기 */
@@ -1418,7 +1405,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v40', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v41', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1831,7 +1818,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v40') || localStorage.getItem('yslide_final_v39') || localStorage.getItem('yslide_final_v38');
+      const saved = localStorage.getItem('yslide_final_v41') || localStorage.getItem('yslide_final_v40') || localStorage.getItem('yslide_final_v39');
       if (saved) {
         editor.innerHTML = saved;
       }
