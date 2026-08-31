@@ -1,25 +1,15 @@
-const CACHE_NAME = 'yslide-v2026-fix2';
+const CACHE_NAME = 'ybible-v3';
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
+self.addEventListener('activate', (e) => {
+  e.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+self.addEventListener('fetch', (e) => {
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
   );
 });
