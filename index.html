@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_font_step2_v39">
+<link rel="manifest" href="manifest.json?v=2026_font_selection_v40">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -26,11 +26,11 @@
     --font-size: 30px;
     --line-height: 1.45;
     --slide-fixed-height: 740px;
-    --font-family: 'KoPubWorld Dotum', 'Pretendard', sans-serif;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
     --content-padding-x: 32px;
     --toolbar-height: 96px;
+    --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
@@ -41,7 +41,7 @@
     overflow: hidden;
     background-color: #000000;
     color: #f3f4f6;
-    font-family: var(--font-family);
+    font-family: 'KoPubWorld Dotum', 'Pretendard', sans-serif;
   }
 
   ::selection {
@@ -53,7 +53,7 @@
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
   }
 
-  /* 상단 2단 고정 툴바 */
+  /* 상단 2단 고정 툴바 (UI 폰트 완전 고정) */
   #toolbar {
     position: fixed;
     top: 0;
@@ -69,6 +69,7 @@
     z-index: 9999999;
     gap: 6px;
     pointer-events: auto;
+    font-family: var(--ui-font) !important;
   }
 
   .toolbar-row {
@@ -77,9 +78,10 @@
     justify-content: space-between;
     width: 100%;
     height: 40px;
+    font-family: var(--ui-font) !important;
   }
 
-  /* 1단 (자간/줄간격/눈금선 2단/글꼴 선택) */
+  /* 1단 (자간/줄간격/눈금선 2단/선택 글꼴 변경) */
   .toolbar-row-top {
     justify-content: flex-start;
     gap: 8px;
@@ -96,6 +98,7 @@
     background-color: #2c2c2c; color: #d1d5db; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; user-select: none;
     transition: all 0.15s ease;
+    font-family: var(--ui-font) !important;
   }
   button:active { background-color: #404040; color: #fff; }
   
@@ -143,13 +146,14 @@
     height: 28px;
     background-color: #282828;
     border: 1px solid #4a4a4a;
-    color: #e5e5e5;
+    color: #38bdf8;
     border-radius: 4px;
     font-size: 12px;
     font-weight: bold;
     padding: 0 6px;
     outline: none;
     cursor: pointer;
+    font-family: var(--ui-font) !important;
   }
   .font-select option {
     background-color: #1e1e1e;
@@ -162,6 +166,7 @@
     margin-right: 2px;
     font-weight: bold;
     user-select: none;
+    font-family: var(--ui-font) !important;
   }
 
   #btn-continuous.active {
@@ -189,6 +194,7 @@
   .btn-step:active { background: #444; }
   #size-val {
     font-size: 13px; font-weight: bold; color: #d1d5db; width: 28px; text-align: center;
+    font-family: var(--ui-font) !important;
   }
 
   #file-input { display: none; }
@@ -259,6 +265,7 @@
     transform: translateY(-50%);
     margin-right: 20px;
     pointer-events: none !important;
+    font-family: var(--ui-font) !important;
   }
 
   /* 에디터 본문 */
@@ -270,7 +277,6 @@
     background-color: transparent;
     padding: 24px var(--content-padding-x) 24px var(--content-padding-x);
     outline: none;
-    font-family: var(--font-family);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -342,6 +348,7 @@
     pointer-events: none;
     transition: opacity 0.15s ease;
     box-shadow: 0 4px 16px rgba(0,0,0,0.7);
+    font-family: var(--ui-font) !important;
   }
   #quick-scroll-badge.show { opacity: 1; }
 
@@ -380,7 +387,6 @@
   #reader-canvas {
     width: 100%;
     padding: 0 var(--content-padding-x);
-    font-family: var(--font-family);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -408,6 +414,7 @@
     color: #fff; font-size: 22px; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
     z-index: 5000; cursor: pointer; padding: 0;
+    font-family: var(--ui-font) !important;
   }
   #exit-btn:active { background: rgba(239, 68, 68, 0.9); }
 
@@ -416,6 +423,7 @@
     background: rgba(30, 30, 30, 0.75); padding: 5px 14px; border-radius: 12px;
     color: #ffb703; font-weight: bold; z-index: 5000; user-select: none; pointer-events: none;
     border: 1px solid #333;
+    font-family: var(--ui-font) !important;
   }
 
   #toast-msg {
@@ -435,6 +443,7 @@
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
     z-index: 99999999;
+    font-family: var(--ui-font) !important;
   }
   #toast-msg.show {
     opacity: 1;
@@ -449,6 +458,7 @@
     z-index: 20000000;
     justify-content: center;
     align-items: center;
+    font-family: var(--ui-font) !important;
   }
   .modal-box {
     width: 90%; max-width: 950px; height: 82vh;
@@ -459,6 +469,7 @@
     flex-direction: column;
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    font-family: var(--ui-font) !important;
   }
   .modal-header {
     padding: 16px 20px;
@@ -538,7 +549,6 @@
       position: static !important; overflow: visible !important;
       background-color: #ffffff !important; color: #000000 !important;
       height: auto !important; width: auto !important;
-      font-family: var(--font-family) !important;
     }
     #toolbar, #editor-container, #reader-container, #storage-modal, #toast-msg, #quick-scrollbar-track, #quick-scroll-badge {
       display: none !important;
@@ -557,9 +567,9 @@
     .print-slide-header {
       text-align: right; font-size: 11pt; font-weight: bold; color: #777777;
       margin-bottom: 15px; border-bottom: 1px solid #dddddd; padding-bottom: 4px;
+      font-family: var(--ui-font) !important;
     }
     .print-slide-body {
-      font-family: var(--font-family) !important;
       font-size: 18pt !important; line-height: 1.5 !important; font-weight: 500 !important;
       word-break: keep-all !important; color: #000000 !important; white-space: pre-wrap !important;
     }
@@ -569,7 +579,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 글꼴 선택 -->
+  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 선택 글꼴 변경 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
@@ -589,10 +599,11 @@
     <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
 
     <span class="format-label">글꼴:</span>
-    <select id="font-family-select" class="font-select" onchange="changeFontFamily(this.value)" title="글꼴 선택">
-      <option value="'KoPubWorld Dotum', 'Pretendard', sans-serif">KoPub 돋움체</option>
+    <select id="font-family-select" class="font-select" onmousedown="saveCurrentSelection()" onchange="applyFontFamilyToSelection(this.value)" title="선택 텍스트 글꼴 변경">
+      <option value="" disabled selected>글꼴 선택</option>
+      <option value="'KoPubWorld Dotum', sans-serif">KoPub 돋움체</option>
       <option value="'KoPubWorld Batang', serif">KoPub 바탕체</option>
-      <option value="'Pretendard', 'Noto Sans KR', sans-serif">Pretendard 고딕</option>
+      <option value="'Pretendard', sans-serif">Pretendard 고딕</option>
       <option value="-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif">시스템 기본체</option>
     </select>
   </div>
@@ -788,7 +799,10 @@
     try {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-        savedSelectionRange = sel.getRangeAt(0).cloneRange();
+        const range = sel.getRangeAt(0);
+        if (editor.contains(range.commonAncestorContainer)) {
+          savedSelectionRange = range.cloneRange();
+        }
       }
     } catch(e){}
   }
@@ -799,13 +813,56 @@
     }
   });
 
-  /* 글꼴 변경 엔진 */
-  function changeFontFamily(fontVal) {
-    document.documentElement.style.setProperty('--font-family', fontVal);
-    try { localStorage.setItem('yslide_font_family', fontVal); } catch(e){}
-    updateSlideIndicators();
-    updateScrollThumbPosition();
-    showQuickToast("🔤 글꼴이 변경되었습니다");
+  /* 드래그하여 선택한 텍스트만 글꼴 적용 */
+  function applyFontFamilyToSelection(fontVal) {
+    if (!fontVal) return;
+
+    try {
+      const sel = window.getSelection();
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+                  ? sel.getRangeAt(0) 
+                  : savedSelectionRange;
+
+      if (!range || range.collapsed) {
+        showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
+        if (fontSelect) fontSelect.selectedIndex = 0;
+        return;
+      }
+
+      const currentScroll = editorContainer.scrollTop;
+      pushHistory();
+
+      let targetEl = null;
+      let node = range.commonAncestorContainer;
+      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+      if (node && node !== editor && node.tagName === 'SPAN') {
+        targetEl = node;
+        targetEl.style.fontFamily = fontVal;
+      } else {
+        targetEl = document.createElement('span');
+        targetEl.style.fontFamily = fontVal;
+        const fragment = range.extractContents();
+        targetEl.appendChild(fragment);
+        range.insertNode(targetEl);
+      }
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(targetEl);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedSelectionRange = newRange.cloneRange();
+
+      editorContainer.scrollTop = currentScroll;
+      pushHistory();
+      saveEditorContent();
+      updateSlideIndicators();
+      showQuickToast("🔤 선택한 텍스트 글꼴이 변경되었습니다");
+    } catch(err) {
+      console.error(err);
+    } finally {
+      if (fontSelect) fontSelect.selectedIndex = 0;
+    }
   }
 
   /* 텍스트 공유하기 */
@@ -892,8 +949,10 @@
   function adjustLetterSpacing(delta) {
     try {
       const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
-      if (!range) {
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+                  ? sel.getRangeAt(0) 
+                  : savedSelectionRange;
+      if (!range || range.collapsed) {
         showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
         return;
       }
@@ -935,8 +994,10 @@
   function adjustLineHeight(delta) {
     try {
       const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) ? sel.getRangeAt(0) : savedSelectionRange;
-      if (!range) {
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+                  ? sel.getRangeAt(0) 
+                  : savedSelectionRange;
+      if (!range || range.collapsed) {
         showQuickToast("⚠️ 텍스트를 먼저 드래그하세요");
         return;
       }
@@ -1279,7 +1340,7 @@
     }
   }
 
-  /* 구글 슬라이드/PPT 글자 색상 보존 스마트 붙여넣기 */
+  /* 구글 슬라이드/PPT 글자 색상 및 서식 보존 스마트 붙여넣기 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1357,7 +1418,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v39', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v40', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1764,19 +1825,13 @@ ${content}`;
       }
       applyFontSize(currentFontSize);
 
-      const savedFont = localStorage.getItem('yslide_font_family');
-      if (savedFont) {
-        document.documentElement.style.setProperty('--font-family', savedFont);
-        if (fontSelect) fontSelect.value = savedFont;
-      }
-
       const savedStep = localStorage.getItem('yslide_height_step');
       if (savedStep !== null) {
         heightStepIndex = parseInt(savedStep, 10) % 2;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v39') || localStorage.getItem('yslide_final_v38') || localStorage.getItem('yslide_final_v37');
+      const saved = localStorage.getItem('yslide_final_v40') || localStorage.getItem('yslide_final_v39') || localStorage.getItem('yslide_final_v38');
       if (saved) {
         editor.innerHTML = saved;
       }
