@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_font_keep_selection_v41">
+<link rel="manifest" href="manifest.json?v=2026_font_perfect_dom_v42">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -815,7 +815,80 @@
     }
   });
 
-  /* 드래그를 전혀 풀지 않고 선택 영역 글꼴 변경 */
+  /* 드래그된 범위의 모든 텍스트 노드를 찾아 글꼴을 적용하고 선택 영역을 복원하는 고성능 DOM 엔진 */
+  function applyFontToRange(range, fontFamily) {
+    if (!range || range.collapsed) return;
+
+    // 1. 단일 텍스트 노드 내부 선택인 경우
+    if (range.startContainer === range.endContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+      const textNode = range.startContainer;
+      const span = document.createElement('span');
+      span.style.fontFamily = fontFamily;
+
+      const subRange = range.cloneRange();
+      const extracted = subRange.extractContents();
+      span.appendChild(extracted);
+      subRange.insertNode(span);
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      return newRange;
+    }
+
+    // 2. 여러 태그/노드에 걸쳐 선택된 경우
+    const treeWalker = document.createTreeWalker(
+      range.commonAncestorContainer,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          if (range.intersectsNode(node)) {
+            return NodeFilter.FILTER_ACCEPT;
+          }
+          return NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+
+    const nodesToWrap = [];
+    while (treeWalker.nextNode()) {
+      nodesToWrap.push(treeWalker.currentNode);
+    }
+
+    if (nodesToWrap.length === 0) return range;
+
+    let firstCreatedSpan = null;
+    let lastCreatedSpan = null;
+
+    nodesToWrap.forEach((node) => {
+      let start = (node === range.startContainer) ? range.startOffset : 0;
+      let end = (node === range.endContainer) ? range.endOffset : node.textContent.length;
+
+      if (start >= end) return;
+
+      const subRange = document.createRange();
+      subRange.setStart(node, start);
+      subRange.setEnd(node, end);
+
+      const span = document.createElement('span');
+      span.style.fontFamily = fontFamily;
+
+      const extracted = subRange.extractContents();
+      span.appendChild(extracted);
+      subRange.insertNode(span);
+
+      if (!firstCreatedSpan) firstCreatedSpan = span;
+      lastCreatedSpan = span;
+    });
+
+    const newRange = document.createRange();
+    if (firstCreatedSpan && lastCreatedSpan) {
+      newRange.setStartBefore(firstCreatedSpan);
+      newRange.setEndAfter(lastCreatedSpan);
+    }
+    return newRange;
+  }
+
+  /* 드래그를 전혀 풀지 않고 선택 영역 글꼴 원터치 순환 변경 */
   function cycleSelectedFontFamily() {
     const sel = window.getSelection();
     let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
@@ -833,17 +906,17 @@
 
     const currentScroll = editorContainer.scrollTop;
     editor.focus();
-
-    // 드래그 복원
-    sel.removeAllRanges();
-    sel.addRange(range);
-
     pushHistory();
-    // 브라우저 네이티브 폰트 적용 커맨드로 드래그 블록 100% 유지
-    document.execCommand('fontName', false, targetFont.family);
-    
-    // 생성된 font 태그를 깔끔한 인라인 스타일로 보정 및 드래그 유지
-    savedSelectionRange = sel.getRangeAt(0).cloneRange();
+
+    // 완벽한 DOM 분할 글꼴 주입 및 새로운 드래그 Range 생성
+    const newRange = applyFontToRange(range, targetFont.family);
+
+    // 파란색 선택 블록 100% 복원
+    if (newRange) {
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedSelectionRange = newRange.cloneRange();
+    }
 
     editorContainer.scrollTop = currentScroll;
     pushHistory();
@@ -1342,15 +1415,19 @@
 
       doc.querySelectorAll('script, style, meta, link, svg, title').forEach(el => el.remove());
 
-      function processNode(node, inheritedColor = '') {
+      function processNode(node, inheritedColor = '', inheritedFont = '') {
         if (node.nodeType === Node.TEXT_NODE) {
           const text = node.textContent;
           if (!text) return '';
+          let output = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
           if (inheritedColor && !isDefaultDarkColor(inheritedColor)) {
             const hex = rgbToHex(inheritedColor);
-            return `<font color="${hex}">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</font>`;
+            output = `<font color="${hex}">${output}</font>`;
           }
-          return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          if (inheritedFont) {
+            output = `<span style="font-family:${inheritedFont}">${output}</span>`;
+          }
+          return output;
         }
 
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -1358,10 +1435,11 @@
           if (tag === 'br') return '<br>';
 
           let curColor = node.style.color || node.getAttribute('color') || inheritedColor;
+          let curFont = node.style.fontFamily || inheritedFont;
 
           let inner = '';
           node.childNodes.forEach(child => {
-            inner += processNode(child, curColor);
+            inner += processNode(child, curColor, curFont);
           });
 
           if (tag === 'p' || tag === 'div' || tag === 'li' || tag === 'tr') {
@@ -1383,7 +1461,7 @@
 
       let finalHtml = '';
       doc.body.childNodes.forEach(child => {
-        finalHtml += processNode(child, '');
+        finalHtml += processNode(child, '', '');
       });
 
       finalHtml = finalHtml.replace(/(<br\s*[\/]?>){3,}/gi, '<br><br>');
@@ -1405,7 +1483,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v41', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v42', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1818,7 +1896,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v41') || localStorage.getItem('yslide_final_v40') || localStorage.getItem('yslide_final_v39');
+      const saved = localStorage.getItem('yslide_final_v42') || localStorage.getItem('yslide_final_v41') || localStorage.getItem('yslide_final_v40');
       if (saved) {
         editor.innerHTML = saved;
       }
