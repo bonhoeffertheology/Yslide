@@ -6,7 +6,7 @@
 <title>Yslide</title>
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_share_v36">
+<link rel="manifest" href="manifest.json?v=2026_ratio_grid_v37">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -541,7 +541,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 / 눈금선 3단 조절 -->
+  <!-- 1단: 자간 / 줄간격 / 반응형 비율 눈금선 조절 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
@@ -556,7 +556,7 @@
     <div style="width: 1px; height: 16px; background: #444; margin: 0 4px;"></div>
 
     <span class="format-label">눈금:</span>
-    <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 3단계 순환 조절 (기본 740px → 중간 → Full)">📏 740px</button>
+    <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="화면 비율 기준 3단계 조절 (기본 72% → 중간 86% → 전체 100%)">📏 기본 (72%)</button>
   </div>
 
   <!-- 2단: 기본 기능 및 공유하기 -->
@@ -577,7 +577,6 @@
         </svg>
       </button>
 
-      <!-- 공유하기 버튼 (카톡, 이메일, 페이스북, 블루투스 등) -->
       <button class="btn-icon" onclick="shareSelectedText()" title="선택 텍스트 공유하기 (카톡/메일/페이스북/블루투스)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="18" cy="5" r="3"></circle>
@@ -690,8 +689,10 @@
     });
   }
 
-  let currentSlideHeight = 740;
+  // 화면 비율 기반 3단계 높이 정의 (0: 72% 기본, 1: 86% 중간, 2: 100% 전체)
+  const RATIO_STEPS = [0.72, 0.86, 1.0];
   let heightStepIndex = 0;
+  let currentSlideHeight = 740;
 
   let isReaderMode = false;
   let isContinuousMode = false;
@@ -758,7 +759,7 @@
     }
   });
 
-  /* 텍스트 공유하기 (Web Share API 및 클립보드 폴백) */
+  /* 텍스트 공유하기 */
   async function shareSelectedText() {
     let shareText = '';
     const sel = window.getSelection();
@@ -808,29 +809,26 @@
     }
   }
 
-  /* 눈금선 3단계 순환 조절 */
+  /* 화면 높이 비율 기반 눈금선 동적 계산 엔진 */
   function cycleSlideHeightStep() {
     heightStepIndex = (heightStepIndex + 1) % 3;
-    applySlideHeightByStep(heightStepIndex);
+    applySlideHeightByStep(heightStepIndex, true);
   }
 
-  function applySlideHeightByStep(step) {
-    const screenFullHeight = window.innerHeight || 1000;
-    const fullVal = Math.max(740, screenFullHeight);
-    const midVal = Math.round((740 + fullVal) / 2);
+  function applySlideHeightByStep(step, showToast = false) {
+    const vh = window.innerHeight || document.documentElement.clientHeight || 1000;
+    const ratio = RATIO_STEPS[step] || 0.72;
+    currentSlideHeight = Math.max(480, Math.round(vh * ratio));
 
     if (step === 0) {
-      currentSlideHeight = 740;
-      if (btnSlideHeight) btnSlideHeight.innerText = "📏 740px";
-      showQuickToast("📏 눈금선: 기본 모드 (740px)");
+      if (btnSlideHeight) btnSlideHeight.innerText = `📏 기본 (${currentSlideHeight}px)`;
+      if (showToast) showQuickToast(`📏 눈금선: 기본 모드 (${currentSlideHeight}px / 72%)`);
     } else if (step === 1) {
-      currentSlideHeight = midVal;
-      if (btnSlideHeight) btnSlideHeight.innerText = `📏 중간 (${midVal}px)`;
-      showQuickToast(`📏 눈금선: 중간 모드 (${midVal}px)`);
+      if (btnSlideHeight) btnSlideHeight.innerText = `📏 중간 (${currentSlideHeight}px)`;
+      if (showToast) showQuickToast(`📏 눈금선: 중간 모드 (${currentSlideHeight}px / 86%)`);
     } else {
-      currentSlideHeight = fullVal;
-      if (btnSlideHeight) btnSlideHeight.innerText = `📏 Full (${fullVal}px)`;
-      showQuickToast(`📏 눈금선: 전체화면 모드 (${fullVal}px)`);
+      if (btnSlideHeight) btnSlideHeight.innerText = `📏 전체 (${currentSlideHeight}px)`;
+      if (showToast) showQuickToast(`📏 눈금선: 전체화면 모드 (${currentSlideHeight}px / 100%)`);
     }
 
     document.documentElement.style.setProperty('--slide-fixed-height', currentSlideHeight + 'px');
@@ -838,6 +836,11 @@
     updateSlideIndicators();
     updateScrollThumbPosition();
   }
+
+  // 화면 크기 변경 / 회전 시 실시간 비율 재동기화
+  window.addEventListener('resize', () => {
+    applySlideHeightByStep(heightStepIndex, false);
+  });
 
   /* 1단 자간 연타 조절 */
   function adjustLetterSpacing(delta) {
@@ -1172,7 +1175,7 @@
     }, 300);
   });
 
-  /* 색상 변환 유틸리티 */
+  /* 색상 유틸리티 */
   function rgbToHex(rgb) {
     if (!rgb) return '';
     if (rgb.startsWith('#')) return rgb;
@@ -1308,7 +1311,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v36', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v37', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1642,6 +1645,7 @@ ${content}`;
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
+    applySlideHeightByStep(heightStepIndex, false);
     updateSlideIndicators();
     readerCanvas.innerHTML = editor.innerHTML;
 
@@ -1718,9 +1722,9 @@ ${content}`;
       if (savedStep !== null) {
         heightStepIndex = parseInt(savedStep, 10);
       }
-      applySlideHeightByStep(heightStepIndex);
+      applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_share_v36') || localStorage.getItem('yslide_final_v35') || localStorage.getItem('yslide_final_v34');
+      const saved = localStorage.getItem('yslide_final_v37') || localStorage.getItem('yslide_share_v36') || localStorage.getItem('yslide_final_v35');
       if (saved) {
         editor.innerHTML = saved;
       }
