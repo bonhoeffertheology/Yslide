@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_sync_perfect_v43">
+<link rel="manifest" href="manifest.json?v=2026_viewport_match_v45">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -25,7 +25,7 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
-    --top-margin: calc(var(--font-size) * var(--line-height) * 2); /* 정확한 상단 2줄 여백 */
+    --top-margin: calc(var(--font-size) * var(--line-height) * 2); /* 상단 2줄 여백 */
     --slide-fixed-height: 740px;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -229,7 +229,7 @@
     pointer-events: none;
   }
 
-  /* 눈금선 레이어 (0px 절대 기준 정렬) */
+  /* 눈금선 레이어 (0px 기준) */
   #slide-indicators-layer {
     position: absolute;
     top: 0;
@@ -267,7 +267,7 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 에디터 본문 (상단 2줄 순수 여백 적용) */
+  /* 에디터 본문 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -351,7 +351,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체모드 & 미리보기 (1:1 오차 없는 절대 뷰포트) */
+  /* 전체모드 & 미리보기 */
   #reader-container {
     display: none;
     height: 100vh;
@@ -375,6 +375,7 @@
     pointer-events: none;
   }
 
+  /* 눈금선 1칸 높이와 1:1 완벽 일치하도록 높이 고정 */
   #reader-viewport {
     width: 100%;
     max-width: var(--content-max-width);
@@ -698,6 +699,7 @@
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
   <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
   <div id="reader-box">
+    <!-- 에디터 눈금선 높이와 1:1로 일치하는 마스킹 뷰포트 -->
     <div id="reader-viewport">
       <div id="reader-canvas"></div>
     </div>
@@ -761,6 +763,7 @@
   const scrollThumb = document.getElementById('quick-scrollbar-thumb');
   const scrollBadge = document.getElementById('quick-scroll-badge');
   const readerCanvas = document.getElementById('reader-canvas');
+  const readerViewport = document.getElementById('reader-viewport');
   const btnSlideHeight = document.getElementById('btn-slide-height');
   const btnFontCycle = document.getElementById('btn-font-cycle');
 
@@ -982,13 +985,17 @@
 
     if (step === 0) {
       if (btnSlideHeight) btnSlideHeight.innerText = "📏 1";
-      if (showToast) showQuickToast(`📏 눈금선: 1단계 기본 (${currentSlideHeight}px / 72%)`);
+      if (showToast) showQuickToast(`📏 눈금선: 1단계 기본 (${currentSlideHeight}px)`);
     } else {
       if (btnSlideHeight) btnSlideHeight.innerText = "📏 2";
-      if (showToast) showQuickToast(`📏 눈금선: 2단계 중간 (${currentSlideHeight}px / 86%)`);
+      if (showToast) showQuickToast(`📏 눈금선: 2단계 중간 (${currentSlideHeight}px)`);
     }
 
     document.documentElement.style.setProperty('--slide-fixed-height', currentSlideHeight + 'px');
+    if (readerViewport) {
+      readerViewport.style.height = currentSlideHeight + 'px';
+    }
+
     try { localStorage.setItem('yslide_height_step', step); } catch(e){}
     updateSlideIndicators();
     updateScrollThumbPosition();
@@ -1474,7 +1481,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v43', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v45', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1804,7 +1811,7 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 완벽 뷰포트 전체모드 */
+  /* 1:1 완벽 뷰포트 전체모드 (눈금선 높이와 100% 동기화) */
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
@@ -1845,6 +1852,10 @@ ${content}`;
   }
 
   function updateReader() {
+    // 뷰포트 높이(창 크기)와 이동 단위를 정확히 currentSlideHeight로 고정
+    if (readerViewport) {
+      readerViewport.style.height = currentSlideHeight + 'px';
+    }
     readerCanvas.style.top = `-${currentSlideHeight * currentPageIndex}px`;
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
     document.getElementById('total-page').innerText = totalSlideCount;
@@ -1887,7 +1898,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v43') || localStorage.getItem('yslide_final_v42') || localStorage.getItem('yslide_final_v41');
+      const saved = localStorage.getItem('yslide_final_v45') || localStorage.getItem('yslide_final_v44') || localStorage.getItem('yslide_final_v43');
       if (saved) {
         editor.innerHTML = saved;
       }
