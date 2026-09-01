@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_font_perfect_dom_v42">
+<link rel="manifest" href="manifest.json?v=2026_sync_perfect_v43">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -25,6 +25,7 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
+    --top-margin: calc(var(--font-size) * var(--line-height) * 2); /* 정확한 상단 2줄 여백 */
     --slide-fixed-height: 740px;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -141,7 +142,6 @@
     color: #000;
   }
 
-  /* 드래그 유지 원터치 글꼴 토글 버튼 */
   .btn-font-cycle {
     height: 28px;
     padding: 0 10px;
@@ -229,10 +229,10 @@
     pointer-events: none;
   }
 
-  /* 눈금선 레이어 */
+  /* 눈금선 레이어 (0px 절대 기준 정렬) */
   #slide-indicators-layer {
     position: absolute;
-    top: 24px;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
@@ -267,14 +267,14 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 에디터 본문 */
+  /* 에디터 본문 (상단 2줄 순수 여백 적용) */
   #main-editor {
     position: relative;
     z-index: 2;
     width: 100%;
     min-height: 100%;
     background-color: transparent;
-    padding: 24px var(--content-padding-x) 24px var(--content-padding-x);
+    padding: var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x);
     outline: none;
     font-size: var(--font-size);
     line-height: var(--line-height);
@@ -351,7 +351,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체모드 & 미리보기 */
+  /* 전체모드 & 미리보기 (1:1 오차 없는 절대 뷰포트) */
   #reader-container {
     display: none;
     height: 100vh;
@@ -371,7 +371,7 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding-top: calc(var(--font-size) * var(--line-height) * 3);
+    padding-top: 0;
     pointer-events: none;
   }
 
@@ -385,7 +385,7 @@
 
   #reader-canvas {
     width: 100%;
-    padding: 0 var(--content-padding-x);
+    padding: var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -731,7 +731,6 @@
     });
   }
 
-  // 글꼴 목록 정의
   const FONT_OPTIONS = [
     { name: "KoPub돋움", family: "'KoPubWorld Dotum', sans-serif" },
     { name: "KoPub바탕", family: "'KoPubWorld Batang', serif" },
@@ -740,7 +739,6 @@
   ];
   let currentFontIndex = 0;
 
-  // 눈금선 2단계 설정: 0 (기본 72%), 1 (중간 86%)
   const RATIO_STEPS = [0.72, 0.86];
   const TOOLBAR_HEIGHT = 96;
   let heightStepIndex = 0;
@@ -815,11 +813,10 @@
     }
   });
 
-  /* 드래그된 범위의 모든 텍스트 노드를 찾아 글꼴을 적용하고 선택 영역을 복원하는 고성능 DOM 엔진 */
+  /* 텍스트 노드 분할 스타일 주입 엔진 */
   function applyFontToRange(range, fontFamily) {
     if (!range || range.collapsed) return;
 
-    // 1. 단일 텍스트 노드 내부 선택인 경우
     if (range.startContainer === range.endContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
       const textNode = range.startContainer;
       const span = document.createElement('span');
@@ -835,7 +832,6 @@
       return newRange;
     }
 
-    // 2. 여러 태그/노드에 걸쳐 선택된 경우
     const treeWalker = document.createTreeWalker(
       range.commonAncestorContainer,
       NodeFilter.SHOW_TEXT,
@@ -888,7 +884,6 @@
     return newRange;
   }
 
-  /* 드래그를 전혀 풀지 않고 선택 영역 글꼴 원터치 순환 변경 */
   function cycleSelectedFontFamily() {
     const sel = window.getSelection();
     let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
@@ -908,10 +903,8 @@
     editor.focus();
     pushHistory();
 
-    // 완벽한 DOM 분할 글꼴 주입 및 새로운 드래그 Range 생성
     const newRange = applyFontToRange(range, targetFont.family);
 
-    // 파란색 선택 블록 100% 복원
     if (newRange) {
       sel.removeAllRanges();
       sel.addRange(newRange);
@@ -1132,7 +1125,7 @@
 
   function getAccurateSlideMetrics() {
     const slideHeight = currentSlideHeight;
-    const textHeight = Math.max(editor.scrollHeight - 48, slideHeight);
+    const textHeight = Math.max(editor.scrollHeight, slideHeight);
     const count = Math.max(1, Math.ceil(textHeight / slideHeight));
     return { slideHeight, count };
   }
@@ -1342,7 +1335,6 @@
     }, 300);
   });
 
-  /* 색상 변환 유틸리티 */
   function rgbToHex(rgb) {
     if (!rgb) return '';
     if (rgb.startsWith('#')) return rgb;
@@ -1400,7 +1392,6 @@
     }
   }
 
-  /* 구글 슬라이드/PPT 글자 색상 및 서식 보존 스마트 붙여넣기 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1483,7 +1474,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v42', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v43', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1896,7 +1887,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v42') || localStorage.getItem('yslide_final_v41') || localStorage.getItem('yslide_final_v40');
+      const saved = localStorage.getItem('yslide_final_v43') || localStorage.getItem('yslide_final_v42') || localStorage.getItem('yslide_final_v41');
       if (saved) {
         editor.innerHTML = saved;
       }
