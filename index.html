@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.0/kopubworld.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
-<!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_repair_all_v50">
+<!-- PWA 설정 및 캐시 무효화 -->
+<link rel="manifest" href="manifest.json?v=2026_page_aligned_v51">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -25,7 +25,7 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
-    --top-margin: calc(var(--font-size) * var(--line-height) * 2);
+    --top-margin: calc(var(--font-size) * var(--line-height) * 2.2); /* 상단 안전 여백 */
     --slide-fixed-height: 740px;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -350,7 +350,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체모드 & 미리보기 */
+  /* 전체모드 슬라이드 뷰포트 (독립 페이지 렌더링) */
   #reader-container {
     display: none;
     height: 100vh;
@@ -376,30 +376,20 @@
   #reader-viewport {
     width: 100%;
     max-width: var(--content-max-width);
-    height: var(--slide-fixed-height);
+    height: 100%;
     overflow: hidden !important;
     position: relative;
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
   }
 
-  #reader-top-spacer {
+  /* 개별 슬라이드 페이지: 모든 페이지가 동일한 상단 여백에서 시작 */
+  .slide-page {
     width: 100%;
-    height: var(--top-margin);
-    flex-shrink: 0;
-  }
-
-  #reader-content-window {
-    width: 100%;
-    flex: 1;
-    overflow: hidden !important;
-    position: relative;
-  }
-
-  #reader-canvas {
-    width: 100%;
-    padding: 0 var(--content-padding-x) 24px var(--content-padding-x);
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x);
     font-size: var(--font-size);
     line-height: var(--line-height);
     font-weight: 500;
@@ -408,9 +398,11 @@
     color: #ffffff;
     white-space: pre-wrap;
     box-sizing: border-box;
-    position: absolute;
-    top: 0;
-    left: 0;
+    display: none;
+    overflow: hidden;
+  }
+  .slide-page.active {
+    display: block;
   }
 
   .touch-zone {
@@ -592,7 +584,7 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 드래그 유지 글꼴 변경 -->
+  <!-- 1단: 자간 / 줄간격 / 2단계 눈금선 (1, 2) / 글꼴 변경 -->
   <div class="toolbar-row toolbar-row-top">
     <span class="format-label">자간:</span>
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">-</button>
@@ -712,12 +704,7 @@
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
   <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
   <div id="reader-box">
-    <div id="reader-viewport">
-      <div id="reader-top-spacer"></div>
-      <div id="reader-content-window">
-        <div id="reader-canvas"></div>
-      </div>
-    </div>
+    <div id="reader-viewport"></div>
   </div>
   <div id="page-info"><span id="curr-page">1</span> / <span id="total-page">1</span></div>
 </div>
@@ -780,7 +767,6 @@
   const scrollTrack = document.getElementById('quick-scrollbar-track');
   const scrollThumb = document.getElementById('quick-scrollbar-thumb');
   const scrollBadge = document.getElementById('quick-scroll-badge');
-  const readerCanvas = document.getElementById('reader-canvas');
   const readerViewport = document.getElementById('reader-viewport');
   const btnSlideHeight = document.getElementById('btn-slide-height');
   const btnFontCycle = document.getElementById('btn-font-cycle');
@@ -998,8 +984,8 @@
     const ratio = RATIO_STEPS[step] || 0.72;
 
     currentSlideHeight = Math.round(availableEditorHeight * ratio);
-    currentTopMargin = Math.round(currentFontSize * 1.45 * 2);
-    currentContentStepHeight = Math.max(300, currentSlideHeight - currentTopMargin);
+    currentTopMargin = Math.round(currentFontSize * 1.45 * 2.2);
+    currentContentStepHeight = Math.max(280, currentSlideHeight - currentTopMargin);
 
     if (step === 0) {
       if (btnSlideHeight) btnSlideHeight.innerText = "📏 1";
@@ -1011,10 +997,6 @@
 
     document.documentElement.style.setProperty('--slide-fixed-height', currentSlideHeight + 'px');
     document.documentElement.style.setProperty('--top-margin', currentTopMargin + 'px');
-
-    if (readerViewport) {
-      readerViewport.style.height = currentSlideHeight + 'px';
-    }
 
     try { localStorage.setItem('yslide_height_step', step); } catch(e){}
     updateSlideIndicators();
@@ -1499,7 +1481,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v50', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v51', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1807,9 +1789,6 @@ ${content}`;
       headerDiv.className = 'print-slide-header';
       headerDiv.innerText = `[ ${i + 1} / ${count} ]`;
 
-      const topSpacer = document.createElement('div');
-      topSpacer.style.height = `${currentTopMargin}px`;
-
       const viewWrap = document.createElement('div');
       viewWrap.style.height = `${currentContentStepHeight}px`;
       viewWrap.style.overflow = 'hidden';
@@ -1826,7 +1805,6 @@ ${content}`;
 
       viewWrap.appendChild(canvasCopy);
       pageDiv.appendChild(headerDiv);
-      pageDiv.appendChild(topSpacer);
       pageDiv.appendChild(viewWrap);
       printContainer.appendChild(pageDiv);
     }
@@ -1834,19 +1812,43 @@ ${content}`;
     window.print();
   }
 
-  /* 전체모드 시작 */
+  /* 전체화면 슬라이드 DOM 생성 및 동기화 */
+  function renderReaderSlides() {
+    if (!readerViewport) return;
+    readerViewport.innerHTML = '';
+    
+    const { count } = getAccurateSlideMetrics();
+    totalSlideCount = count;
+
+    for (let i = 0; i < totalSlideCount; i++) {
+      const slide = document.createElement('div');
+      slide.className = `slide-page ${i === currentPageIndex ? 'active' : ''}`;
+      slide.id = `slide-page-${i}`;
+      
+      const innerWrap = document.createElement('div');
+      innerWrap.style.position = 'relative';
+      innerWrap.style.height = `${currentContentStepHeight}px`;
+      innerWrap.style.overflow = 'hidden';
+      
+      const content = document.createElement('div');
+      content.style.position = 'absolute';
+      content.style.top = `-${currentContentStepHeight * i}px`;
+      content.style.left = '0';
+      content.style.width = '100%';
+      content.innerHTML = editor.innerHTML;
+      
+      innerWrap.appendChild(content);
+      slide.appendChild(innerWrap);
+      readerViewport.appendChild(slide);
+    }
+  }
+
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
-    if (readerViewport) {
-      readerViewport.style.height = currentSlideHeight + 'px';
-    }
-
-    updateSlideIndicators();
-    readerCanvas.innerHTML = editor.innerHTML;
-
     currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlideCount - 1);
-    updateReader();
+    renderReaderSlides();
+    updateReaderUI();
 
     document.getElementById('reader-container').style.display = 'block';
     isReaderMode = true;
@@ -1877,11 +1879,11 @@ ${content}`;
     } catch(e){}
   }
 
-  function updateReader() {
-    if (readerViewport) {
-      readerViewport.style.height = currentSlideHeight + 'px';
-    }
-    readerCanvas.style.top = `-${currentContentStepHeight * currentPageIndex}px`;
+  function updateReaderUI() {
+    document.querySelectorAll('.slide-page').forEach((el, idx) => {
+      if (idx === currentPageIndex) el.classList.add('active');
+      else el.classList.remove('active');
+    });
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
     document.getElementById('total-page').innerText = totalSlideCount;
   }
@@ -1889,13 +1891,13 @@ ${content}`;
   function nextPage() {
     if (currentPageIndex < totalSlideCount - 1) {
       currentPageIndex++;
-      updateReader();
+      updateReaderUI();
     }
   }
   function prevPage() {
     if (currentPageIndex > 0) {
       currentPageIndex--;
-      updateReader();
+      updateReaderUI();
     }
   }
 
@@ -1906,7 +1908,6 @@ ${content}`;
     if (e.key === 'Escape') exitSermonMode();
   });
 
-  // 초기화 함수
   function initApp() {
     try {
       const savedSize = localStorage.getItem('yslide_font_size');
@@ -1923,7 +1924,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v50') || localStorage.getItem('yslide_final_v49') || localStorage.getItem('yslide_final_v48') || localStorage.getItem('yslide_final_v47');
+      const saved = localStorage.getItem('yslide_final_v51') || localStorage.getItem('yslide_final_v50') || localStorage.getItem('yslide_final_v49') || localStorage.getItem('yslide_final_v48');
       if (saved) {
         editor.innerHTML = saved;
       }
