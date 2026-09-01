@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_viewport_match_v45">
+<link rel="manifest" href="manifest.json?v=2026_perfect_mask_v46">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -375,13 +375,14 @@
     pointer-events: none;
   }
 
-  /* 눈금선 1칸 높이와 1:1 완벽 일치하도록 높이 고정 */
+  /* 툴바 제거로 인한 과다 노출을 완벽하게 마스킹하는 뷰포트 */
   #reader-viewport {
     width: 100%;
     max-width: var(--content-max-width);
-    height: var(--slide-fixed-height);
-    overflow: hidden;
+    height: var(--slide-fixed-height) !important;
+    overflow: hidden !important;
     position: relative;
+    box-sizing: border-box;
   }
 
   #reader-canvas {
@@ -699,7 +700,7 @@
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
   <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
   <div id="reader-box">
-    <!-- 에디터 눈금선 높이와 1:1로 일치하는 마스킹 뷰포트 -->
+    <!-- 에디터 눈금선 높이와 1:1로 일치하는 뷰포트 -->
     <div id="reader-viewport">
       <div id="reader-canvas"></div>
     </div>
@@ -971,7 +972,7 @@
     }
   }
 
-  /* 2단계 눈금선 토글 (1 <-> 2) */
+  /* 2단계 눈금선 토글 및 전체화면 뷰포트 완벽 동기화 */
   function cycleSlideHeightStep() {
     heightStepIndex = (heightStepIndex + 1) % 2;
     applySlideHeightByStep(heightStepIndex, true);
@@ -1481,7 +1482,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v45', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v46', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1811,7 +1812,7 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 완벽 뷰포트 전체모드 (눈금선 높이와 100% 동기화) */
+  /* 1:1 완벽 뷰포트 전체모드 (눈금선과 1:1 절대 마스킹) */
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
@@ -1852,7 +1853,6 @@ ${content}`;
   }
 
   function updateReader() {
-    // 뷰포트 높이(창 크기)와 이동 단위를 정확히 currentSlideHeight로 고정
     if (readerViewport) {
       readerViewport.style.height = currentSlideHeight + 'px';
     }
@@ -1898,7 +1898,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v45') || localStorage.getItem('yslide_final_v44') || localStorage.getItem('yslide_final_v43');
+      const saved = localStorage.getItem('yslide_final_v46') || localStorage.getItem('yslide_final_v45') || localStorage.getItem('yslide_final_v44');
       if (saved) {
         editor.innerHTML = saved;
       }
