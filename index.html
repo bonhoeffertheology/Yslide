@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 강력 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_perfect_sync_v47">
+<link rel="manifest" href="manifest.json?v=2026_top_margin_every_slide_v48">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -25,7 +25,7 @@
   :root {
     --font-size: 30px;
     --line-height: 1.45;
-    --top-margin: calc(var(--font-size) * var(--line-height) * 2); /* 정확한 상단 2줄 여백 */
+    --top-margin: calc(var(--font-size) * var(--line-height) * 2); /* 모든 슬라이드 상단 2줄 여백 */
     --slide-fixed-height: 740px;
     --color-yellow: #ffb703;
     --content-max-width: 1000px;
@@ -54,7 +54,7 @@
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
   }
 
-  /* 상단 2단 고정 툴바 (UI 폰트 고정) */
+  /* 상단 2단 고정 툴바 */
   #toolbar {
     position: fixed;
     top: 0;
@@ -82,7 +82,6 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 1단 (자간/줄간격/눈금선 2단/드래그 유지 글꼴 변경) */
   .toolbar-row-top {
     justify-content: flex-start;
     gap: 8px;
@@ -229,7 +228,7 @@
     pointer-events: none;
   }
 
-  /* 눈금선 레이어 (0px 기준) */
+  /* 눈금선 레이어 (정확한 0px 기준) */
   #slide-indicators-layer {
     position: absolute;
     top: 0;
@@ -267,7 +266,7 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 에디터 본문 (상단 2줄 여백 적용) */
+  /* 에디터 본문 (상단 2줄 여백 탑재) */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -375,7 +374,7 @@
     pointer-events: none;
   }
 
-  /* 눈금선 높이와 1:1로 일치하는 마스킹 창 */
+  /* 뷰포트 마스킹 */
   #reader-viewport {
     width: 100%;
     max-width: var(--content-max-width);
@@ -700,7 +699,7 @@
   <div class="touch-zone" id="touch-left" onclick="prevPage()"></div>
   <div class="touch-zone" id="touch-right" onclick="nextPage()"></div>
   <div id="reader-box">
-    <!-- 에디터 눈금선 높이와 1:1로 일치하는 뷰포트 -->
+    <!-- 에디터 눈금선 1칸과 1:1 완벽 고정되는 뷰포트 -->
     <div id="reader-viewport">
       <div id="reader-canvas"></div>
     </div>
@@ -745,6 +744,10 @@
   const RATIO_STEPS = [0.72, 0.86];
   const TOOLBAR_HEIGHT = 96;
   let heightStepIndex = 0;
+  
+  // 에디터 눈금선 1장 분량의 순수 텍스트 유효 높이 (여백 제외)
+  let currentContentStepHeight = 650;
+  let currentTopMargin = 87;
   let currentSlideHeight = 740;
 
   let isReaderMode = false;
@@ -972,7 +975,7 @@
     }
   }
 
-  /* 2단계 눈금선 토글 및 전체화면 뷰포트 완벽 동기화 */
+  /* 2단계 눈금선 토글 및 상단 2줄 여백 기반 동기화 계산 */
   function cycleSlideHeightStep() {
     heightStepIndex = (heightStepIndex + 1) % 2;
     applySlideHeightByStep(heightStepIndex, true);
@@ -982,7 +985,15 @@
     const vh = window.innerHeight || document.documentElement.clientHeight || 1000;
     const availableEditorHeight = Math.max(480, vh - TOOLBAR_HEIGHT);
     const ratio = RATIO_STEPS[step] || 0.72;
+
+    // 슬라이드 1장 전체 높이
     currentSlideHeight = Math.round(availableEditorHeight * ratio);
+    
+    // 정확한 2줄 여백 계산 (30px * 1.45 * 2 = 87px)
+    currentTopMargin = Math.round(currentFontSize * 1.45 * 2);
+    
+    // 1장에 들어갈 순수 텍스트 표시 영역 높이
+    currentContentStepHeight = Math.max(300, currentSlideHeight - currentTopMargin);
 
     if (step === 0) {
       if (btnSlideHeight) btnSlideHeight.innerText = "📏 1";
@@ -993,6 +1004,8 @@
     }
 
     document.documentElement.style.setProperty('--slide-fixed-height', currentSlideHeight + 'px');
+    document.documentElement.style.setProperty('--top-margin', currentTopMargin + 'px');
+
     if (readerViewport) {
       readerViewport.style.height = currentSlideHeight + 'px';
     }
@@ -1129,28 +1142,29 @@
     const sv = document.getElementById('size-val');
     if (sv) sv.innerText = size;
     try { localStorage.setItem('yslide_font_size', size); } catch(e){}
-    updateSlideIndicators();
-    updateScrollThumbPosition();
+    applySlideHeightByStep(heightStepIndex, false);
   }
 
+  /* 모든 페이지 상단 여백을 포함한 정확한 슬라이드 개수 산출 */
   function getAccurateSlideMetrics() {
-    const slideHeight = currentSlideHeight;
-    const textHeight = Math.max(editor.scrollHeight, slideHeight);
-    const count = Math.max(1, Math.ceil(textHeight / slideHeight));
-    return { slideHeight, count };
+    const pureTextHeight = Math.max(0, editor.scrollHeight - currentTopMargin - 24);
+    const count = Math.max(1, Math.ceil(pureTextHeight / currentContentStepHeight) + (pureTextHeight > 0 ? 0 : 1));
+    return { count };
   }
 
+  /* 에디터 눈금선 그리기 (모든 슬라이드의 순수 텍스트 단위로 눈금선 분할) */
   function updateSlideIndicators() {
     try {
-      const { slideHeight, count } = getAccurateSlideMetrics();
-      totalSlideCount = count;
+      const { count } = getAccurateSlideMetrics();
+      totalSlideCount = Math.max(1, count);
       const drawCount = Math.max(totalSlideCount, 6);
 
       indicatorsLayer.innerHTML = '';
       for (let i = 1; i <= drawCount; i++) {
         const boundary = document.createElement('div');
         boundary.className = 'slide-boundary';
-        boundary.style.top = `${slideHeight * i}px`;
+        // 첫 줄 상단 2줄 여백(currentTopMargin) + (i번째 슬라이드 텍스트 영역)
+        boundary.style.top = `${currentTopMargin + (currentContentStepHeight * i)}px`;
 
         const badge = document.createElement('div');
         badge.className = 'slide-boundary-badge';
@@ -1207,7 +1221,7 @@
     editorContainer.scrollTop = progress * maxScroll;
     scrollThumb.style.top = `${offsetY}px`;
 
-    const currentSlide = Math.floor(editorContainer.scrollTop / currentSlideHeight) + 1;
+    const currentSlide = Math.floor(editorContainer.scrollTop / currentContentStepHeight) + 1;
     scrollBadge.innerText = `${currentSlide} 슬라이드`;
   }
 
@@ -1484,7 +1498,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v47', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v48', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1782,7 +1796,7 @@ ${content}`;
     const printContainer = document.getElementById('print-container');
     printContainer.innerHTML = '';
 
-    const { slideHeight, count } = getAccurateSlideMetrics();
+    const { count } = getAccurateSlideMetrics();
 
     for (let i = 0; i < count; i++) {
       const pageDiv = document.createElement('div');
@@ -1793,7 +1807,7 @@ ${content}`;
       headerDiv.innerText = `[ ${i + 1} / ${count} ]`;
 
       const viewWrap = document.createElement('div');
-      viewWrap.style.height = `${slideHeight}px`;
+      viewWrap.style.height = `${currentSlideHeight}px`;
       viewWrap.style.overflow = 'hidden';
       viewWrap.style.position = 'relative';
 
@@ -1801,7 +1815,7 @@ ${content}`;
       canvasCopy.className = 'print-slide-body';
       canvasCopy.innerHTML = editor.innerHTML;
       canvasCopy.style.position = 'absolute';
-      canvasCopy.style.top = `-${slideHeight * i}px`;
+      canvasCopy.style.top = `-${currentContentStepHeight * i}px`;
       canvasCopy.style.left = '0';
       canvasCopy.style.width = '100%';
 
@@ -1814,11 +1828,10 @@ ${content}`;
     window.print();
   }
 
-  /* 1:1 완벽 뷰포트 전체모드 (에디터 높이 100% 보존) */
+  /* 1:1 완벽 뷰포트 전체모드 (모든 페이지 상단 여백 보장) */
   function startSermonMode(targetPageIndex = 0) {
     if (editor.innerText.trim() === '') return;
 
-    // 전체화면 진입 전 에디터의 눈금선 높이를 뷰포트에 1:1 완벽 고정
     if (readerViewport) {
       readerViewport.style.height = currentSlideHeight + 'px';
     }
@@ -1841,7 +1854,7 @@ ${content}`;
 
   function startPreviewCurrentSlide() {
     const currentViewY = editorContainer.scrollTop;
-    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / currentSlideHeight));
+    const currentSlideIndex = Math.max(0, Math.floor(currentViewY / currentContentStepHeight));
     startSermonMode(currentSlideIndex);
   }
 
@@ -1862,8 +1875,8 @@ ${content}`;
     if (readerViewport) {
       readerViewport.style.height = currentSlideHeight + 'px';
     }
-    // 0px부터 눈금선 단위로 정확히 이동하여 오차 차단
-    readerCanvas.style.top = `-${currentSlideHeight * currentPageIndex}px`;
+    // 모든 페이지가 상단 여백 아래에 정확히 배치되도록 순수 텍스트 스텝(currentContentStepHeight)으로 정밀 이동
+    readerCanvas.style.top = `-${currentContentStepHeight * currentPageIndex}px`;
     document.getElementById('curr-page').innerText = currentPageIndex + 1;
     document.getElementById('total-page').innerText = totalSlideCount;
   }
@@ -1905,7 +1918,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v47') || localStorage.getItem('yslide_final_v46') || localStorage.getItem('yslide_final_v45');
+      const saved = localStorage.getItem('yslide_final_v48') || localStorage.getItem('yslide_final_v47') || localStorage.getItem('yslide_final_v46');
       if (saved) {
         editor.innerHTML = saved;
       }
