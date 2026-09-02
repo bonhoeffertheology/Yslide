@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_connected_page_engine_v57">
+<link rel="manifest" href="manifest.json?v=2026_dynamic_pagination_v58">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -714,7 +714,7 @@
 
     <div class="format-divider"></div>
 
-    <!-- 5. 눈금선 토글 버튼 -->
+    <!-- 5. 눈금선 토글 버튼 (1: 86% / 2: 72%) -->
     <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 토글 (1: 기본 86% / 2: 72%)">📏 1</button>
 
     <div class="format-divider"></div>
@@ -949,7 +949,7 @@
   }
 
   document.addEventListener('selectionchange', () => {
-    if (document.activeElement === editor || editor.contains(document.activeElement)) {
+    if (document.activeElement === editor || (editorPagesWrapper && editorPagesWrapper.contains(document.activeElement))) {
       saveCurrentSelection();
     }
   });
@@ -980,13 +980,15 @@
     }
   }
 
-  /* 모든 페이지가 연속적으로 연결되는 실시간 페이지 뷰 렌더링 */
-  function renderEditorPages() {
+  /* 실시간 다이내믹 페이징 엔진 (글자 길이에 따라 페이지 자동 증설/연결) */
+  function renderEditorPages(preserveFocusIndex = null) {
     if (!editorPagesWrapper) return;
-    editorPagesWrapper.innerHTML = '';
-
+    
+    // 현재 에디터 높이 기준으로 정확한 페이지 개수 계산
     const { count } = getAccurateSlideMetrics();
-    totalSlideCount = count;
+    totalSlideCount = Math.max(1, count);
+
+    editorPagesWrapper.innerHTML = '';
 
     for (let i = 0; i < totalSlideCount; i++) {
       const pageCard = document.createElement('div');
@@ -1002,6 +1004,8 @@
       const pageView = document.createElement('div');
       pageView.contentEditable = "true";
       pageView.spellcheck = false;
+      pageView.className = 'page-view-editor';
+      pageView.dataset.pageIndex = i;
       pageView.style.position = 'absolute';
       pageView.style.top = `-${currentContentStepHeight * i}px`;
       pageView.style.left = '0';
@@ -1017,11 +1021,18 @@
       pageView.style.color = '#ffffff';
       pageView.innerHTML = editor.innerHTML;
 
-      // 실시간 입력/삭제/붙여넣기 시 모든 페이지와 본문 동기화
+      // 실시간 입력 및 글자 증감 감지 -> 즉시 전체 페이지 재계산
       pageView.addEventListener('input', () => {
         editor.innerHTML = pageView.innerHTML;
         onContentModified();
-        syncAllPageViews(pageView);
+        
+        // 입력 후 페이지 개수가 변경되었는지 확인
+        const newMetrics = getAccurateSlideMetrics();
+        if (newMetrics.count !== totalSlideCount) {
+          renderEditorPages(i);
+        } else {
+          syncAllPageViews(pageView);
+        }
       });
 
       pageView.addEventListener('paste', handleSmartPaste);
@@ -1031,10 +1042,18 @@
       pageCard.appendChild(inner);
       editorPagesWrapper.appendChild(pageCard);
     }
+
+    if (preserveFocusIndex !== null) {
+      const targetCard = editorPagesWrapper.children[preserveFocusIndex];
+      if (targetCard) {
+        const targetEditor = targetCard.querySelector('.page-view-editor');
+        if (targetEditor) targetEditor.focus();
+      }
+    }
   }
 
   function syncAllPageViews(sourceElement) {
-    document.querySelectorAll('.editor-page-card-inner > div').forEach(pv => {
+    document.querySelectorAll('.page-view-editor').forEach(pv => {
       if (pv !== sourceElement) {
         pv.innerHTML = editor.innerHTML;
       }
@@ -1388,9 +1407,18 @@
     applySlideHeightByStep(heightStepIndex, false);
   }
 
+  /* 정확한 텍스트 높이 기반 슬라이드 개수 산출 */
   function getAccurateSlideMetrics() {
-    const pureTextHeight = Math.max(0, editor.scrollHeight - currentTopMargin - 24);
-    const count = Math.max(1, Math.ceil(pureTextHeight / currentContentStepHeight));
+    let checkHeight = 0;
+    if (editorViewMode === 'page') {
+      const firstEditor = document.querySelector('.page-view-editor') || editor;
+      checkHeight = firstEditor.scrollHeight;
+    } else {
+      checkHeight = editor.scrollHeight;
+    }
+
+    const pureTextHeight = Math.max(0, checkHeight - currentTopMargin - 24);
+    const count = Math.max(1, Math.ceil(pureTextHeight / currentContentStepHeight) || 1);
     return { count };
   }
 
@@ -1731,13 +1759,14 @@
       const activeEl = document.activeElement;
       if (activeEl && activeEl.innerHTML) {
         editor.innerHTML = activeEl.innerHTML;
-        syncAllPageViews(activeEl);
       }
     }
 
     setTimeout(() => {
       onContentModified();
-      if (editorViewMode === 'page') renderEditorPages();
+      if (editorViewMode === 'page') {
+        renderEditorPages();
+      }
     }, 20);
   }
 
@@ -1745,7 +1774,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v57', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v58', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -2223,7 +2252,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v57') || localStorage.getItem('yslide_final_v56') || localStorage.getItem('yslide_final_v55') || localStorage.getItem('yslide_final_v54');
+      const saved = localStorage.getItem('yslide_final_v58') || localStorage.getItem('yslide_final_v57') || localStorage.getItem('yslide_final_v56') || localStorage.getItem('yslide_final_v55');
       if (saved) {
         editor.innerHTML = saved;
       }
