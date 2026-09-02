@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_minimal_toolbar_v55">
+<link rel="manifest" href="manifest.json?v=2026_connected_page_engine_v57">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -139,7 +139,6 @@
     color: #000;
   }
 
-  /* 글꼴 선택 버튼 (텍스트만 심플하게) */
   .btn-font-cycle {
     height: 28px;
     padding: 0 10px;
@@ -157,7 +156,6 @@
     color: #38bdf8;
   }
 
-  /* 심플 흑백 뷰 모드 아이콘 버튼 */
   .btn-view-toggle {
     width: 32px;
     height: 28px;
@@ -218,7 +216,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 편집 스크롤 영역 */
+  /* 편집 스크롤/페이지 뷰포트 */
   #editor-container {
     position: absolute;
     top: var(--toolbar-height);
@@ -240,7 +238,7 @@
   }
   #editor-container.mode-scroll::-webkit-scrollbar { display: none; }
 
-  /* 2. 가로 페이지 넘김 모드 (눈금 크기 단위 스냅) */
+  /* 2. 가로 페이지 넘김 모드 */
   #editor-container.mode-page {
     overflow-x: auto;
     overflow-y: hidden;
@@ -288,9 +286,21 @@
     padding: 0 16px;
     margin: 0 auto;
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
     box-sizing: border-box;
+  }
+
+  .editor-page-card-header {
+    width: 100%;
+    text-align: right;
+    padding: 6px 16px 2px 0;
+    font-size: 12px;
+    font-weight: bold;
+    color: #777;
+    user-select: none;
+    font-family: var(--ui-font) !important;
   }
 
   .editor-page-card-inner {
@@ -299,17 +309,9 @@
     overflow: hidden;
     position: relative;
     background-color: #000000;
-    border: 1px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    padding: var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x);
+    border: 1px dashed rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
     box-sizing: border-box;
-    font-size: var(--font-size);
-    line-height: var(--line-height);
-    font-weight: 500;
-    word-break: keep-all;
-    letter-spacing: normal;
-    color: #ffffff;
-    white-space: pre-wrap;
   }
 
   /* 눈금선 레이어 */
@@ -350,7 +352,7 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 에디터 본문 */
+  /* 단일 통합 에디터 본문 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -434,7 +436,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체모드 슬라이드 뷰포트 */
+  /* 전체화면 슬라이드 뷰포트 */
   #reader-container {
     display: none;
     height: 100vh;
@@ -668,30 +670,30 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간(좌우 화살표) / 줄간격(수축/확장 화살표) / 2단계 눈금선 / 글꼴 이름 / 흑백 심플 뷰모드 아이콘 -->
+  <!-- 1단: 자간(수축: →← / 확장: ←→) / 줄간격(수축/확장) / 눈금(1:86%, 2:72%) / 글꼴 이름 / 흑백 뷰모드 아이콘 -->
   <div class="toolbar-row toolbar-row-top">
-    <!-- 자간 좁게 -->
+    <!-- 1. 자간 좁게: 바깥에서 안쪽으로 모여드는 화살표 (→ ←) -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
-        <polyline points="7 9 4 12 7 15"></polyline>
-        <line x1="4" y1="12" x2="10" y2="12"></line>
-        <polyline points="17 9 20 12 17 15"></polyline>
-        <line x1="20" y1="12" x2="14" y2="12"></line>
+        <line x1="3" y1="12" x2="9" y2="12"></line>
+        <polyline points="6 9 9 12 6 15"></polyline>
+        <line x1="21" y1="12" x2="15" y2="12"></line>
+        <polyline points="18 9 15 12 18 15"></polyline>
       </svg>
     </button>
-    <!-- 자간 넓게 -->
+    <!-- 2. 자간 넓게: 안쪽에서 바깥으로 뻗어나가는 화살표 (← →) -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
-        <polyline points="9 7 4 12 9 17"></polyline>
-        <line x1="4" y1="12" x2="11" y2="12"></line>
-        <polyline points="15 7 20 12 15 17"></polyline>
-        <line x1="20" y1="12" x2="13" y2="12"></line>
+        <line x1="9" y1="12" x2="3" y2="12"></line>
+        <polyline points="6 9 3 12 6 15"></polyline>
+        <line x1="15" y1="12" x2="21" y2="12"></line>
+        <polyline points="18 9 21 12 18 15"></polyline>
       </svg>
     </button>
 
     <div class="format-divider"></div>
 
-    <!-- 줄간격 좁게 -->
+    <!-- 3. 줄간격 좁게: 위아래 안쪽으로 모이는 화살표 (↓ ↑) -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <polyline points="9 6 12 9 15 6"></polyline>
@@ -700,7 +702,7 @@
         <line x1="12" y1="22" x2="12" y2="15"></line>
       </svg>
     </button>
-    <!-- 줄간격 넓게 -->
+    <!-- 4. 줄간격 넓게: 위아래 바깥으로 뻗어나가는 화살표 (↑ ↓) -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <polyline points="8 6 12 2 16 6"></polyline>
@@ -712,15 +714,15 @@
 
     <div class="format-divider"></div>
 
-    <!-- 눈금선 토글 버튼 ('눈금' 글자 제거) -->
+    <!-- 5. 눈금선 토글 버튼 -->
     <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 토글 (1: 기본 86% / 2: 72%)">📏 1</button>
 
     <div class="format-divider"></div>
 
-    <!-- 글꼴 순환 버튼 ('글꼴' 글자 및 컬러 아이콘 제거) -->
+    <!-- 6. 글꼴 순환 버튼 -->
     <button id="btn-font-cycle" class="btn-font-cycle" onmousedown="event.preventDefault()" onclick="cycleSelectedFontFamily()" title="선택 텍스트 글꼴 원터치 순환 변경">KoPub돋움</button>
 
-    <!-- 흑백 심플 뷰모드 아이콘 버튼 -->
+    <!-- 7. 흑백 심플 뷰모드 아이콘 버튼 -->
     <button id="btn-view-mode" class="btn-view-toggle" onclick="toggleEditorViewMode()" title="세로 스크롤 / 가로 페이지 넘김 모드 전환">
       <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -814,6 +816,7 @@
     <div id="main-editor" contenteditable="true" spellcheck="false"></div>
     <div id="editor-bottom-spacer"></div>
   </div>
+  <!-- 페이지 넘김 모드 전용 래퍼 -->
   <div id="editor-pages-wrapper"></div>
 </div>
 
@@ -946,12 +949,12 @@
   }
 
   document.addEventListener('selectionchange', () => {
-    if (document.activeElement === editor) {
+    if (document.activeElement === editor || editor.contains(document.activeElement)) {
       saveCurrentSelection();
     }
   });
 
-  /* 에디터 세로 스크롤 ↔ 가로 페이지 넘김 모드 토글 */
+  /* 에디터 세로 스크롤 ↔ 가로 페이지 넘김 모드 전환 */
   function toggleEditorViewMode() {
     if (editorViewMode === 'scroll') {
       editorViewMode = 'page';
@@ -977,7 +980,7 @@
     }
   }
 
-  /* 페이지 모드 렌더링 */
+  /* 모든 페이지가 연속적으로 연결되는 실시간 페이지 뷰 렌더링 */
   function renderEditorPages() {
     if (!editorPagesWrapper) return;
     editorPagesWrapper.innerHTML = '';
@@ -989,21 +992,60 @@
       const pageCard = document.createElement('div');
       pageCard.className = 'editor-page-card';
 
+      const header = document.createElement('div');
+      header.className = 'editor-page-card-header';
+      header.innerText = `[ ${i + 1} / ${totalSlideCount} ]`;
+
       const inner = document.createElement('div');
       inner.className = 'editor-page-card-inner';
       
-      const content = document.createElement('div');
-      content.style.position = 'absolute';
-      content.style.top = `-${currentContentStepHeight * i}px`;
-      content.style.left = '0';
-      content.style.width = '100%';
-      content.style.padding = 'var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x)';
-      content.innerHTML = editor.innerHTML;
+      const pageView = document.createElement('div');
+      pageView.contentEditable = "true";
+      pageView.spellcheck = false;
+      pageView.style.position = 'absolute';
+      pageView.style.top = `-${currentContentStepHeight * i}px`;
+      pageView.style.left = '0';
+      pageView.style.width = '100%';
+      pageView.style.minHeight = '100%';
+      pageView.style.padding = 'var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x)';
+      pageView.style.outline = 'none';
+      pageView.style.fontSize = 'var(--font-size)';
+      pageView.style.lineHeight = 'var(--line-height)';
+      pageView.style.fontWeight = '500';
+      pageView.style.wordBreak = 'keep-all';
+      pageView.style.whiteSpace = 'pre-wrap';
+      pageView.style.color = '#ffffff';
+      pageView.innerHTML = editor.innerHTML;
 
-      inner.appendChild(content);
+      // 실시간 입력/삭제/붙여넣기 시 모든 페이지와 본문 동기화
+      pageView.addEventListener('input', () => {
+        editor.innerHTML = pageView.innerHTML;
+        onContentModified();
+        syncAllPageViews(pageView);
+      });
+
+      pageView.addEventListener('paste', handleSmartPaste);
+
+      inner.appendChild(pageView);
+      pageCard.appendChild(header);
       pageCard.appendChild(inner);
       editorPagesWrapper.appendChild(pageCard);
     }
+  }
+
+  function syncAllPageViews(sourceElement) {
+    document.querySelectorAll('.editor-page-card-inner > div').forEach(pv => {
+      if (pv !== sourceElement) {
+        pv.innerHTML = editor.innerHTML;
+      }
+    });
+  }
+
+  function onContentModified() {
+    pushHistory();
+    saveEditorContent();
+    updateSlideIndicators();
+    updateScrollThumbPosition();
   }
 
   /* 텍스트 노드 분할 스타일 주입 엔진 */
@@ -1079,7 +1121,7 @@
 
   function cycleSelectedFontFamily() {
     const sel = window.getSelection();
-    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) 
                 ? sel.getRangeAt(0) 
                 : savedSelectionRange;
 
@@ -1093,7 +1135,6 @@
     if (btnFontCycle) btnFontCycle.innerText = targetFont.name;
 
     const currentScroll = editorContainer.scrollTop;
-    editor.focus();
     pushHistory();
 
     const newRange = applyFontToRange(range, targetFont.family);
@@ -1102,6 +1143,14 @@
       sel.removeAllRanges();
       sel.addRange(newRange);
       savedSelectionRange = newRange.cloneRange();
+    }
+
+    if (editorViewMode === 'page') {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.innerHTML) {
+        editor.innerHTML = activeEl.innerHTML;
+        syncAllPageViews(activeEl);
+      }
     }
 
     editorContainer.scrollTop = currentScroll;
@@ -1202,7 +1251,7 @@
   function adjustLetterSpacing(delta) {
     try {
       const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) 
                   ? sel.getRangeAt(0) 
                   : savedSelectionRange;
       if (!range || range.collapsed) {
@@ -1235,6 +1284,14 @@
       sel.addRange(newRange);
       savedSelectionRange = newRange.cloneRange();
 
+      if (editorViewMode === 'page') {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.innerHTML) {
+          editor.innerHTML = activeEl.innerHTML;
+          syncAllPageViews(activeEl);
+        }
+      }
+
       editorContainer.scrollTop = currentScroll;
       saveEditorContent();
       updateSlideIndicators();
@@ -1247,7 +1304,7 @@
   function adjustLineHeight(delta) {
     try {
       const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) 
                   ? sel.getRangeAt(0) 
                   : savedSelectionRange;
       if (!range || range.collapsed) {
@@ -1282,6 +1339,14 @@
       sel.removeAllRanges();
       sel.addRange(newRange);
       savedSelectionRange = newRange.cloneRange();
+
+      if (editorViewMode === 'page') {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.innerHTML) {
+          editor.innerHTML = activeEl.innerHTML;
+          syncAllPageViews(activeEl);
+        }
+      }
 
       editorContainer.scrollTop = currentScroll;
       saveEditorContent();
@@ -1487,6 +1552,14 @@
 
         document.execCommand('foreColor', false, activeColor);
         sel.removeAllRanges();
+
+        if (editorViewMode === 'page') {
+          const activeEl = document.activeElement;
+          if (activeEl && activeEl.innerHTML) {
+            editor.innerHTML = activeEl.innerHTML;
+            syncAllPageViews(activeEl);
+          }
+        }
       }
     }
   }
@@ -1529,10 +1602,7 @@
   editor.addEventListener('input', () => {
     if (inputDebounce) clearTimeout(inputDebounce);
     inputDebounce = setTimeout(() => {
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
+      onContentModified();
       if (editorViewMode === 'page') renderEditorPages();
     }, 300);
   });
@@ -1564,14 +1634,6 @@
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
       let range = sel.getRangeAt(0);
-      if (!editor.contains(range.commonAncestorContainer)) {
-        editor.focus();
-        range = document.createRange();
-        range.selectNodeContents(editor);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
       range.deleteContents();
       
       const el = document.createElement("div");
@@ -1594,6 +1656,7 @@
     }
   }
 
+  /* 긴 텍스트 붙여넣기 시 모든 페이지와 연결되는 스마트 붙여넣기 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1664,11 +1727,16 @@
       insertHtmlAtCaret(formattedText);
     }
 
+    if (editorViewMode === 'page') {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.innerHTML) {
+        editor.innerHTML = activeEl.innerHTML;
+        syncAllPageViews(activeEl);
+      }
+    }
+
     setTimeout(() => {
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
+      onContentModified();
       if (editorViewMode === 'page') renderEditorPages();
     }, 20);
   }
@@ -1677,7 +1745,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v55', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v57', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1721,6 +1789,15 @@
       }
       pushHistory();
       document.execCommand('foreColor', false, color);
+
+      if (editorViewMode === 'page') {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.innerHTML) {
+          editor.innerHTML = activeEl.innerHTML;
+          syncAllPageViews(activeEl);
+        }
+      }
+
       editorContainer.scrollTop = currentScroll;
       pushHistory();
       saveEditorContent();
@@ -2146,7 +2223,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v55') || localStorage.getItem('yslide_final_v54') || localStorage.getItem('yslide_final_v53');
+      const saved = localStorage.getItem('yslide_final_v57') || localStorage.getItem('yslide_final_v56') || localStorage.getItem('yslide_final_v55') || localStorage.getItem('yslide_final_v54');
       if (saved) {
         editor.innerHTML = saved;
       }
