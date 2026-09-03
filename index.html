@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_page_frame_perfect_v61">
+<link rel="manifest" href="manifest.json?v=2026_fixed_page_mode_v62">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -216,7 +216,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 에디터 뷰포트 영역 */
+  /* 편집 뷰포트 영역 */
   #editor-container {
     position: absolute;
     top: var(--toolbar-height);
@@ -235,11 +235,10 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    display: flex;
   }
   #editor-container.mode-scroll::-webkit-scrollbar { display: none; }
 
-  /* 2. 가로 페이지 넘김 모드 (1화면 1페이지 완벽 잠금) */
+  /* 2. 가로 페이지 넘김 모드 (삼성노트 스타일 1화면 1페이지 스냅) */
   #editor-container.mode-page {
     overflow-x: auto;
     overflow-y: hidden;
@@ -248,7 +247,6 @@
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
-    padding: 0;
   }
   #editor-container.mode-page::-webkit-scrollbar { display: none; }
 
@@ -257,20 +255,17 @@
     width: 100%;
     max-width: var(--content-max-width);
     min-height: 100%;
-    pointer-events: auto;
+    pointer-events: none;
     margin: 0 auto;
   }
 
-  /* 페이지 모드 시 스크롤 에디터 래퍼 숨김 */
   #editor-container.mode-page #editor-wrapper {
     display: none;
   }
 
-  /* 페이지 모드 전용 래퍼: 각 카드가 정확히 100vw를 차지 */
   #editor-pages-wrapper {
     display: none;
     height: 100%;
-    width: auto;
   }
   #editor-container.mode-page #editor-pages-wrapper {
     display: flex;
@@ -278,7 +273,6 @@
     height: 100%;
   }
 
-  /* 한 페이지 카드: 100vw 전체를 차지하며 정중앙에 배치 */
   .editor-page-card {
     flex: 0 0 100vw;
     width: 100vw;
@@ -290,7 +284,7 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: center;
     box-sizing: border-box;
   }
@@ -307,7 +301,6 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 점선 경계가 있는 정확한 페이지 틀 */
   .editor-page-card-inner {
     width: 100%;
     max-width: var(--content-max-width);
@@ -320,7 +313,7 @@
     box-sizing: border-box;
   }
 
-  /* 눈금선 레이어 (스크롤 모드용) */
+  /* 눈금선 레이어 */
   #slide-indicators-layer {
     position: absolute;
     top: 0;
@@ -822,7 +815,7 @@
     <div id="main-editor" contenteditable="true" spellcheck="false"></div>
     <div id="editor-bottom-spacer"></div>
   </div>
-  <!-- 페이지 넘김 모드 전용 래퍼 (100vw 단위 슬라이드) -->
+  <!-- 페이지 넘김 모드 전용 다이내믹 래퍼 -->
   <div id="editor-pages-wrapper"></div>
 </div>
 
@@ -960,7 +953,7 @@
     }
   });
 
-  /* 에디터 세로 스크롤 ↔ 가로 페이지 넘김 모드 전환 */
+  /* 세로 스크롤 ↔ 가로 페이지 넘김 모드 전환 */
   function toggleEditorViewMode() {
     if (editorViewMode === 'scroll') {
       editorViewMode = 'page';
@@ -970,6 +963,7 @@
         iconViewMode.innerHTML = '<rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line>';
       }
       scrollTrack.style.display = 'none';
+      editorContainer.scrollLeft = 0;
       renderEditorPages();
       showQuickToast("📄 페이지 넘김 모드 (1화면 1페이지)");
     } else {
@@ -986,12 +980,12 @@
     }
   }
 
-  /* 1화면 1페이지 점선 프레임 렌더링 엔진 */
+  /* 1화면 1페이지 점선 틀 가로 스냅 엔진 (드래그/선택 완벽 보장) */
   function renderEditorPages(preserveFocusIndex = null) {
     if (!editorPagesWrapper) return;
 
     const { count } = getAccurateSlideMetrics();
-    totalSlideCount = count;
+    totalSlideCount = Math.max(1, count);
     editorPagesWrapper.innerHTML = '';
 
     for (let i = 0; i < totalSlideCount; i++) {
@@ -1025,7 +1019,7 @@
       pageContent.style.color = '#ffffff';
       pageContent.innerHTML = editor.innerHTML;
 
-      // 실시간 입력/삭제 시 전체 페이지 자동 증설/축소 및 동기화
+      // 실시간 입력/삭제/붙여넣기 시 텍스트 전체 동기화 및 페이지 카드 자동 증설
       pageContent.addEventListener('input', () => {
         editor.innerHTML = pageContent.innerHTML;
         onContentModified();
@@ -1157,7 +1151,6 @@
     if (btnFontCycle) btnFontCycle.innerText = targetFont.name;
 
     const currentScroll = editorContainer.scrollTop;
-    editor.focus();
     pushHistory();
 
     const newRange = applyFontToRange(range, targetFont.family);
@@ -1413,6 +1406,10 @@
 
   function getAccurateSlideMetrics() {
     let checkHeight = editor.scrollHeight;
+    if (editorViewMode === 'page') {
+      const activeEditor = document.querySelector('.page-view-editor');
+      if (activeEditor) checkHeight = activeEditor.scrollHeight;
+    }
     const pureTextHeight = Math.max(0, checkHeight - currentTopMargin - 24);
     const count = Math.max(1, Math.ceil(pureTextHeight / currentContentStepHeight) || 1);
     return { count };
@@ -1576,14 +1573,6 @@
 
         document.execCommand('foreColor', false, activeColor);
         sel.removeAllRanges();
-
-        if (editorViewMode === 'page') {
-          const activeEl = document.activeElement;
-          if (activeEl && activeEl.innerHTML) {
-            editor.innerHTML = activeEl.innerHTML;
-            syncAllPageViews(activeEl);
-          }
-        }
       }
     }
   }
@@ -1626,9 +1615,11 @@
   editor.addEventListener('input', () => {
     if (inputDebounce) clearTimeout(inputDebounce);
     inputDebounce = setTimeout(() => {
-      onContentModified();
-      if (editorViewMode === 'page') renderEditorPages();
-    }, 200);
+      pushHistory();
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+    }, 150);
   });
 
   function rgbToHex(rgb) {
@@ -1680,7 +1671,7 @@
     }
   }
 
-  /* 긴 텍스트 붙여넣기 */
+  /* 긴 텍스트 스마트 붙여넣기 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1751,18 +1742,12 @@
       insertHtmlAtCaret(formattedText);
     }
 
-    if (editorViewMode === 'page') {
-      const activeEl = document.activeElement;
-      if (activeEl && activeEl.innerHTML) {
-        editor.innerHTML = activeEl.innerHTML;
-      }
-    }
-
     setTimeout(() => {
-      onContentModified();
-      if (editorViewMode === 'page') {
-        renderEditorPages();
-      }
+      pushHistory();
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+      if (editorViewMode === 'page') renderEditorPages();
     }, 20);
   }
 
@@ -1770,7 +1755,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v61', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v62', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1814,15 +1799,6 @@
       }
       pushHistory();
       document.execCommand('foreColor', false, color);
-
-      if (editorViewMode === 'page') {
-        const activeEl = document.activeElement;
-        if (activeEl && activeEl.innerHTML) {
-          editor.innerHTML = activeEl.innerHTML;
-          syncAllPageViews(activeEl);
-        }
-      }
-
       editorContainer.scrollTop = currentScroll;
       pushHistory();
       saveEditorContent();
@@ -2115,7 +2091,7 @@ ${content}`;
     window.print();
   }
 
-  /* 전체화면 슬라이드 독립 DOM 생성 엔진 */
+  /* 전체화면 슬라이드 DOM 생성 엔진 */
   function renderReaderSlides() {
     if (!readerViewport) return;
     readerViewport.innerHTML = '';
@@ -2211,7 +2187,7 @@ ${content}`;
     }
   }
 
-  /* 릿제로 2(LitZero 2) 및 키보드 이벤트 */
+  /* 릿제로 2 및 키보드 이벤트 */
   window.addEventListener('keydown', (e) => {
     if (!isReaderMode) return;
     
@@ -2248,7 +2224,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v61') || localStorage.getItem('yslide_final_v60') || localStorage.getItem('yslide_final_v59') || localStorage.getItem('yslide_final_v58');
+      const saved = localStorage.getItem('yslide_final_v62') || localStorage.getItem('yslide_final_v61') || localStorage.getItem('yslide_final_v60') || localStorage.getItem('yslide_final_v59');
       if (saved) {
         editor.innerHTML = saved;
       }
