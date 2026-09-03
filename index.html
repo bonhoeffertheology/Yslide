@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_native_pagination_v60">
+<link rel="manifest" href="manifest.json?v=2026_page_frame_perfect_v61">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -139,7 +139,6 @@
     color: #000;
   }
 
-  /* 글꼴 선택 버튼 */
   .btn-font-cycle {
     height: 28px;
     padding: 0 10px;
@@ -157,7 +156,6 @@
     color: #38bdf8;
   }
 
-  /* 흑백 심플 뷰모드 아이콘 버튼 */
   .btn-view-toggle {
     width: 32px;
     height: 28px;
@@ -218,7 +216,7 @@
   }
   .btn-play:active { background-color: #404040; color: #fff; }
 
-  /* 에디터 뷰포트 */
+  /* 에디터 뷰포트 영역 */
   #editor-container {
     position: absolute;
     top: var(--toolbar-height);
@@ -237,16 +235,20 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+    display: flex;
   }
   #editor-container.mode-scroll::-webkit-scrollbar { display: none; }
 
-  /* 2. 가로 페이지 넘김 모드 (CSS Column & Snap 페이징) */
+  /* 2. 가로 페이지 넘김 모드 (1화면 1페이지 완벽 잠금) */
   #editor-container.mode-page {
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
-    display: block;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 0;
   }
   #editor-container.mode-page::-webkit-scrollbar { display: none; }
 
@@ -259,17 +261,66 @@
     margin: 0 auto;
   }
 
-  /* 페이지 모드 시의 래퍼 스타일 */
+  /* 페이지 모드 시 스크롤 에디터 래퍼 숨김 */
   #editor-container.mode-page #editor-wrapper {
-    max-width: none;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    justify-content: flex-start;
+    display: none;
   }
 
-  /* 눈금선 레이어 (스크롤 모드 전용) */
+  /* 페이지 모드 전용 래퍼: 각 카드가 정확히 100vw를 차지 */
+  #editor-pages-wrapper {
+    display: none;
+    height: 100%;
+    width: auto;
+  }
+  #editor-container.mode-page #editor-pages-wrapper {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+  }
+
+  /* 한 페이지 카드: 100vw 전체를 차지하며 정중앙에 배치 */
+  .editor-page-card {
+    flex: 0 0 100vw;
+    width: 100vw;
+    height: 100%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    position: relative;
+    padding: 12px 16px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  .editor-page-card-header {
+    width: 100%;
+    max-width: var(--content-max-width);
+    text-align: right;
+    padding: 0 12px 6px 0;
+    font-size: 13px;
+    font-weight: bold;
+    color: #888;
+    user-select: none;
+    font-family: var(--ui-font) !important;
+  }
+
+  /* 점선 경계가 있는 정확한 페이지 틀 */
+  .editor-page-card-inner {
+    width: 100%;
+    max-width: var(--content-max-width);
+    height: var(--slide-fixed-height);
+    overflow: hidden !important;
+    position: relative;
+    background-color: #000000;
+    border: 2px dashed rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+
+  /* 눈금선 레이어 (스크롤 모드용) */
   #slide-indicators-layer {
     position: absolute;
     top: 0;
@@ -279,9 +330,6 @@
     pointer-events: none !important;
     user-select: none;
     z-index: 1;
-  }
-  #editor-container.mode-page #slide-indicators-layer {
-    display: none;
   }
 
   .slide-boundary {
@@ -310,7 +358,7 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 단일 원본 에디터 (스크롤 ↔ 페이지 모드 완벽 상호 호환) */
+  /* 단일 원본 에디터 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -330,23 +378,9 @@
     pointer-events: auto;
   }
 
-  /* 페이지 모드 시 에디터 스타일: CSS Column 기반 페이지 분할 */
-  #editor-container.mode-page #main-editor {
-    height: var(--slide-fixed-height);
-    width: 100vw;
-    column-width: 100vw;
-    column-gap: 0px;
-    column-fill: auto;
-    padding: var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x);
-    overflow: visible;
-  }
-
   #editor-bottom-spacer {
     height: calc(100vh - 140px);
     pointer-events: none;
-  }
-  #editor-container.mode-page #editor-bottom-spacer {
-    display: none;
   }
 
   body.paint-mode #main-editor {
@@ -644,7 +678,7 @@
 <div id="toolbar">
   <!-- 1단: 자간(수축: →← / 확장: ←→) / 줄간격(수축/확장) / 눈금(1:86%, 2:72%) / 글꼴 이름 / 흑백 뷰모드 아이콘 -->
   <div class="toolbar-row toolbar-row-top">
-    <!-- 1. 자간 좁게 (→ ←) -->
+    <!-- 자간 좁게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <line x1="3" y1="12" x2="9" y2="12"></line>
@@ -653,7 +687,7 @@
         <polyline points="18 9 15 12 18 15"></polyline>
       </svg>
     </button>
-    <!-- 2. 자간 넓게 (← →) -->
+    <!-- 자간 넓게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <line x1="9" y1="12" x2="3" y2="12"></line>
@@ -665,7 +699,7 @@
 
     <div class="format-divider"></div>
 
-    <!-- 3. 줄간격 좁게 (↓ ↑) -->
+    <!-- 줄간격 좁게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <polyline points="9 6 12 9 15 6"></polyline>
@@ -674,7 +708,7 @@
         <line x1="12" y1="22" x2="12" y2="15"></line>
       </svg>
     </button>
-    <!-- 4. 줄간격 넓게 (↑ ↓) -->
+    <!-- 줄간격 넓게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <polyline points="8 6 12 2 16 6"></polyline>
@@ -686,15 +720,15 @@
 
     <div class="format-divider"></div>
 
-    <!-- 5. 눈금선 토글 버튼 (1: 86% / 2: 72%) -->
+    <!-- 눈금선 토글 버튼 (1: 86% / 2: 72%) -->
     <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 토글 (1: 기본 86% / 2: 72%)">📏 1</button>
 
     <div class="format-divider"></div>
 
-    <!-- 6. 글꼴 순환 버튼 -->
+    <!-- 글꼴 순환 버튼 -->
     <button id="btn-font-cycle" class="btn-font-cycle" onmousedown="event.preventDefault()" onclick="cycleSelectedFontFamily()" title="선택 텍스트 글꼴 원터치 순환 변경">KoPub돋움</button>
 
-    <!-- 7. 흑백 심플 뷰모드 아이콘 버튼 -->
+    <!-- 흑백 심플 뷰모드 아이콘 버튼 -->
     <button id="btn-view-mode" class="btn-view-toggle" onclick="toggleEditorViewMode()" title="세로 스크롤 / 가로 페이지 넘김 모드 전환">
       <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -781,13 +815,15 @@
   </div>
 </div>
 
-<!-- 단일 통합 에디터 뷰포트 -->
+<!-- 에디터 컨테이너 -->
 <div id="editor-container" class="mode-scroll">
   <div id="editor-wrapper">
     <div id="slide-indicators-layer"></div>
     <div id="main-editor" contenteditable="true" spellcheck="false"></div>
     <div id="editor-bottom-spacer"></div>
   </div>
+  <!-- 페이지 넘김 모드 전용 래퍼 (100vw 단위 슬라이드) -->
+  <div id="editor-pages-wrapper"></div>
 </div>
 
 <div id="quick-scrollbar-track">
@@ -863,7 +899,7 @@
 
   const editor = document.getElementById('main-editor');
   const editorContainer = document.getElementById('editor-container');
-  const editorWrapper = document.getElementById('editor-wrapper');
+  const editorPagesWrapper = document.getElementById('editor-pages-wrapper');
   const indicatorsLayer = document.getElementById('slide-indicators-layer');
   const scrollTrack = document.getElementById('quick-scrollbar-track');
   const scrollThumb = document.getElementById('quick-scrollbar-thumb');
@@ -895,11 +931,13 @@
         saveEditorContent();
         updateSlideIndicators();
         updateScrollThumbPosition();
+        if (editorViewMode === 'page') renderEditorPages();
         showQuickToast("↶ 되돌리기가 적용되었습니다");
       } else if (document.execCommand) {
         document.execCommand('undo', false, null);
         saveEditorContent();
         updateSlideIndicators();
+        if (editorViewMode === 'page') renderEditorPages();
       }
     } catch(e){}
   }
@@ -909,7 +947,7 @@
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
         const range = sel.getRangeAt(0);
-        if (editor.contains(range.commonAncestorContainer)) {
+        if (editor.contains(range.commonAncestorContainer) || (editorPagesWrapper && editorPagesWrapper.contains(range.commonAncestorContainer))) {
           savedSelectionRange = range.cloneRange();
         }
       }
@@ -917,12 +955,12 @@
   }
 
   document.addEventListener('selectionchange', () => {
-    if (document.activeElement === editor || editor.contains(document.activeElement)) {
+    if (document.activeElement === editor || (editorPagesWrapper && editorPagesWrapper.contains(document.activeElement))) {
       saveCurrentSelection();
     }
   });
 
-  /* 스크롤 ↔ 페이지 모드 완벽 호환 전환 */
+  /* 에디터 세로 스크롤 ↔ 가로 페이지 넘김 모드 전환 */
   function toggleEditorViewMode() {
     if (editorViewMode === 'scroll') {
       editorViewMode = 'page';
@@ -932,9 +970,8 @@
         iconViewMode.innerHTML = '<rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line>';
       }
       scrollTrack.style.display = 'none';
-      editorContainer.scrollLeft = 0;
-      updateSlideIndicators();
-      showQuickToast("📄 페이지 넘김 모드 (가로 스와이프)");
+      renderEditorPages();
+      showQuickToast("📄 페이지 넘김 모드 (1화면 1페이지)");
     } else {
       editorViewMode = 'scroll';
       editorContainer.classList.remove('mode-page');
@@ -947,6 +984,90 @@
       updateScrollThumbPosition();
       showQuickToast("📜 세로 스크롤 모드");
     }
+  }
+
+  /* 1화면 1페이지 점선 프레임 렌더링 엔진 */
+  function renderEditorPages(preserveFocusIndex = null) {
+    if (!editorPagesWrapper) return;
+
+    const { count } = getAccurateSlideMetrics();
+    totalSlideCount = count;
+    editorPagesWrapper.innerHTML = '';
+
+    for (let i = 0; i < totalSlideCount; i++) {
+      const pageCard = document.createElement('div');
+      pageCard.className = 'editor-page-card';
+
+      const header = document.createElement('div');
+      header.className = 'editor-page-card-header';
+      header.innerText = `[ ${i + 1} / ${totalSlideCount} ]`;
+
+      const inner = document.createElement('div');
+      inner.className = 'editor-page-card-inner';
+
+      const pageContent = document.createElement('div');
+      pageContent.contentEditable = "true";
+      pageContent.spellcheck = false;
+      pageContent.className = 'page-view-editor';
+      pageContent.dataset.pageIndex = i;
+      pageContent.style.position = 'absolute';
+      pageContent.style.top = `-${currentContentStepHeight * i}px`;
+      pageContent.style.left = '0';
+      pageContent.style.width = '100%';
+      pageContent.style.minHeight = '100%';
+      pageContent.style.padding = 'var(--top-margin) var(--content-padding-x) 24px var(--content-padding-x)';
+      pageContent.style.outline = 'none';
+      pageContent.style.fontSize = 'var(--font-size)';
+      pageContent.style.lineHeight = 'var(--line-height)';
+      pageContent.style.fontWeight = '500';
+      pageContent.style.wordBreak = 'keep-all';
+      pageContent.style.whiteSpace = 'pre-wrap';
+      pageContent.style.color = '#ffffff';
+      pageContent.innerHTML = editor.innerHTML;
+
+      // 실시간 입력/삭제 시 전체 페이지 자동 증설/축소 및 동기화
+      pageContent.addEventListener('input', () => {
+        editor.innerHTML = pageContent.innerHTML;
+        onContentModified();
+        
+        const newMetrics = getAccurateSlideMetrics();
+        if (newMetrics.count !== totalSlideCount) {
+          renderEditorPages(i);
+        } else {
+          syncAllPageViews(pageContent);
+        }
+      });
+
+      pageContent.addEventListener('paste', handleSmartPaste);
+
+      inner.appendChild(pageContent);
+      pageCard.appendChild(header);
+      pageCard.appendChild(inner);
+      editorPagesWrapper.appendChild(pageCard);
+    }
+
+    if (preserveFocusIndex !== null) {
+      const targetCard = editorPagesWrapper.children[preserveFocusIndex];
+      if (targetCard) {
+        const targetEditor = targetCard.querySelector('.page-view-editor');
+        if (targetEditor) targetEditor.focus();
+      }
+    }
+  }
+
+  function syncAllPageViews(sourceElement) {
+    document.querySelectorAll('.page-view-editor').forEach(pv => {
+      if (pv !== sourceElement) {
+        pv.innerHTML = editor.innerHTML;
+      }
+    });
+  }
+
+  function onContentModified() {
+    pushHistory();
+    saveEditorContent();
+    updateSlideIndicators();
+    updateScrollThumbPosition();
   }
 
   /* 텍스트 노드 분할 스타일 주입 엔진 */
@@ -1022,7 +1143,7 @@
 
   function cycleSelectedFontFamily() {
     const sel = window.getSelection();
-    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+    let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) 
                 ? sel.getRangeAt(0) 
                 : savedSelectionRange;
 
@@ -1047,10 +1168,19 @@
       savedSelectionRange = newRange.cloneRange();
     }
 
+    if (editorViewMode === 'page') {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.innerHTML) {
+        editor.innerHTML = activeEl.innerHTML;
+        syncAllPageViews(activeEl);
+      }
+    }
+
     editorContainer.scrollTop = currentScroll;
     pushHistory();
     saveEditorContent();
     updateSlideIndicators();
+    if (editorViewMode === 'page') renderEditorPages();
     showQuickToast(`글꼴: ${targetFont.name}`);
   }
 
@@ -1132,6 +1262,7 @@
     try { localStorage.setItem('yslide_height_step', step); } catch(e){}
     updateSlideIndicators();
     updateScrollThumbPosition();
+    if (editorViewMode === 'page') renderEditorPages();
   }
 
   window.addEventListener('resize', () => {
@@ -1143,7 +1274,7 @@
   function adjustLetterSpacing(delta) {
     try {
       const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) 
                   ? sel.getRangeAt(0) 
                   : savedSelectionRange;
       if (!range || range.collapsed) {
@@ -1176,9 +1307,18 @@
       sel.addRange(newRange);
       savedSelectionRange = newRange.cloneRange();
 
+      if (editorViewMode === 'page') {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.innerHTML) {
+          editor.innerHTML = activeEl.innerHTML;
+          syncAllPageViews(activeEl);
+        }
+      }
+
       editorContainer.scrollTop = currentScroll;
       saveEditorContent();
       updateSlideIndicators();
+      if (editorViewMode === 'page') renderEditorPages();
     } catch(err) {
       console.error(err);
     }
@@ -1187,7 +1327,7 @@
   function adjustLineHeight(delta) {
     try {
       const sel = window.getSelection();
-      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) 
+      let range = (sel && sel.rangeCount > 0 && !sel.isCollapsed) 
                   ? sel.getRangeAt(0) 
                   : savedSelectionRange;
       if (!range || range.collapsed) {
@@ -1223,9 +1363,18 @@
       sel.addRange(newRange);
       savedSelectionRange = newRange.cloneRange();
 
+      if (editorViewMode === 'page') {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.innerHTML) {
+          editor.innerHTML = activeEl.innerHTML;
+          syncAllPageViews(activeEl);
+        }
+      }
+
       editorContainer.scrollTop = currentScroll;
       saveEditorContent();
       updateSlideIndicators();
+      if (editorViewMode === 'page') renderEditorPages();
     } catch(err) {
       console.error(err);
     }
@@ -1262,14 +1411,13 @@
     applySlideHeightByStep(heightStepIndex, false);
   }
 
-  /* 정확한 텍스트 높이 기반 슬라이드 개수 산출 */
   function getAccurateSlideMetrics() {
-    const pureTextHeight = Math.max(0, editor.scrollHeight - currentTopMargin - 24);
+    let checkHeight = editor.scrollHeight;
+    const pureTextHeight = Math.max(0, checkHeight - currentTopMargin - 24);
     const count = Math.max(1, Math.ceil(pureTextHeight / currentContentStepHeight) || 1);
     return { count };
   }
 
-  /* 눈금선 및 페이지 경계 업데이트 */
   function updateSlideIndicators() {
     try {
       const { count } = getAccurateSlideMetrics();
@@ -1428,6 +1576,14 @@
 
         document.execCommand('foreColor', false, activeColor);
         sel.removeAllRanges();
+
+        if (editorViewMode === 'page') {
+          const activeEl = document.activeElement;
+          if (activeEl && activeEl.innerHTML) {
+            editor.innerHTML = activeEl.innerHTML;
+            syncAllPageViews(activeEl);
+          }
+        }
       }
     }
   }
@@ -1470,11 +1626,9 @@
   editor.addEventListener('input', () => {
     if (inputDebounce) clearTimeout(inputDebounce);
     inputDebounce = setTimeout(() => {
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
-    }, 150);
+      onContentModified();
+      if (editorViewMode === 'page') renderEditorPages();
+    }, 200);
   });
 
   function rgbToHex(rgb) {
@@ -1597,11 +1751,18 @@
       insertHtmlAtCaret(formattedText);
     }
 
+    if (editorViewMode === 'page') {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.innerHTML) {
+        editor.innerHTML = activeEl.innerHTML;
+      }
+    }
+
     setTimeout(() => {
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
+      onContentModified();
+      if (editorViewMode === 'page') {
+        renderEditorPages();
+      }
     }, 20);
   }
 
@@ -1609,7 +1770,7 @@
 
   function saveEditorContent(shouldSave = true) {
     if (shouldSave) {
-      try { localStorage.setItem('yslide_final_v60', editor.innerHTML); } catch(e){}
+      try { localStorage.setItem('yslide_final_v61', editor.innerHTML); } catch(e){}
     }
   }
 
@@ -1653,9 +1814,19 @@
       }
       pushHistory();
       document.execCommand('foreColor', false, color);
+
+      if (editorViewMode === 'page') {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.innerHTML) {
+          editor.innerHTML = activeEl.innerHTML;
+          syncAllPageViews(activeEl);
+        }
+      }
+
       editorContainer.scrollTop = currentScroll;
       pushHistory();
       saveEditorContent();
+      if (editorViewMode === 'page') renderEditorPages();
     }
   }
 
@@ -1723,6 +1894,7 @@ ${content}`;
         saveEditorContent();
         updateSlideIndicators();
         updateScrollThumbPosition();
+        if (editorViewMode === 'page') renderEditorPages();
         showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
       } else {
         showQuickToast("⚠️ 번역 결과를 받지 못했습니다.");
@@ -1813,6 +1985,7 @@ ${content}`;
     saveEditorContent();
     updateSlideIndicators();
     updateScrollThumbPosition();
+    if (editorViewMode === 'page') renderEditorPages();
     closeStorageModal();
     showQuickToast("📂 문서를 불러왔습니다");
   }
@@ -1881,6 +2054,7 @@ ${content}`;
           saveEditorContent();
           updateSlideIndicators();
           updateScrollThumbPosition();
+          if (editorViewMode === 'page') renderEditorPages();
           saveDocumentToArchive(editor.innerHTML);
           showQuickToast("📂 파일을 불러왔습니다");
           return;
@@ -1891,6 +2065,7 @@ ${content}`;
       saveEditorContent();
       updateSlideIndicators();
       updateScrollThumbPosition();
+      if (editorViewMode === 'page') renderEditorPages();
       saveDocumentToArchive(editor.innerHTML);
       showQuickToast("📂 텍스트를 불러왔습니다");
     };
@@ -2073,7 +2248,7 @@ ${content}`;
       }
       applySlideHeightByStep(heightStepIndex, false);
 
-      const saved = localStorage.getItem('yslide_final_v60') || localStorage.getItem('yslide_final_v59') || localStorage.getItem('yslide_final_v58');
+      const saved = localStorage.getItem('yslide_final_v61') || localStorage.getItem('yslide_final_v60') || localStorage.getItem('yslide_final_v59') || localStorage.getItem('yslide_final_v58');
       if (saved) {
         editor.innerHTML = saved;
       }
