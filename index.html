@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_page_sync_perfect_v64">
+<link rel="manifest" href="manifest.json?v=2026_page_sync_perfect_v65">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -667,9 +667,8 @@
 <body>
 
 <div id="toolbar">
-  <!-- 1단: 자간 / 줄간격 / 눈금 / 글꼴 / 뷰모드 아이콘 -->
+  <!-- 1단 -->
   <div class="toolbar-row toolbar-row-top">
-    <!-- 자간 좁게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <line x1="3" y1="12" x2="9" y2="12"></line>
@@ -678,7 +677,6 @@
         <polyline points="18 9 15 12 18 15"></polyline>
       </svg>
     </button>
-    <!-- 자간 넓게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <line x1="9" y1="12" x2="3" y2="12"></line>
@@ -690,7 +688,6 @@
 
     <div class="format-divider"></div>
 
-    <!-- 줄간격 좁게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <polyline points="9 6 12 9 15 6"></polyline>
@@ -699,7 +696,6 @@
         <line x1="12" y1="22" x2="12" y2="15"></line>
       </svg>
     </button>
-    <!-- 줄간격 넓게 -->
     <button class="btn-format" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
       <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px;">
         <polyline points="8 6 12 2 16 6"></polyline>
@@ -711,15 +707,12 @@
 
     <div class="format-divider"></div>
 
-    <!-- 눈금선 토글 버튼 -->
     <button id="btn-slide-height" class="btn-height-toggle" onmousedown="event.preventDefault()" onclick="cycleSlideHeightStep()" title="눈금선 높이 토글 (1: 기본 86% / 2: 72%)">📏 1</button>
 
     <div class="format-divider"></div>
 
-    <!-- 글꼴 순환 버튼 -->
     <button id="btn-font-cycle" class="btn-font-cycle" onmousedown="event.preventDefault()" onclick="cycleSelectedFontFamily()" title="선택 텍스트 글꼴 원터치 순환 변경">KoPub돋움</button>
 
-    <!-- 흑백 심플 뷰모드 아이콘 버튼 -->
     <button id="btn-view-mode" class="btn-view-toggle" onclick="toggleEditorViewMode()" title="세로 스크롤 / 가로 페이지 넘김 모드 전환">
       <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -728,7 +721,7 @@
     </button>
   </div>
 
-  <!-- 2단: 기본 기능 -->
+  <!-- 2단 -->
   <div class="toolbar-row">
     <div class="btn-group" id="edit-tools">
       <button class="btn-icon" onclick="openStorageModal()" title="문서 보관함 열기">
@@ -964,7 +957,6 @@
       scrollTrack.style.display = 'none';
       editorPagesWrapper.style.display = 'flex';
 
-      // 높이 측정을 위해 렌더링을 먼저 수행한 뒤 숨김 처리
       renderEditorPages();
 
       editorWrapper.style.display = 'none';
@@ -987,7 +979,6 @@
     }
   }
 
-  /* 스크롤 눈금선과 1:1 완벽 일치하는 페이지 카드 렌더링 엔진 */
   function renderEditorPages(preserveFocusIndex = null) {
     if (!editorPagesWrapper) return;
 
@@ -1070,7 +1061,6 @@
     updateScrollThumbPosition();
   }
 
-  /* 텍스트 노드 분할 스타일 주입 엔진 */
   function applyFontToRange(range, fontFamily) {
     if (!range || range.collapsed) return;
 
@@ -1232,7 +1222,6 @@
     }
   }
 
-  /* 2단계 눈금선 토글 (1: 기본 86% / 2: 72%) */
   function cycleSlideHeightStep() {
     heightStepIndex = (heightStepIndex + 1) % 2;
     applySlideHeightByStep(heightStepIndex, true);
@@ -1399,6 +1388,7 @@
   function stepFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     applyFontSize(currentFontSize);
+    applySlideHeightByStep(heightStepIndex, false);
   }
 
   function applyFontSize(size) {
@@ -1406,7 +1396,6 @@
     const sv = document.getElementById('size-val');
     if (sv) sv.innerText = size;
     try { localStorage.setItem('yslide_font_size', size); } catch(e){}
-    applySlideHeightByStep(heightStepIndex, false);
   }
 
   function getAccurateSlideMetrics() {
@@ -1671,7 +1660,6 @@
     }
   }
 
-  /* 긴 텍스트 스마트 붙여넣기 */
   function handleSmartPaste(e) {
     e.preventDefault();
     pushHistory();
@@ -1861,4 +1849,368 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
+        pushHistory();
+        editor.innerHTML = translatedHtml;
+        pushHistory();
+        saveEditorContent();
+        updateSlideIndicators();
+        updateScrollThumbPosition();
+        showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
+      } else {
+        showQuickToast("⚠️ 번역 결과를 받지 못했습니다.");
+      }
+    } catch (err) {
+      alert("네트워크 오류로 번역에 실패했습니다: " + err.message);
+    }
+  }
+
+  function getStoredDocuments() {
+    try {
+      const stored = localStorage.getItem('yslide_saved_archive');
+      return stored ? JSON.parse(stored) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveDocumentToArchive(contentHtml) {
+    try {
+      const archive = getStoredDocuments();
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = contentHtml;
+      const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
+      const title = firstLine.substring(0, 30);
+
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      const newDoc = {
+        id: 'doc_' + Date.now(),
+        title: title,
+        preview: (tempDiv.textContent || '').substring(0, 80),
+        date: timeStr,
+        html: contentHtml
+      };
+
+      archive.unshift(newDoc);
+      if (archive.length > 50) archive.pop();
+      localStorage.setItem('yslide_saved_archive', JSON.stringify(archive));
+    } catch(e){}
+  }
+
+  function openStorageModal() {
+    renderDocumentGrid();
+    document.getElementById('storage-modal').style.display = 'flex';
+  }
+
+  function closeStorageModal() {
+    document.getElementById('storage-modal').style.display = 'none';
+  }
+
+  function renderDocumentGrid() {
+    const grid = document.getElementById('doc-grid');
+    const docs = getStoredDocuments();
+
+    if (docs.length === 0) {
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 60px 0;">보관된 문서가 없습니다.<br>상단 💾 버튼을 누르면 이 보관함에 자동 저장됩니다.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    docs.forEach(doc => {
+      const card = document.createElement('div');
+      card.className = 'doc-card';
+      card.innerHTML = `
+        <button class="doc-del-btn" title="삭제" onclick="deleteStoredDoc('${doc.id}', event)">✕</button>
+        <div>
+          <div class="doc-title">${doc.title}</div>
+          <div class="doc-preview">${doc.preview}</div>
+        </div>
+        <div class="doc-footer">
+          <span>${doc.date}</span>
+        </div>
+      `;
+      card.onclick = () => loadDocumentFromArchive(doc.id);
+      grid.appendChild(card);
+    });
+  }
+
+  function loadDocumentFromArchive(docId) {
+    const docs = getStoredDocuments();
+    const target = docs.find(d => d.id === docId);
+    if (!target) return;
+
+    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
+    pushHistory();
+    saveEditorContent();
+    updateSlideIndicators();
+    updateScrollThumbPosition();
+    if (editorViewMode === 'page') renderEditorPages();
+    closeStorageModal();
+    showQuickToast("📂 문서를 불러왔습니다");
+  }
+
+  function deleteStoredDoc(docId, e) {
+    e.stopPropagation();
+    let docs = getStoredDocuments();
+    docs = docs.filter(d => d.id !== docId);
+    try { localStorage.setItem('yslide_saved_archive', JSON.stringify(docs)); } catch(err){}
+    renderDocumentGrid();
+  }
+
+  async function saveToFile() {
+    const content = editor.innerHTML;
+    if (editor.innerText.trim() === '') {
+      showQuickToast("⚠️ 저장할 내용이 없습니다.");
+      return;
+    }
+
+    saveDocumentToArchive(content);
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const defaultFilename = `Yslide_${dateStr}.txt`;
+
+    if (window.showSaveFilePicker) {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFilename,
+          types: [{
+            description: '텍스트 파일 (.txt, .json)',
+            accept: { 'text/plain': ['.txt', '.json'] }
+          }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        showQuickToast("💾 파일이 저장되었습니다");
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = defaultFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showQuickToast("💾 파일이 저장되었습니다");
+  }
+
+  function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          editor.innerHTML = parsed.join('<br>');
+          pushHistory();
+          saveEditorContent();
+          updateSlideIndicators();
+          updateScrollThumbPosition();
+          if (editorViewMode === 'page') renderEditorPages();
+          saveDocumentToArchive(editor.innerHTML);
+          showQuickToast("📂 파일을 불러왔습니다");
+          return;
+        }
+      } catch (err) {}
+      editor.innerHTML = raw.replace(/\n/g, '<br>');
+      pushHistory();
+      saveEditorContent();
+      updateSlideIndicators();
+      updateScrollThumbPosition();
+      if (editorViewMode === 'page') renderEditorPages();
+      saveDocumentToArchive(editor.innerHTML);
+      showQuickToast("📂 텍스트를 불러왔습니다");
+    };
+    reader.readAsText(files[0], 'utf-8');
+  }
+
+  function printSermonDocument() {
+    if (editor.innerText.trim() === '') {
+      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
+      return;
+    }
+
+    updateSlideIndicators();
+    const printContainer = document.getElementById('print-container');
+    printContainer.innerHTML = '';
+
+    const { count } = getAccurateSlideMetrics();
+
+    for (let i = 0; i < count; i++) {
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'print-slide-page';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'print-slide-header';
+      headerDiv.innerText = `[ ${i + 1} / ${count} ]`;
+
+      const viewWrap = document.createElement('div');
+      viewWrap.style.height = `${currentContentStepHeight}px`;
+      viewWrap.style.overflow = 'hidden';
+      viewWrap.style.position = 'relative';
+
+      const canvasCopy = document.createElement('div');
+      canvasCopy.className = 'print-slide-body';
+      canvasCopy.innerHTML = editor.innerHTML;
+      canvasCopy.style.position = 'absolute';
+      canvasCopy.style.top = `-${currentContentStepHeight * i}px`;
+      canvasCopy.style.left = '0';
+      canvasCopy.style.width = '100%';
+      canvasCopy.style.padding = '0 var(--content-padding-x)';
+
+      viewWrap.appendChild(canvasCopy);
+      pageDiv.appendChild(headerDiv);
+      pageDiv.appendChild(viewWrap);
+      printContainer.appendChild(pageDiv);
+    }
+
+    window.print();
+  }
+
+  function renderReaderSlides() {
+    if (!readerViewport) return;
+    readerViewport.innerHTML = '';
+    
+    const { count } = getAccurateSlideMetrics();
+    totalSlideCount = count;
+
+    for (let i = 0; i < totalSlideCount; i++) {
+      const slide = document.createElement('div');
+      slide.className = `slide-page ${i === currentPageIndex ? 'active' : ''}`;
+      slide.id = `slide-page-${i}`;
+      
+      const innerWrap = document.createElement('div');
+      innerWrap.style.position = 'relative';
+      innerWrap.style.height = `${currentContentStepHeight}px`;
+      innerWrap.style.overflow = 'hidden';
+      
+      const content = document.createElement('div');
+      content.style.position = 'absolute';
+      content.style.top = `-${currentContentStepHeight * i}px`;
+      content.style.left = '0';
+      content.style.width = '100%';
+      content.innerHTML = editor.innerHTML;
+      
+      innerWrap.appendChild(content);
+      slide.appendChild(innerWrap);
+      readerViewport.appendChild(slide);
+    }
+  }
+
+  function startSermonMode(targetPageIndex = 0) {
+    if (editor.innerText.trim() === '') return;
+
+    currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlideCount - 1);
+    renderReaderSlides();
+    updateReaderUI();
+
+    document.getElementById('reader-container').style.display = 'block';
+    isReaderMode = true;
+
+    try {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
+      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+    } catch(e){}
+  }
+
+  function startPreviewCurrentSlide() {
+    let currentSlideIndex = 0;
+    if (editorViewMode === 'page') {
+      const scrollLeft = editorContainer.scrollLeft;
+      const width = window.innerWidth || editorContainer.clientWidth || 1;
+      currentSlideIndex = Math.round(scrollLeft / width);
+    } else {
+      const currentViewY = editorContainer.scrollTop;
+      currentSlideIndex = Math.max(0, Math.floor(currentViewY / currentContentStepHeight));
+    }
+    startSermonMode(currentSlideIndex);
+  }
+
+  function exitSermonMode() {
+    document.getElementById('reader-container').style.display = 'none';
+    isReaderMode = false;
+
+    try {
+      if (document.exitFullscreen && document.fullscreenElement) {
+        document.exitFullscreen().catch(()=>{});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    } catch(e){}
+  }
+
+  function updateReaderUI() {
+    document.querySelectorAll('.slide-page').forEach((el, idx) => {
+      if (idx === currentPageIndex) el.classList.add('active');
+      else el.classList.remove('active');
+    });
+    document.getElementById('curr-page').innerText = currentPageIndex + 1;
+    document.getElementById('total-page').innerText = totalSlideCount;
+  }
+
+  function nextPage() {
+    if (currentPageIndex < totalSlideCount - 1) {
+      currentPageIndex++;
+      updateReaderUI();
+    }
+  }
+  function prevPage() {
+    if (currentPageIndex > 0) {
+      currentPageIndex--;
+      updateReaderUI();
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!isReaderMode) return;
+    
+    const nextKeys = ['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter', 'Space'];
+    const prevKeys = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
+
+    if (nextKeys.includes(e.key)) {
+      e.preventDefault();
+      nextPage();
+    } else if (prevKeys.includes(e.key)) {
+      e.preventDefault();
+      prevPage();
+    } else if (e.key === 'Escape') {
+      exitSermonMode();
+    }
+  });
+
+  // 안전한 순차 초기화
+  function initApp() {
+    try {
+      const savedSize = localStorage.getItem('yslide_font_size');
+      currentFontSize = savedSize ? parseInt(savedSize, 10) : 30;
+      applyFontSize(currentFontSize);
+
+      const savedStep = localStorage.getItem('yslide_height_step');
+      heightStepIndex = savedStep !== null ? (parseInt(savedStep, 10) % 2) : 0;
+
+      const saved = localStorage.getItem('yslide_final_v63') || localStorage.getItem('yslide_final_v62') || localStorage.getItem('yslide_final_v61') || localStorage.getItem('yslide_final_v60');
+      if (saved) {
+        editor.innerHTML = saved;
+      }
+      pushHistory();
+    } catch(e){}
+
+    applySlideHeightByStep(heightStepIndex, false);
+    updateSlideIndicators();
+    updateScrollThumbPosition();
+  }
+
+  initApp();
+</script>
+</body>
+</html>
