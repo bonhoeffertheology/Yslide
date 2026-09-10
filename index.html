@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_page_sync_perfect_v65">
+<link rel="manifest" href="manifest.json?v=2026_page_sync_perfect_v66">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -367,6 +367,25 @@
     white-space: pre-wrap;
     box-sizing: border-box;
     pointer-events: auto;
+  }
+
+  /* 눈금 측정용 독립 고스트 캔버스 */
+  #ghost-measure-box {
+    position: absolute;
+    top: -99999px;
+    left: -99999px;
+    visibility: hidden;
+    pointer-events: none;
+    width: 100%;
+    max-width: var(--content-max-width);
+    padding: 0 var(--content-padding-x);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    font-weight: 500;
+    word-break: keep-all;
+    letter-spacing: normal;
+    white-space: pre-wrap;
+    box-sizing: border-box;
   }
 
   #editor-bottom-spacer {
@@ -810,6 +829,9 @@
   <div id="editor-pages-wrapper"></div>
 </div>
 
+<!-- 눈금 정밀 측정용 고스트 요소 -->
+<div id="ghost-measure-box"></div>
+
 <div id="quick-scrollbar-track">
   <div id="quick-scrollbar-thumb"></div>
 </div>
@@ -882,6 +904,7 @@
   let editorViewMode = 'scroll';
 
   const editor = document.getElementById('main-editor');
+  const ghostMeasureBox = document.getElementById('ghost-measure-box');
   const editorContainer = document.getElementById('editor-container');
   const editorPagesWrapper = document.getElementById('editor-pages-wrapper');
   const editorWrapper = document.getElementById('editor-wrapper');
@@ -979,6 +1002,25 @@
     }
   }
 
+  /* 고스트 캔버스를 통한 1:1 완벽 정밀 높이 측정 */
+  function getAccurateSlideMetrics() {
+    if (!ghostMeasureBox) {
+      return { count: 1 };
+    }
+    // 실제 렌더링 너비를 복제하여 텍스트 높이만 오차 없이 측정
+    const editorWidth = editor.clientWidth || 1000;
+    ghostMeasureBox.style.width = `${editorWidth}px`;
+    ghostMeasureBox.innerHTML = editor.innerHTML || ' ';
+
+    const measuredHeight = Math.max(0, ghostMeasureBox.offsetHeight);
+    // 높이가 눈금 1개 높이(currentContentStepHeight) 이하이면 무조건 1페이지
+    if (measuredHeight <= 10) return { count: 1 };
+
+    const count = Math.max(1, Math.ceil(measuredHeight / currentContentStepHeight));
+    return { count };
+  }
+
+  /* 스크롤 눈금선과 1:1 완벽 일치하는 페이지 카드 렌더링 엔진 */
   function renderEditorPages(preserveFocusIndex = null) {
     if (!editorPagesWrapper) return;
 
@@ -1003,6 +1045,7 @@
       pageContent.className = 'page-view-editor';
       pageContent.dataset.pageIndex = i;
       pageContent.style.position = 'absolute';
+      // 스크롤 모드의 눈금선 위치와 정확히 1:1로 일치하도록 상단 위치 조정
       pageContent.style.top = `-${(currentContentStepHeight * i)}px`;
       pageContent.style.left = '0';
       pageContent.style.width = '100%';
@@ -1396,12 +1439,6 @@
     const sv = document.getElementById('size-val');
     if (sv) sv.innerText = size;
     try { localStorage.setItem('yslide_font_size', size); } catch(e){}
-  }
-
-  function getAccurateSlideMetrics() {
-    const pureTextHeight = Math.max(0, editor.scrollHeight - currentTopMargin - 24);
-    const count = Math.max(1, Math.ceil(pureTextHeight / currentContentStepHeight) || 1);
-    return { count };
   }
 
   function updateSlideIndicators() {
