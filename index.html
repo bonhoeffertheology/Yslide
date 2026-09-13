@@ -21,7 +21,6 @@
     --toolbar-height: 96px;
     --page-width: 820px;
     --page-height: 928px;
-    --editor-height: 822px; /* 카드 928px - 헤더 42px - 여백 64px */
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
     --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
   }
@@ -287,7 +286,7 @@
   }
   .page-del-btn:hover { color: #ef4444; }
 
-  /* 텍스트 편집 영역 (오버플로우 방지) */
+  /* 텍스트 편집 영역 */
   .page-editor {
     flex: 1;
     width: 100%;
@@ -402,6 +401,46 @@
     z-index: 6000;
   }
 
+  /* 스마트 붙여넣기 모달 */
+  #paste-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 8000;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-box {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .modal-textarea {
+    width: 100%;
+    height: 220px;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #fff;
+    padding: 12px;
+    font-size: 16px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+  }
+  .modal-btns {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
   /* 인쇄 영역 */
   #print-area { display: none; }
 
@@ -414,7 +453,7 @@
       color: #000000 !important;
       height: auto !important;
     }
-    #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast {
+    #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #paste-modal {
       display: none !important;
     }
     #print-area {
@@ -464,7 +503,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s, transform 0.2s;
-    z-index: 7000;
+    z-index: 9000;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
@@ -536,6 +575,15 @@
   <!-- 2단: 불러오기, 저장, 공유, 인쇄, 번역, 되돌리기, 다시실행, 색깔, 글씨크기, 미리보기, 전체보기 -->
   <div class="toolbar-row">
     <div class="tool-group">
+      <!-- 스마트 붙여넣기 모달 열기 버튼 (태블릿/모바일 지원) -->
+      <button class="btn-icon" onclick="openPasteModal()" title="긴 글 스마트 분할 붙여넣기">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      </button>
+
+      <!-- 파일 불러오기 -->
       <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
@@ -543,6 +591,7 @@
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
 
+      <!-- 저장 -->
       <button class="btn-icon" onclick="saveNoteData()" title="저장">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -551,6 +600,7 @@
         </svg>
       </button>
 
+      <!-- 공유 -->
       <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="18" cy="5" r="3"></circle>
@@ -561,6 +611,7 @@
         </svg>
       </button>
 
+      <!-- 인쇄 -->
       <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -569,6 +620,7 @@
         </svg>
       </button>
 
+      <!-- Gemini AI 영문 번역 -->
       <button class="btn-icon" onclick="translateSelectedTextWithGemini()" title="선택 텍스트 영어로 번역 (Gemini AI)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
@@ -577,6 +629,7 @@
         </svg>
       </button>
 
+      <!-- 되돌리기 -->
       <button class="btn-icon" onclick="undo()" title="실행 취소 / 되돌리기 (Ctrl+Z)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M3 7v6h6"></path>
@@ -584,6 +637,7 @@
         </svg>
       </button>
 
+      <!-- 다시실행 -->
       <button class="btn-icon" onclick="redo()" title="다시 실행 (Ctrl+Y)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M21 7v6h-6"></path>
@@ -593,6 +647,7 @@
 
       <div class="divider"></div>
 
+      <!-- 연속 버튼 및 색상 팔레트 -->
       <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
       <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
       <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
@@ -602,6 +657,7 @@
 
       <div class="divider"></div>
 
+      <!-- 글자 크기 -->
       <div class="size-box">
         <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
         <span id="size-display">26</span>
@@ -642,6 +698,18 @@
   <div class="touch-zone" id="touch-right" onclick="nextSlide()"></div>
   <div id="reader-viewport"></div>
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
+</div>
+
+<!-- 스마트 붙여넣기 모달 -->
+<div id="paste-modal" style="display:none;">
+  <div class="modal-box">
+    <h3 style="color:#fff; font-size:16px;">📋 긴 글 자동 분할 붙여넣기</h3>
+    <textarea id="modal-paste-input" class="modal-textarea" placeholder="여기에 긴 글을 붙여넣으세요..."></textarea>
+    <div class="modal-btns">
+      <button onclick="closePasteModal()" style="background:#333;">취소</button>
+      <button onclick="confirmModalPaste()" style="background:#0284c7; color:#fff;">페이지로 분할 삽입</button>
+    </div>
+  </div>
 </div>
 
 <!-- 인쇄 전용 컨테이너 -->
@@ -696,7 +764,7 @@
     }
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v16');
+    const saved = localStorage.getItem('yslide_note_pages_v17');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -820,11 +888,20 @@
         }
       });
 
+      // 텍스트 입력 및 태블릿 기본 붙여넣기 넘침 실시간 감지
       editor.addEventListener('input', () => {
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
           pagesData[index].isPlaceholder = false;
         }
+
+        // 높이가 넘치면 즉시 자동 분할 실행
+        if (editor.scrollHeight > (editor.clientHeight + 15)) {
+          const rawText = editor.innerText;
+          reflowTextIntoPages(rawText, index);
+          return;
+        }
+
         pagesData[index].html = editor.innerHTML;
         saveToLocalStorageSilent();
 
@@ -834,15 +911,22 @@
         }, 500);
       });
 
-      // 붙여넣기 이벤트 가로채기 (데스크탑 & 태블릿)
+      // 붙여넣기 이벤트 가로채기
       editor.addEventListener('paste', (e) => {
-        e.preventDefault();
-        if (editor.classList.contains('is-placeholder')) {
-          editor.classList.remove('is-placeholder');
-          pagesData[index].isPlaceholder = false;
+        let text = '';
+        if (e.clipboardData || window.clipboardData) {
+          const cd = e.clipboardData || window.clipboardData;
+          text = cd.getData('text/plain') || cd.getData('text');
         }
-        pushHistory();
-        executeSmartPaste(e, index);
+
+        if (text && text.length > 50) {
+          e.preventDefault();
+          if (editor.classList.contains('is-placeholder')) {
+            editor.classList.remove('is-placeholder');
+            pagesData[index].isPlaceholder = false;
+          }
+          reflowTextIntoPages(text, index);
+        }
       });
 
       attachContinuousEvents(editor, index);
@@ -873,127 +957,136 @@
     }
   });
 
-  /* 100% 신뢰성 보장: 임시 DOM 측정 기반 페이지 분할 알고리즘 */
-  function splitTextIntoPages(rawText) {
-    const tempContainer = document.createElement('div');
-    tempContainer.className = 'page-editor';
-    tempContainer.style.position = 'absolute';
-    tempContainer.style.visibility = 'hidden';
-    tempContainer.style.left = '-99999px';
-    tempContainer.style.top = '-99999px';
-    tempContainer.style.width = '820px';
-    tempContainer.style.fontSize = `${currentFontSize}px`;
-    tempContainer.style.lineHeight = '1.55';
-    tempContainer.style.fontFamily = FONT_LIST[currentFontIndex].family;
-    tempContainer.style.padding = '32px 44px';
-    tempContainer.style.boxSizing = 'border-box';
-    document.body.appendChild(tempContainer);
+  /* 실제 DOM 렌더링 기반 100% 신뢰성 자동 분할 엔진 */
+  function reflowTextIntoPages(rawText, targetIndex = 0) {
+    if (!rawText || !rawText.trim()) return;
 
-    // 카드(928px) - 헤더(42px) - 패딩 상하(64px) = 내부 텍스트 최대 높이 822px
-    const MAX_HEIGHT = 822;
+    // 측정용 실체 카드 생성 및 DOM 연결
+    const testCard = document.createElement('div');
+    testCard.className = 'note-page-card';
+    testCard.style.position = 'fixed';
+    testCard.style.top = '0';
+    testCard.style.left = '0';
+    testCard.style.visibility = 'hidden';
+    testCard.style.zIndex = '-99999';
+
+    const testHeader = document.createElement('div');
+    testHeader.className = 'page-header';
+    testHeader.innerHTML = '<span>TEST</span>';
+    testCard.appendChild(testHeader);
+
+    const testEditor = document.createElement('div');
+    testEditor.className = 'page-editor';
+    testEditor.style.fontSize = `${currentFontSize}px`;
+    testEditor.style.fontFamily = FONT_LIST[currentFontIndex].family;
+    testCard.appendChild(testEditor);
+
+    document.body.appendChild(testCard);
+
+    // 에디터 실제 가용 높이 (886px)
+    const maxHeight = testEditor.clientHeight || 822;
 
     const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     let pages = [];
-    let currentHtml = '';
+    let curHtml = '';
+    testEditor.innerHTML = '';
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
       if (line === '') {
-        const testHtml = currentHtml ? `${currentHtml}<br>` : '';
-        tempContainer.innerHTML = testHtml || '<br>';
-        if (tempContainer.scrollHeight > MAX_HEIGHT && currentHtml !== '') {
-          pages.push(currentHtml);
-          currentHtml = '';
+        const testCandidate = curHtml ? `${curHtml}<br>` : '';
+        testEditor.innerHTML = testCandidate || '<br>';
+        if (testEditor.scrollHeight > maxHeight && curHtml !== '') {
+          pages.push(curHtml);
+          curHtml = '';
+          testEditor.innerHTML = '';
         } else {
-          currentHtml = testHtml;
+          curHtml = testCandidate;
         }
         continue;
       }
 
-      // 1. 통문단으로 먼저 시도
-      const testHtml = currentHtml ? `${currentHtml}<br>${line}` : line;
-      tempContainer.innerHTML = testHtml;
+      // 문단 전체 시도
+      const testCandidate = curHtml ? `${curHtml}<br>${line}` : line;
+      testEditor.innerHTML = testCandidate;
 
-      if (tempContainer.scrollHeight <= MAX_HEIGHT) {
-        currentHtml = testHtml;
+      if (testEditor.scrollHeight <= maxHeight) {
+        curHtml = testCandidate;
       } else {
-        // 2. 넘칠 경우 단어 단위로 쪼개기
+        // 문단 분할
         const words = line.split(' ');
-        let tempLine = '';
+        let tempParagraph = '';
 
         for (let j = 0; j < words.length; j++) {
           const word = words[j];
-          const nextTemp = tempLine ? `${tempLine} ${word}` : word;
-          const candidateHtml = currentHtml 
-            ? `${currentHtml}<br>${nextTemp}`
+          const nextTemp = tempParagraph ? `${tempParagraph} ${word}` : word;
+          const candidateHtml = curHtml 
+            ? `${curHtml}<br>${nextTemp}`
             : nextTemp;
 
-          tempContainer.innerHTML = candidateHtml;
+          testEditor.innerHTML = candidateHtml;
 
-          if (tempContainer.scrollHeight <= MAX_HEIGHT) {
-            tempLine = nextTemp;
+          if (testEditor.scrollHeight <= maxHeight) {
+            tempParagraph = nextTemp;
           } else {
-            if (currentHtml !== '') {
-              pages.push(currentHtml);
-              currentHtml = tempLine ? `${tempLine}` : '';
-              tempLine = word;
-              tempContainer.innerHTML = tempLine;
+            if (curHtml !== '') {
+              pages.push(curHtml);
+              curHtml = tempParagraph ? `${tempParagraph}` : '';
+              tempParagraph = word;
+              testEditor.innerHTML = tempParagraph;
             } else {
-              if (tempLine) pages.push(tempLine);
-              tempLine = word;
+              if (tempParagraph) pages.push(tempParagraph);
+              tempParagraph = word;
             }
           }
         }
 
-        if (tempLine) {
-          currentHtml = currentHtml ? `${currentHtml}<br>${tempLine}` : tempLine;
+        if (tempParagraph) {
+          curHtml = curHtml ? `${curHtml}<br>${tempParagraph}` : tempParagraph;
         }
       }
     }
 
-    if (currentHtml && currentHtml.trim() !== '') {
-      pages.push(currentHtml);
+    if (curHtml && curHtml.trim() !== '') {
+      pages.push(curHtml);
     }
 
-    document.body.removeChild(tempContainer);
-    return pages.length > 0 ? pages : [''];
-  }
+    document.body.removeChild(testCard);
 
-  /* 스마트 붙여넣기 실행 */
-  async function executeSmartPaste(e, startIndex) {
-    let text = '';
+    if (pages.length === 0) pages = [''];
 
-    if (e.clipboardData || window.clipboardData) {
-      const cd = e.clipboardData || window.clipboardData;
-      text = cd.getData('text/plain') || cd.getData('text');
-    }
+    pagesData[targetIndex].html = pages[0];
+    pagesData[targetIndex].isPlaceholder = false;
 
-    if (!text && navigator.clipboard && navigator.clipboard.readText) {
-      try {
-        text = await navigator.clipboard.readText();
-      } catch (err) {}
-    }
-
-    if (!text) {
-      showToast('⚠️ 클립보드 내용을 읽지 못했습니다');
-      return;
-    }
-
-    const pagesCreated = splitTextIntoPages(text);
-
-    pagesData[startIndex].html = pagesCreated[0];
-    pagesData[startIndex].isPlaceholder = false;
-
-    if (pagesCreated.length > 1) {
-      const restPages = pagesCreated.slice(1).map(content => ({ html: content, isPlaceholder: false }));
-      pagesData.splice(startIndex + 1, 0, ...restPages);
+    if (pages.length > 1) {
+      const rest = pages.slice(1).map(h => ({ html: h, isPlaceholder: false }));
+      pagesData.splice(targetIndex + 1, 0, ...rest);
     }
 
     renderPages();
     pushHistory();
     saveToLocalStorageSilent();
-    showToast(`📄 글의 분량에 맞춰 총 ${pagesCreated.length}개 페이지로 자동 분할되었습니다!`);
+    showToast(`📄 원고가 총 ${pages.length}개 페이지로 자동 분할되었습니다!`);
+  }
+
+  /* 스마트 붙여넣기 모달 컨트롤 */
+  function openPasteModal() {
+    document.getElementById('paste-modal').style.display = 'flex';
+    const ta = document.getElementById('modal-paste-input');
+    ta.value = '';
+    ta.focus();
+  }
+
+  function closePasteModal() {
+    document.getElementById('paste-modal').style.display = 'none';
+  }
+
+  function confirmModalPaste() {
+    const text = document.getElementById('modal-paste-input').value;
+    closePasteModal();
+    if (!text || !text.trim()) return;
+    reflowTextIntoPages(text, pagesData.length - 1);
   }
 
   async function translateSelectedTextWithGemini() {
@@ -1362,7 +1455,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v16', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v17', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1400,12 +1493,7 @@ ${originalHtml}`;
         }
       } catch (err) {}
 
-      const pagesCreated = splitTextIntoPages(raw);
-      pagesData = pagesCreated.map(html => ({ html: html, isPlaceholder: false }));
-      renderPages();
-      pushHistory();
-      saveToLocalStorageSilent();
-      showToast(`📂 텍스트를 총 ${pagesData.length}개 페이지로 불러왔습니다`);
+      reflowTextIntoPages(raw, 0);
     };
     reader.readAsText(files[0]);
   }
