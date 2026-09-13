@@ -313,7 +313,7 @@
     color: #38bdf8;
   }
 
-  /* 텍스트 편집 영역 */
+  /* 텍스트 편집 영역 (오버플로우 숨김 & 규격 고정) */
   .page-editor {
     flex: 1;
     width: 100%;
@@ -806,7 +806,7 @@
     if (savedMode) viewMode = savedMode;
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v22');
+    const saved = localStorage.getItem('yslide_note_pages_v23');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -959,7 +959,7 @@
         }
       });
 
-      // 한글 HWP 스타일 연속 유기적 리플로우
+      // 삼성노트/한글 스타일 연속 유기적 리플로우
       editor.addEventListener('input', () => {
         if (isReflowing) return;
         if (editor.classList.contains('is-placeholder')) {
@@ -978,7 +978,7 @@
         }
       });
 
-      // 붙여넣기 시 전체 문서 연속 분할
+      // 붙여넣기 시 문단 강제 절단 없이 연속 분할
       editor.addEventListener('paste', (e) => {
         e.preventDefault();
         let text = '';
@@ -1017,14 +1017,14 @@
     updatePageInfo();
   }
 
-  /* 연속 문서 흐름 페이지네이션 엔진 (제목 보존) */
+  /* 문단 강제 분리 없는 100% 연속 스트리밍 페이지네이션 엔진 */
   function triggerContinuousReflow(fromIndex = 0) {
     if (isReflowing) return;
     isReflowing = true;
 
     saveAllPagesState();
 
-    // 전체 페이지 내용 스트림 결합
+    // 전체 페이지들의 모든 내용을 하나의 연속된 텍스트 스트림으로 결합
     let fullHtml = pagesData
       .map(p => (p.isPlaceholder ? '' : p.html))
       .filter(h => h && h.trim() !== '')
@@ -1035,6 +1035,7 @@
       return;
     }
 
+    // 측정용 DOM
     const testCard = document.createElement('div');
     testCard.className = 'note-page-card';
     testCard.style.position = 'fixed';
@@ -1050,62 +1051,35 @@
     testCard.appendChild(testEditor);
     document.body.appendChild(testCard);
 
+    // 내부 실제 높이 (822px)
     const maxHeight = testEditor.clientHeight || 822;
 
-    const rawLines = fullHtml.split(/<br\s*[\/]?>/gi);
+    // 문단을 강제로 나누지 않고 개행(<br>) 및 공백 단위로 토큰화
+    const tokens = fullHtml.split(/(<br\s*[\/]?>|\s+)/gi).filter(t => t !== undefined && t !== '');
+    
     let newPagesHtml = [];
     let curHtml = '';
     testEditor.innerHTML = '';
 
-    for (let i = 0; i < rawLines.length; i++) {
-      const line = rawLines[i];
-
-      if (line === '') {
-        const candidate = curHtml ? `${curHtml}<br>` : '';
-        testEditor.innerHTML = candidate || '<br>';
-        if (testEditor.scrollHeight > maxHeight && curHtml !== '') {
-          newPagesHtml.push(curHtml);
-          curHtml = '';
-          testEditor.innerHTML = '';
-        } else {
-          curHtml = candidate;
-        }
-        continue;
-      }
-
-      const candidate = curHtml ? `${curHtml}<br>${line}` : line;
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      const candidate = curHtml + token;
       testEditor.innerHTML = candidate;
 
+      // 높이를 초과하지 않으면 계속 같은 페이지에 문단들을 연이어 채움
       if (testEditor.scrollHeight <= maxHeight) {
         curHtml = candidate;
       } else {
-        const words = line.split(' ');
-        let tempParagraph = '';
-
-        for (let j = 0; j < words.length; j++) {
-          const word = words[j];
-          const nextTemp = tempParagraph ? `${tempParagraph} ${word}` : word;
-          const wordCandidate = curHtml ? `${curHtml}<br>${nextTemp}` : nextTemp;
-
-          testEditor.innerHTML = wordCandidate;
-
-          if (testEditor.scrollHeight <= maxHeight) {
-            tempParagraph = nextTemp;
-          } else {
-            if (curHtml !== '') {
-              newPagesHtml.push(curHtml);
-              curHtml = tempParagraph ? `${tempParagraph}` : '';
-              tempParagraph = word;
-              testEditor.innerHTML = tempParagraph;
-            } else {
-              if (tempParagraph) newPagesHtml.push(tempParagraph);
-              tempParagraph = word;
-            }
-          }
-        }
-
-        if (tempParagraph) {
-          curHtml = curHtml ? `${curHtml}<br>${tempParagraph}` : tempParagraph;
+        // 높이를 초과하면 현재까지 채운 것을 한 페이지로 완성하고, 넘친 토큰부터 새 페이지 시작
+        if (curHtml.trim() !== '') {
+          newPagesHtml.push(curHtml);
+          curHtml = token.replace(/^(<br\s*[\/]?>|\s+)/gi, ''); // 새 페이지 첫머리의 불필요한 공백/개행 제거
+          testEditor.innerHTML = curHtml;
+        } else {
+          // 단일 토큰 자체가 한 페이지를 넘는 경우
+          newPagesHtml.push(token);
+          curHtml = '';
+          testEditor.innerHTML = '';
         }
       }
     }
@@ -1118,7 +1092,7 @@
 
     if (newPagesHtml.length === 0) newPagesHtml = [''];
 
-    // 기존 페이지들의 제목을 유지하면서 본문 재배치
+    // 기존 페이지 제목 보존
     pagesData = newPagesHtml.map((h, idx) => ({
       title: (pagesData[idx] && pagesData[idx].title) ? pagesData[idx].title : '',
       html: h,
@@ -1548,7 +1522,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v22', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v23', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
