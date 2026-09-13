@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Yslide Note</title>
 
+<!-- PWA 메타 태그 및 아이콘 설정 -->
+<meta name="theme-color" content="#181818">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Yslide">
+<link rel="apple-touch-icon" href="https://api.iconify.design/fluent-emoji:memo.svg">
+
+<!-- PWA Manifest 인라인 생성 연결 -->
+<link id="manifest-link" rel="manifest">
+
 <!-- KoPubWorld 및 Pretendard CDN 로드 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.0/kopubworld.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
@@ -512,7 +523,7 @@
 
 <!-- 상단 2단 툴바 -->
 <div id="header-toolbar">
-  <!-- 1단: 자간, 줄간격, 글꼴, 스크롤/페이지 모드 전환 아이콘 -->
+  <!-- 1단: 자간, 줄간격, 글꼴, 스크롤/페이지 모드 전환, 앱 설치 버튼 -->
   <div class="toolbar-row toolbar-row-top">
     <div class="tool-group">
       <!-- 자간 좁게 -->
@@ -569,13 +580,24 @@
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
         </svg>
       </button>
+
+      <div class="divider"></div>
+
+      <!-- PWA 앱(아이콘) 홈화면 설치 버튼 -->
+      <button id="btn-install-app" class="btn-icon" onclick="promptInstallApp()" style="display:none; background:#0284c7; border-color:#38bdf8;" title="홈 화면에 앱/아이콘 설치">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </button>
     </div>
   </div>
 
   <!-- 2단: 불러오기, 저장, 공유, 인쇄, 번역, 되돌리기, 다시실행, 색깔, 글씨크기, 미리보기, 전체보기 -->
   <div class="toolbar-row">
     <div class="tool-group">
-      <!-- 스마트 붙여넣기 모달 열기 버튼 (태블릿/모바일 지원) -->
+      <!-- 스마트 붙여넣기 모달 열기 버튼 -->
       <button class="btn-icon" onclick="openPasteModal()" title="긴 글 스마트 분할 붙여넣기">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -718,6 +740,58 @@
 <div id="toast"></div>
 
 <script>
+  /* ================= PWA Manifest & Service Worker 등록 ================= */
+  const manifestData = {
+    name: "Yslide Note",
+    short_name: "Yslide",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#0a0a0a",
+    theme_color: "#181818",
+    icons: [
+      {
+        src: "https://api.iconify.design/fluent-emoji:memo.svg",
+        sizes: "192x192 512x512",
+        type: "image/svg+xml"
+      }
+    ]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+  document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+
+  // 서비스 워커 인라인 등록
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      self.addEventListener('install', e => self.skipWaiting());
+      self.addEventListener('activate', e => clients.claim());
+      self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+  }
+
+  // PWA 설치 프롬프트 캐치
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installBtn = document.getElementById('btn-install-app');
+    if (installBtn) installBtn.style.display = 'inline-flex';
+  });
+
+  function promptInstallApp() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        document.getElementById('btn-install-app').style.display = 'none';
+      });
+    } else {
+      showToast('💡 브라우저 메뉴의 [홈 화면에 추가]를 눌러 설치하세요');
+    }
+  }
+
+  /* ================= 앱 로직 ================= */
   const PLACEHOLDER_TEXT = "여기를 클릭하여 글을 작성하거나 긴 글을 붙여넣으세요.";
 
   const FONT_LIST = [
@@ -764,7 +838,7 @@
     }
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v17');
+    const saved = localStorage.getItem('yslide_note_pages_v18');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -888,14 +962,13 @@
         }
       });
 
-      // 텍스트 입력 및 태블릿 기본 붙여넣기 넘침 실시간 감지
+      // 텍스트 입력 및 태블릿 기본 붙여넣기 넘침 감지
       editor.addEventListener('input', () => {
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
           pagesData[index].isPlaceholder = false;
         }
 
-        // 높이가 넘치면 즉시 자동 분할 실행
         if (editor.scrollHeight > (editor.clientHeight + 15)) {
           const rawText = editor.innerText;
           reflowTextIntoPages(rawText, index);
@@ -911,7 +984,7 @@
         }, 500);
       });
 
-      // 붙여넣기 이벤트 가로채기
+      // 붙여넣기 가로채기
       editor.addEventListener('paste', (e) => {
         let text = '';
         if (e.clipboardData || window.clipboardData) {
@@ -961,7 +1034,6 @@
   function reflowTextIntoPages(rawText, targetIndex = 0) {
     if (!rawText || !rawText.trim()) return;
 
-    // 측정용 실체 카드 생성 및 DOM 연결
     const testCard = document.createElement('div');
     testCard.className = 'note-page-card';
     testCard.style.position = 'fixed';
@@ -983,7 +1055,6 @@
 
     document.body.appendChild(testCard);
 
-    // 에디터 실제 가용 높이 (886px)
     const maxHeight = testEditor.clientHeight || 822;
 
     const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -1007,14 +1078,12 @@
         continue;
       }
 
-      // 문단 전체 시도
       const testCandidate = curHtml ? `${curHtml}<br>${line}` : line;
       testEditor.innerHTML = testCandidate;
 
       if (testEditor.scrollHeight <= maxHeight) {
         curHtml = testCandidate;
       } else {
-        // 문단 분할
         const words = line.split(' ');
         let tempParagraph = '';
 
@@ -1070,7 +1139,6 @@
     showToast(`📄 원고가 총 ${pages.length}개 페이지로 자동 분할되었습니다!`);
   }
 
-  /* 스마트 붙여넣기 모달 컨트롤 */
   function openPasteModal() {
     document.getElementById('paste-modal').style.display = 'flex';
     const ta = document.getElementById('modal-paste-input');
@@ -1455,7 +1523,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v17', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v18', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
