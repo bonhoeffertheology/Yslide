@@ -32,6 +32,7 @@
     --toolbar-height: 96px;
     --page-width: 820px;
     --page-height: 928px;
+    --editor-content-height: 886px; /* 카드(928px) - 헤더(42px) = 886px */
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
     --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
   }
@@ -795,18 +796,24 @@
   const iconViewMode = document.getElementById('icon-view-mode');
   const btnBatchMode = document.getElementById('btn-batch-mode');
 
-  // 상주 측정용 컨테이너
+  // 고속 상주 측정 컨테이너 (고정 높이 없는 순수 컨텐츠 측정용)
   let permanentMeasureBox = null;
 
   function getMeasureBox() {
     if (!permanentMeasureBox) {
       permanentMeasureBox = document.createElement('div');
-      permanentMeasureBox.className = 'page-editor';
       permanentMeasureBox.style.position = 'fixed';
       permanentMeasureBox.style.top = '0';
       permanentMeasureBox.style.left = '0';
       permanentMeasureBox.style.width = '820px';
+      permanentMeasureBox.style.maxWidth = '820px';
+      permanentMeasureBox.style.height = 'auto';
+      permanentMeasureBox.style.minHeight = '0';
+      permanentMeasureBox.style.maxHeight = 'none';
       permanentMeasureBox.style.padding = '32px 44px';
+      permanentMeasureBox.style.boxSizing = 'border-box';
+      permanentMeasureBox.style.whiteSpace = 'pre-wrap';
+      permanentMeasureBox.style.wordBreak = 'break-word';
       permanentMeasureBox.style.visibility = 'hidden';
       permanentMeasureBox.style.zIndex = '-99999';
       permanentMeasureBox.style.pointerEvents = 'none';
@@ -830,12 +837,12 @@
     if (savedMode) viewMode = savedMode;
     applyViewModeUI();
 
-    // 손상된 대량 페이지 캐시 감지 및 안전 복구
-    const saved = localStorage.getItem('yslide_note_pages_v25');
+    // 341페이지 등 비정상 캐시 데이터 복구
+    const saved = localStorage.getItem('yslide_note_pages_v26');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 500) {
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
           pagesData = parsed;
         } else {
           pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true }];
@@ -1085,7 +1092,7 @@
         }
       });
 
-      // 실시간 안전 입력 처리
+      // 실시간 입력 처리
       editor.addEventListener('input', (e) => {
         if (isReflowing) return;
         if (editor.classList.contains('is-placeholder')) {
@@ -1096,17 +1103,14 @@
         pagesData[index].html = editor.innerHTML;
         saveToLocalStorageSilent();
 
-        // 높이가 넘치거나 변경 시 안전 지연 분할
-        if (editor.scrollHeight > (editor.clientHeight + 4)) {
-          if (reflowDebounceTimer) clearTimeout(reflowDebounceTimer);
-          reflowDebounceTimer = setTimeout(() => {
-            const caretPos = getCaretGlobalOffset(editor);
-            safeContinuousReflow(caretPos);
-          }, 120);
-        }
+        if (reflowDebounceTimer) clearTimeout(reflowDebounceTimer);
+        reflowDebounceTimer = setTimeout(() => {
+          const caretPos = getCaretGlobalOffset(editor);
+          safeContinuousReflow(caretPos);
+        }, 80);
       });
 
-      // 안전한 스마트 붙여넣기
+      // 붙여넣기 처리
       editor.addEventListener('paste', (e) => {
         e.preventDefault();
         let text = '';
@@ -1147,7 +1151,7 @@
     updatePageInfo();
   }
 
-  /* ================== 무한루프 방지 고속 이진 스트림 분할 엔진 ================== */
+  /* ================== 정확한 높이 측정 기반 고속 유기적 페이지네이션 ================== */
   function safeContinuousReflow(savedCaretOffset = null) {
     if (isReflowing) return;
     isReflowing = true;
@@ -1165,84 +1169,79 @@
     }
 
     const measureBox = getMeasureBox();
-    const maxHeight = 822;
+    const MAX_PAGE_HEIGHT = 886; // 카드(928px) - 헤더(42px) = 886px
 
-    // 안전한 줄바꿈 단위 분할
-    const lines = fullHtml.split(/<br\s*[\/]?>/gi);
+    const rawLines = fullHtml.split(/<br\s*[\/]?>/gi);
     let newPagesHtml = [];
-    let curHtml = '';
+    let curPageHtml = '';
     measureBox.innerHTML = '';
 
-    const MAX_PAGE_LIMIT = 300; // 최대 300페이지 안전 가드
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
 
-    for (let i = 0; i < lines.length; i++) {
-      if (newPagesHtml.length >= MAX_PAGE_LIMIT) {
-        showToast('⚠️ 최대 페이지 한도에 도달했습니다');
-        break;
-      }
-
-      const line = lines[i];
-
-      // 빈 줄 (엔터)
+      // 빈 줄(엔터) 처리
       if (line === '') {
-        const candidate = curHtml ? `${curHtml}<br>` : '';
-        measureBox.innerHTML = candidate || '<br>';
-        if (measureBox.scrollHeight > maxHeight && curHtml !== '') {
-          newPagesHtml.push(curHtml);
-          curHtml = '';
-          measureBox.innerHTML = '';
+        const testCandidate = curPageHtml ? `${curPageHtml}<br>` : '<br>';
+        measureBox.innerHTML = testCandidate;
+        if (measureBox.offsetHeight <= MAX_PAGE_HEIGHT) {
+          curPageHtml = curPageHtml ? `${curPageHtml}<br>` : '';
         } else {
-          curHtml = candidate;
+          if (curPageHtml.trim() !== '') newPagesHtml.push(curPageHtml);
+          curPageHtml = '';
+          measureBox.innerHTML = '';
         }
         continue;
       }
 
-      // 1. 문단 전체를 먼저 시도 (여러 문단이 한 페이지에 연속으로 꽉 차게 들어감)
-      const candidate = curHtml ? `${curHtml}<br>${line}` : line;
-      measureBox.innerHTML = candidate;
+      // 문단 통째로 시도 (공간이 남아있으면 여러 문단이 한 페이지에 연속으로 꽉 차게 들어감)
+      const testCandidate = curPageHtml ? `${curPageHtml}<br>${line}` : line;
+      measureBox.innerHTML = testCandidate;
 
-      if (measureBox.scrollHeight <= maxHeight) {
-        curHtml = candidate;
+      if (measureBox.offsetHeight <= MAX_PAGE_HEIGHT) {
+        curPageHtml = testCandidate;
       } else {
-        // 2. 넘칠 경우 단어 단위로 쪼개어 다음 페이지로 자연스럽게 넘김
+        // 문단 중간에서 넘칠 때 단어 단위로 쪼개어 다음 페이지로 넘김
         const words = line.split(' ');
-        let tempLine = '';
+        let accumulatedLine = '';
 
         for (let j = 0; j < words.length; j++) {
           const word = words[j];
-          const nextTemp = tempLine ? `${tempLine} ${word}` : word;
-          const wordCandidate = curHtml ? `${curHtml}<br>${nextTemp}` : nextTemp;
+          const testWord = accumulatedLine ? `${accumulatedLine} ${word}` : word;
+          const wordCandidate = curPageHtml ? `${curPageHtml}<br>${testWord}` : testWord;
 
           measureBox.innerHTML = wordCandidate;
 
-          if (measureBox.scrollHeight <= maxHeight) {
-            tempLine = nextTemp;
+          if (measureBox.offsetHeight <= MAX_PAGE_HEIGHT) {
+            accumulatedLine = testWord;
           } else {
-            if (curHtml !== '') {
-              newPagesHtml.push(curHtml);
-              curHtml = tempLine ? `${tempLine}` : '';
-              tempLine = word;
-              measureBox.innerHTML = tempLine;
+            // 현재 페이지 마감 후 새 페이지 시작
+            if (curPageHtml.trim() !== '') {
+              newPagesHtml.push(curPageHtml);
+              curPageHtml = accumulatedLine ? `${accumulatedLine}` : '';
+              accumulatedLine = word;
+              measureBox.innerHTML = accumulatedLine;
             } else {
-              if (tempLine) newPagesHtml.push(tempLine);
-              tempLine = word;
+              // 단일 단어가 긴 경우
+              if (accumulatedLine) newPagesHtml.push(accumulatedLine);
+              accumulatedLine = word;
+              measureBox.innerHTML = accumulatedLine;
             }
           }
         }
 
-        if (tempLine) {
-          curHtml = curHtml ? `${curHtml}<br>${tempLine}` : tempLine;
+        if (accumulatedLine) {
+          curPageHtml = curPageHtml ? `${curPageHtml}<br>${accumulatedLine}` : accumulatedLine;
         }
       }
     }
 
-    if (curHtml && curHtml.trim() !== '') {
-      newPagesHtml.push(curHtml);
+    if (curPageHtml && curPageHtml.trim() !== '') {
+      newPagesHtml.push(curPageHtml);
     }
 
     if (newPagesHtml.length === 0) newPagesHtml = [''];
 
-    // 변경 여부 확인 후 신속 반영
+    // 페이지 데이터 반영
     const hasChanged = newPagesHtml.length !== pagesData.length || 
       newPagesHtml.some((html, idx) => pagesData[idx] && pagesData[idx].html !== html);
 
@@ -1675,7 +1674,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v25', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v26', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1703,7 +1702,7 @@ ${originalHtml}`;
       pushHistory();
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 500) {
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
           pagesData = parsed;
           renderPages();
           pushHistory();
