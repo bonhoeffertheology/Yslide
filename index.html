@@ -18,6 +18,7 @@
     --page-border: #444444;
     --text-color: #ffffff;
     --accent: #38bdf8;
+    --toolbar-height: 96px; /* 2단 툴바 높이 */
     --page-width: 820px;
     --page-height: 928px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
@@ -36,26 +37,43 @@
     font-family: var(--ui-font);
   }
 
-  /* 상단 툴바 */
+  /* 상단 2단 고정 툴바 */
   #header-toolbar {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 56px;
+    height: var(--toolbar-height);
     background-color: var(--panel-bg);
     border-bottom: 1px solid var(--border-color);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    justify-content: center;
     padding: 0 16px;
     z-index: 1000;
     user-select: none;
+    gap: 6px;
+  }
+
+  .toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 40px;
     overflow-x: auto;
     white-space: nowrap;
-    gap: 10px;
+    gap: 8px;
   }
-  #header-toolbar::-webkit-scrollbar { display: none; }
+  .toolbar-row::-webkit-scrollbar { display: none; }
+
+  .toolbar-row-top {
+    justify-content: flex-start;
+    border-bottom: 1px solid #282828;
+    padding-bottom: 4px;
+    height: 38px;
+    gap: 8px;
+  }
 
   .tool-group {
     display: inline-flex;
@@ -65,7 +83,7 @@
   }
 
   button {
-    height: 36px;
+    height: 32px;
     padding: 0 10px;
     background-color: #262626;
     border: 1px solid #484848;
@@ -87,13 +105,13 @@
 
   /* 아이콘 버튼 */
   .btn-icon {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     padding: 0;
   }
   .icon-svg {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -103,7 +121,7 @@
 
   .divider {
     width: 1px;
-    height: 22px;
+    height: 20px;
     background-color: var(--border-color);
     margin: 0 2px;
     flex-shrink: 0;
@@ -140,8 +158,8 @@
 
   /* 글꼴 순환 버튼 */
   .btn-font {
-    height: 36px;
-    padding: 0 8px;
+    height: 30px;
+    padding: 0 10px;
     font-size: 12px;
     font-weight: bold;
     color: #d1d5db;
@@ -159,12 +177,12 @@
     border-radius: 6px;
     padding: 2px 4px;
     gap: 2px;
-    height: 36px;
+    height: 32px;
     flex-shrink: 0;
   }
   .btn-size-step {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     padding: 0;
     background: transparent;
     border: none;
@@ -174,7 +192,7 @@
   #size-display {
     font-size: 13px;
     font-weight: bold;
-    min-width: 22px;
+    min-width: 20px;
     text-align: center;
     color: #38bdf8;
   }
@@ -185,7 +203,7 @@
   /* 메인 스크롤 뷰포트 */
   #main-viewport {
     position: absolute;
-    top: 56px;
+    top: var(--toolbar-height);
     bottom: 0;
     left: 0;
     right: 0;
@@ -441,126 +459,133 @@
 </head>
 <body>
 
-<!-- 상단 툴바 -->
+<!-- 상단 2단 툴바 -->
 <div id="header-toolbar">
-  <!-- 1. 포맷팅 & 편집 제어 -->
-  <div class="tool-group">
-    <!-- 자간 좁게 -->
-    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <line x1="4" y1="12" x2="10" y2="12"></line>
-        <polyline points="7 9 10 12 7 15"></polyline>
-        <line x1="20" y1="12" x2="14" y2="12"></line>
-        <polyline points="17 9 14 12 17 15"></polyline>
-      </svg>
-    </button>
-    <!-- 자간 넓게 -->
-    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <line x1="10" y1="12" x2="4" y2="12"></line>
-        <polyline points="7 9 4 12 7 15"></polyline>
-        <line x1="14" y1="12" x2="20" y2="12"></line>
-        <polyline points="17 9 20 12 17 15"></polyline>
-      </svg>
-    </button>
+  <!-- 1단: 자간, 줄간격, 글꼴 -->
+  <div class="toolbar-row toolbar-row-top">
+    <div class="tool-group">
+      <!-- 자간 좁게 -->
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <line x1="4" y1="12" x2="10" y2="12"></line>
+          <polyline points="7 9 10 12 7 15"></polyline>
+          <line x1="20" y1="12" x2="14" y2="12"></line>
+          <polyline points="17 9 14 12 17 15"></polyline>
+        </svg>
+      </button>
+      <!-- 자간 넓게 -->
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <line x1="10" y1="12" x2="4" y2="12"></line>
+          <polyline points="7 9 4 12 7 15"></polyline>
+          <line x1="14" y1="12" x2="20" y2="12"></line>
+          <polyline points="17 9 20 12 17 15"></polyline>
+        </svg>
+      </button>
 
-    <div class="divider"></div>
+      <div class="divider"></div>
 
-    <!-- 줄간격 좁게 -->
-    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <polyline points="9 6 12 9 15 6"></polyline>
-        <line x1="12" y1="2" x2="12" y2="9"></line>
-        <polyline points="9 18 12 15 15 18"></polyline>
-        <line x1="12" y1="22" x2="12" y2="15"></line>
-      </svg>
-    </button>
-    <!-- 줄간격 넓게 -->
-    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <polyline points="8 6 12 2 16 6"></polyline>
-        <line x1="12" y1="2" x2="12" y2="10"></line>
-        <polyline points="8 18 12 22 16 18"></polyline>
-        <line x1="12" y1="22" x2="12" y2="14"></line>
-      </svg>
-    </button>
+      <!-- 줄간격 좁게 -->
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <polyline points="9 6 12 9 15 6"></polyline>
+          <line x1="12" y1="2" x2="12" y2="9"></line>
+          <polyline points="9 18 12 15 15 18"></polyline>
+          <line x1="12" y1="22" x2="12" y2="15"></line>
+        </svg>
+      </button>
+      <!-- 줄간격 넓게 -->
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <polyline points="8 6 12 2 16 6"></polyline>
+          <line x1="12" y1="2" x2="12" y2="10"></line>
+          <polyline points="8 18 12 22 16 18"></polyline>
+          <line x1="12" y1="22" x2="12" y2="14"></line>
+        </svg>
+      </button>
 
-    <div class="divider"></div>
+      <div class="divider"></div>
 
-    <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
-    
-    <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
-    <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
-    <div class="color-btn c-yellow" onmousedown="event.preventDefault()" onclick="selectColor('#ffb703', this)" title="황금 주황"></div>
-    <div class="color-btn c-blue" onmousedown="event.preventDefault()" onclick="selectColor('#38bdf8', this)" title="밝은 파랑"></div>
-    <div class="color-btn c-green" onmousedown="event.preventDefault()" onclick="selectColor('#4ade80', this)" title="밝은 초록"></div>
-
-    <div class="divider"></div>
-
-    <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">삼성 기본</button>
-
-    <div class="size-box">
-      <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
-      <span id="size-display">26</span>
-      <button class="btn-size-step" onclick="changeFontSize(2)">+</button>
+      <!-- 글꼴 순환 선택 -->
+      <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">삼성 기본</button>
     </div>
   </div>
 
-  <!-- 2. 입출력 & 뷰 제어 -->
-  <div class="tool-group">
-    <!-- 불러오기 -->
-    <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-      </svg>
-    </button>
-    <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
+  <!-- 2단: 불러오기, 저장, 공유, 인쇄, 색깔, 글씨크기, 미리보기, 전체보기 -->
+  <div class="toolbar-row">
+    <div class="tool-group">
+      <!-- 불러오기 -->
+      <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+        </svg>
+      </button>
+      <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
 
-    <!-- 저장 -->
-    <button class="btn-icon" onclick="saveNoteData()" title="저장">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-        <polyline points="7 3 7 8 15 8"></polyline>
-      </svg>
-    </button>
+      <!-- 저장 -->
+      <button class="btn-icon" onclick="saveNoteData()" title="저장">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+      </button>
 
-    <!-- 공유 -->
-    <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <circle cx="18" cy="5" r="3"></circle>
-        <circle cx="6" cy="12" r="3"></circle>
-        <circle cx="18" cy="19" r="3"></circle>
-        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-      </svg>
-    </button>
+      <!-- 공유 -->
+      <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+      </button>
 
-    <!-- 인쇄 -->
-    <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-        <rect x="6" y="14" width="12" height="8"></rect>
-      </svg>
-    </button>
-    
-    <div class="divider"></div>
+      <!-- 인쇄 -->
+      <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <polyline points="6 9 6 2 18 2 18 9"></polyline>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+          <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
+      </button>
 
-    <!-- 미리보기 -->
-    <button class="btn-icon" onclick="startPreviewCurrentPage()" title="현재 페이지 미리보기">
-      <svg class="icon-svg" viewBox="0 0 24 24">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-        <circle cx="12" cy="12" r="3"></circle>
-      </svg>
-    </button>
+      <div class="divider"></div>
 
-    <!-- 전체보기 -->
-    <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">
-      <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
-        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-      </svg>
-    </button>
+      <!-- 연속 버튼 및 색상 팔레트 -->
+      <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
+      <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
+      <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
+      <div class="color-btn c-yellow" onmousedown="event.preventDefault()" onclick="selectColor('#ffb703', this)" title="황금 주황"></div>
+      <div class="color-btn c-blue" onmousedown="event.preventDefault()" onclick="selectColor('#38bdf8', this)" title="밝은 파랑"></div>
+      <div class="color-btn c-green" onmousedown="event.preventDefault()" onclick="selectColor('#4ade80', this)" title="밝은 초록"></div>
+
+      <div class="divider"></div>
+
+      <!-- 글씨 크기 -->
+      <div class="size-box">
+        <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
+        <span id="size-display">26</span>
+        <button class="btn-size-step" onclick="changeFontSize(2)">+</button>
+      </div>
+    </div>
+
+    <!-- 미리보기, 전체보기 -->
+    <div class="tool-group">
+      <button class="btn-icon" onclick="startPreviewCurrentPage()" title="현재 페이지 미리보기">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+
+      <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">
+        <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -622,7 +647,7 @@
     }
     applyCurrentFont();
 
-    const saved = localStorage.getItem('yslide_note_pages_v6');
+    const saved = localStorage.getItem('yslide_note_pages_v7');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -713,7 +738,6 @@
     updatePageInfo();
   }
 
-  /* 80% 높이에 맞춘 텍스트 분할 */
   function handleSmartPaste(e, startIndex) {
     e.preventDefault();
     const clipboardData = e.clipboardData || window.clipboardData;
@@ -763,7 +787,6 @@
     showToast(`📄 총 ${pagesCreated.length}개 페이지로 분할되었습니다`);
   }
 
-  /* 자간 조절 */
   function adjustLetterSpacing(delta) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -794,7 +817,6 @@
     saveAllPagesState();
   }
 
-  /* 줄간격 조절 */
   function adjustLineHeight(delta) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -827,7 +849,6 @@
     saveAllPagesState();
   }
 
-  /* 연속 터치 단어 채색 */
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
       if (editorEl.classList.contains('is-placeholder')) return;
@@ -1010,15 +1031,12 @@
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v6', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v7', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
-  /* 파일 저장 (.txt / .json) */
   async function saveNoteData() {
     saveAllPagesState();
-    const plainText = pagesData.map((p, idx) => `[PAGE ${idx + 1}]\n` + (p.isPlaceholder ? '' : p.html.replace(/<br\s*[\/]?>/gi, '\n').replace(/<[^>]+>/g, ''))).join('\n\n');
-    
     const now = new Date();
     const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
     const filename = `Yslide_${dateStr}.json`;
@@ -1033,7 +1051,6 @@
     showToast('💾 파일로 저장되었습니다');
   }
 
-  /* 파일 불러오기 */
   function handleFileImport(files) {
     if (!files || files.length === 0) return;
     const reader = new FileReader();
@@ -1050,7 +1067,6 @@
         }
       } catch (err) {}
 
-      // 일반 텍스트 파일 분할 로드
       const paragraphs = raw.split('\n');
       measureContainer.style.fontSize = `${currentFontSize}px`;
       measureContainer.style.lineHeight = '1.55';
@@ -1084,7 +1100,6 @@
     reader.readAsText(files[0]);
   }
 
-  /* 텍스트 공유하기 */
   async function shareNoteContent() {
     saveAllPagesState();
     let shareText = '';
@@ -1121,7 +1136,6 @@
     }
   }
 
-  /* 문서 인쇄 */
   function printNoteDocument() {
     saveAllPagesState();
     const printArea = document.getElementById('print-area');
@@ -1140,7 +1154,6 @@
     window.print();
   }
 
-  /* 미리보기 및 전체보기 */
   function startPreviewCurrentPage() {
     saveAllPagesState();
     let targetIndex = 0;
