@@ -461,7 +461,6 @@
   <!-- 1단: 자간, 줄간격, 글꼴 -->
   <div class="toolbar-row toolbar-row-top">
     <div class="tool-group">
-      <!-- 자간 좁게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="4" y1="12" x2="10" y2="12"></line>
@@ -470,7 +469,6 @@
           <polyline points="17 9 14 12 17 15"></polyline>
         </svg>
       </button>
-      <!-- 자간 넓게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="10" y1="12" x2="4" y2="12"></line>
@@ -482,7 +480,6 @@
 
       <div class="divider"></div>
 
-      <!-- 줄간격 좁게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="9 6 12 9 15 6"></polyline>
@@ -491,7 +488,6 @@
           <line x1="12" y1="22" x2="12" y2="15"></line>
         </svg>
       </button>
-      <!-- 줄간격 넓게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="8 6 12 2 16 6"></polyline>
@@ -503,7 +499,6 @@
 
       <div class="divider"></div>
 
-      <!-- 글꼴 순환 선택 -->
       <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">삼성 기본</button>
     </div>
   </div>
@@ -511,7 +506,6 @@
   <!-- 2단: 불러오기, 저장, 공유, 인쇄, 번역, 되돌리기, 다시실행, 색깔, 글씨크기, 미리보기, 전체보기 -->
   <div class="toolbar-row">
     <div class="tool-group">
-      <!-- 1. 불러오기 -->
       <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
@@ -519,7 +513,6 @@
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
 
-      <!-- 2. 저장 -->
       <button class="btn-icon" onclick="saveNoteData()" title="저장">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -528,7 +521,6 @@
         </svg>
       </button>
 
-      <!-- 3. 공유 -->
       <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="18" cy="5" r="3"></circle>
@@ -539,7 +531,6 @@
         </svg>
       </button>
 
-      <!-- 4. 인쇄 -->
       <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -548,7 +539,6 @@
         </svg>
       </button>
 
-      <!-- 5. 번역 (Gemini AI) -->
       <button class="btn-icon" onclick="translateSelectedTextWithGemini()" title="선택 텍스트 영어로 번역 (Gemini AI)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
@@ -557,7 +547,6 @@
         </svg>
       </button>
 
-      <!-- 6. 되돌리기 (Undo) -->
       <button class="btn-icon" onclick="undo()" title="실행 취소 / 되돌리기 (Ctrl+Z)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M3 7v6h6"></path>
@@ -565,7 +554,6 @@
         </svg>
       </button>
 
-      <!-- 7. 다시 실행 (Redo) -->
       <button class="btn-icon" onclick="redo()" title="다시 실행 (Ctrl+Y)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M21 7v6h-6"></path>
@@ -575,7 +563,6 @@
 
       <div class="divider"></div>
 
-      <!-- 8. 색상 및 채색 -->
       <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
       <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
       <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
@@ -585,7 +572,6 @@
 
       <div class="divider"></div>
 
-      <!-- 9. 글자 크기 -->
       <div class="size-box">
         <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
         <span id="size-display">26</span>
@@ -593,7 +579,6 @@
       </div>
     </div>
 
-    <!-- 10. 미리보기, 전체보기 -->
     <div class="tool-group">
       <button class="btn-icon" onclick="startPreviewCurrentPage()" title="현재 페이지 미리보기">
         <svg class="icon-svg" viewBox="0 0 24 24">
@@ -675,7 +660,7 @@
     }
     applyCurrentFont();
 
-    const saved = localStorage.getItem('yslide_note_pages_v11');
+    const saved = localStorage.getItem('yslide_note_pages_v12');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -830,7 +815,6 @@
     // 에디터의 실제 내부 최대 가용 높이 (카드 높이 928px - 헤더 42px - 상하패딩 64px = 822px)
     const maxAllowedHeight = 822;
 
-    // 개행 정규화 후 단락 분리
     const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     let pages = [];
     let currentHtml = '';
@@ -840,7 +824,6 @@
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // 빈 줄 처리
       if (line === '') {
         const testHtml = currentHtml ? `${currentHtml}<br>` : '';
         measureContainer.innerHTML = testHtml || '<br>';
@@ -854,14 +837,12 @@
         continue;
       }
 
-      // 문단 통째로 시도
       const testHtml = currentHtml ? `${currentHtml}<br>${line}` : line;
       measureContainer.innerHTML = testHtml;
 
       if (measureContainer.offsetHeight <= maxAllowedHeight) {
         currentHtml = testHtml;
       } else {
-        // 문단이 넘치면 단어 단위로 세부 분할
         const words = line.split(' ');
         let tempParagraph = '';
 
@@ -878,13 +859,11 @@
             tempParagraph = nextTemp;
           } else {
             if (currentHtml !== '') {
-              // 현재 페이지 마감 후 새 페이지 시작
               pages.push(currentHtml);
               currentHtml = tempParagraph ? `${tempParagraph}` : '';
               tempParagraph = word;
               measureContainer.innerHTML = tempParagraph;
             } else {
-              // 단일 단어 자체가 너무 긴 경우 문자 단위로 쪼갬
               if (tempParagraph) pages.push(tempParagraph);
               tempParagraph = word;
             }
@@ -1280,7 +1259,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v11', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v12', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
