@@ -53,20 +53,20 @@
     user-select: none;
     overflow-x: auto;
     white-space: nowrap;
-    gap: 12px;
+    gap: 10px;
   }
   #header-toolbar::-webkit-scrollbar { display: none; }
 
   .tool-group {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
   }
 
   button {
     height: 36px;
-    padding: 0 12px;
+    padding: 0 10px;
     background-color: #262626;
     border: 1px solid #484848;
     border-radius: 6px;
@@ -77,7 +77,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
     transition: all 0.15s ease;
     font-family: var(--ui-font);
@@ -85,15 +85,15 @@
   button:hover { background-color: #333333; }
   button:active { transform: scale(0.97); }
 
-  /* 아이콘 전용 버튼 */
+  /* 아이콘 버튼 */
   .btn-icon {
     width: 36px;
     height: 36px;
     padding: 0;
   }
   .icon-svg {
-    width: 19px;
-    height: 19px;
+    width: 18px;
+    height: 18px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -119,8 +119,8 @@
 
   /* 색상 팔레트 */
   .color-btn {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     border: 2px solid #555555;
     cursor: pointer;
@@ -141,8 +141,8 @@
   /* 글꼴 순환 버튼 */
   .btn-font {
     height: 36px;
-    padding: 0 10px;
-    font-size: 13px;
+    padding: 0 8px;
+    font-size: 12px;
     font-weight: bold;
     color: #d1d5db;
     background-color: #262626;
@@ -158,26 +158,29 @@
     border: 1px solid #484848;
     border-radius: 6px;
     padding: 2px 4px;
-    gap: 4px;
+    gap: 2px;
     height: 36px;
     flex-shrink: 0;
   }
   .btn-size-step {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     padding: 0;
     background: transparent;
     border: none;
     color: #cccccc;
-    font-size: 15px;
+    font-size: 14px;
   }
   #size-display {
     font-size: 13px;
     font-weight: bold;
-    min-width: 24px;
+    min-width: 22px;
     text-align: center;
     color: #38bdf8;
   }
+
+  /* 숨김 파일 인풋 */
+  #file-input { display: none; }
 
   /* 메인 스크롤 뷰포트 */
   #main-viewport {
@@ -257,7 +260,6 @@
     font-family: var(--active-font);
   }
 
-  /* 안내문 상태 스타일 */
   .page-editor.is-placeholder {
     color: #666666 !important;
   }
@@ -326,7 +328,6 @@
   }
   .slide-sheet.active { display: block; }
 
-  /* 좌우 50% 분할 터치 */
   .touch-zone {
     position: absolute;
     top: 0;
@@ -353,6 +354,52 @@
     padding: 6px 14px; border-radius: 12px;
     color: #ffb703; font-size: 14px; font-weight: bold;
     z-index: 6000;
+  }
+
+  /* 인쇄 영역 */
+  #print-area { display: none; }
+
+  @media print {
+    @page { margin: 15mm; size: auto; }
+    html, body {
+      position: static !important;
+      overflow: visible !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      height: auto !important;
+    }
+    #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast {
+      display: none !important;
+    }
+    #print-area {
+      display: block !important;
+      width: 100% !important;
+      background: #ffffff !important;
+    }
+    .print-page-sheet {
+      page-break-after: always !important;
+      break-after: page !important;
+      padding: 10px 0 20px 0;
+      color: #000000 !important;
+      font-size: 18pt !important;
+      line-height: 1.6 !important;
+      white-space: pre-wrap !important;
+      word-break: keep-all !important;
+      font-family: var(--active-font);
+    }
+    .print-page-sheet:last-child {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    .print-page-header {
+      font-size: 11pt;
+      font-weight: bold;
+      color: #777;
+      text-align: right;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 15px;
+      padding-bottom: 4px;
+    }
   }
 
   /* 토스트 메시지 */
@@ -396,16 +443,62 @@
 
 <!-- 상단 툴바 -->
 <div id="header-toolbar">
+  <!-- 1. 포맷팅 & 편집 제어 -->
   <div class="tool-group">
-    <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
+    <!-- 자간 좁게 -->
+    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <line x1="4" y1="12" x2="10" y2="12"></line>
+        <polyline points="7 9 10 12 7 15"></polyline>
+        <line x1="20" y1="12" x2="14" y2="12"></line>
+        <polyline points="17 9 14 12 17 15"></polyline>
+      </svg>
+    </button>
+    <!-- 자간 넓게 -->
+    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <line x1="10" y1="12" x2="4" y2="12"></line>
+        <polyline points="7 9 4 12 7 15"></polyline>
+        <line x1="14" y1="12" x2="20" y2="12"></line>
+        <polyline points="17 9 20 12 17 15"></polyline>
+      </svg>
+    </button>
+
     <div class="divider"></div>
+
+    <!-- 줄간격 좁게 -->
+    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <polyline points="9 6 12 9 15 6"></polyline>
+        <line x1="12" y1="2" x2="12" y2="9"></line>
+        <polyline points="9 18 12 15 15 18"></polyline>
+        <line x1="12" y1="22" x2="12" y2="15"></line>
+      </svg>
+    </button>
+    <!-- 줄간격 넓게 -->
+    <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <polyline points="8 6 12 2 16 6"></polyline>
+        <line x1="12" y1="2" x2="12" y2="10"></line>
+        <polyline points="8 18 12 22 16 18"></polyline>
+        <line x1="12" y1="22" x2="12" y2="14"></line>
+      </svg>
+    </button>
+
+    <div class="divider"></div>
+
+    <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
+    
     <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
     <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
     <div class="color-btn c-yellow" onmousedown="event.preventDefault()" onclick="selectColor('#ffb703', this)" title="황금 주황"></div>
     <div class="color-btn c-blue" onmousedown="event.preventDefault()" onclick="selectColor('#38bdf8', this)" title="밝은 파랑"></div>
     <div class="color-btn c-green" onmousedown="event.preventDefault()" onclick="selectColor('#4ade80', this)" title="밝은 초록"></div>
+
     <div class="divider"></div>
-    <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">기본글꼴</button>
+
+    <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">삼성 기본</button>
+
     <div class="size-box">
       <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
       <span id="size-display">26</span>
@@ -413,8 +506,17 @@
     </div>
   </div>
 
+  <!-- 2. 입출력 & 뷰 제어 -->
   <div class="tool-group">
-    <!-- 저장 아이콘 버튼 -->
+    <!-- 불러오기 -->
+    <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+      </svg>
+    </button>
+    <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
+
+    <!-- 저장 -->
     <button class="btn-icon" onclick="saveNoteData()" title="저장">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -422,10 +524,30 @@
         <polyline points="7 3 7 8 15 8"></polyline>
       </svg>
     </button>
+
+    <!-- 공유 -->
+    <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+      </svg>
+    </button>
+
+    <!-- 인쇄 -->
+    <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="8"></rect>
+      </svg>
+    </button>
     
     <div class="divider"></div>
 
-    <!-- 미리보기 아이콘 버튼 -->
+    <!-- 미리보기 -->
     <button class="btn-icon" onclick="startPreviewCurrentPage()" title="현재 페이지 미리보기">
       <svg class="icon-svg" viewBox="0 0 24 24">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -433,7 +555,7 @@
       </svg>
     </button>
 
-    <!-- 전체보기 아이콘 버튼 -->
+    <!-- 전체보기 -->
     <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">
       <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
         <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -459,6 +581,9 @@
   <div id="reader-viewport"></div>
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
 </div>
+
+<!-- 인쇄 전용 컨테이너 -->
+<div id="print-area"></div>
 
 <!-- 분량 측정용 숨김 컨테이너 -->
 <div id="measure-container"></div>
@@ -497,7 +622,7 @@
     }
     applyCurrentFont();
 
-    const saved = localStorage.getItem('yslide_note_pages_v5');
+    const saved = localStorage.getItem('yslide_note_pages_v6');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -551,7 +676,6 @@
         editor.innerHTML = page.html || '';
       }
 
-      // 터치/클릭 시 안내문 자동 삭제
       editor.addEventListener('focus', () => {
         if (editor.classList.contains('is-placeholder') || editor.innerHTML.trim() === PLACEHOLDER_TEXT) {
           editor.innerHTML = '';
@@ -571,7 +695,6 @@
         saveToLocalStorageSilent();
       });
 
-      // 긴 글 붙여넣기 시 80% 높이에 맞게 자동 분할
       editor.addEventListener('paste', (e) => {
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
@@ -638,6 +761,70 @@
     renderPages();
     saveToLocalStorageSilent();
     showToast(`📄 총 ${pagesCreated.length}개 페이지로 분할되었습니다`);
+  }
+
+  /* 자간 조절 */
+  function adjustLetterSpacing(delta) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      showToast('⚠️ 텍스트를 먼저 드래그하여 선택하세요');
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    let targetSpan = null;
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+    if (node && node.tagName === 'SPAN' && node.style.letterSpacing) {
+      targetSpan = node;
+      let cur = parseFloat(targetSpan.style.letterSpacing) || 0;
+      targetSpan.style.letterSpacing = `${(cur + delta).toFixed(1)}px`;
+    } else {
+      targetSpan = document.createElement('span');
+      targetSpan.style.letterSpacing = `${delta.toFixed(1)}px`;
+      const frag = range.extractContents();
+      targetSpan.appendChild(frag);
+      range.insertNode(targetSpan);
+    }
+
+    const newRange = document.createRange();
+    newRange.selectNodeContents(targetSpan);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    saveAllPagesState();
+  }
+
+  /* 줄간격 조절 */
+  function adjustLineHeight(delta) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      showToast('⚠️ 텍스트를 먼저 드래그하여 선택하세요');
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    let targetSpan = null;
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+    if (node && node.tagName === 'SPAN' && node.style.lineHeight) {
+      targetSpan = node;
+      let cur = parseFloat(targetSpan.style.lineHeight) || 1.55;
+      targetSpan.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
+    } else {
+      targetSpan = document.createElement('span');
+      targetSpan.style.display = 'inline-block';
+      let cur = 1.55;
+      targetSpan.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
+      const frag = range.extractContents();
+      targetSpan.appendChild(frag);
+      range.insertNode(targetSpan);
+    }
+
+    const newRange = document.createRange();
+    newRange.selectNodeContents(targetSpan);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    saveAllPagesState();
   }
 
   /* 연속 터치 단어 채색 */
@@ -823,13 +1010,134 @@
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v5', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v6', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
-  function saveNoteData() {
+  /* 파일 저장 (.txt / .json) */
+  async function saveNoteData() {
     saveAllPagesState();
-    showToast('💾 안전하게 저장되었습니다');
+    const plainText = pagesData.map((p, idx) => `[PAGE ${idx + 1}]\n` + (p.isPlaceholder ? '' : p.html.replace(/<br\s*[\/]?>/gi, '\n').replace(/<[^>]+>/g, ''))).join('\n\n');
+    
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const filename = `Yslide_${dateStr}.json`;
+
+    const blob = new Blob([JSON.stringify(pagesData, null, 2)], { type: "application/json" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    showToast('💾 파일로 저장되었습니다');
+  }
+
+  /* 파일 불러오기 */
+  function handleFileImport(files) {
+    if (!files || files.length === 0) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          pagesData = parsed;
+          renderPages();
+          saveToLocalStorageSilent();
+          showToast('📂 파일을 성공적으로 불러왔습니다');
+          return;
+        }
+      } catch (err) {}
+
+      // 일반 텍스트 파일 분할 로드
+      const paragraphs = raw.split('\n');
+      measureContainer.style.fontSize = `${currentFontSize}px`;
+      measureContainer.style.lineHeight = '1.55';
+      const targetHeight = 928 - 42 - 64;
+
+      let pagesCreated = [];
+      let currentHtml = '';
+      measureContainer.innerHTML = '';
+
+      paragraphs.forEach((p) => {
+        const pText = p.trim();
+        const testHtml = currentHtml ? `${currentHtml}<br>${pText}` : pText;
+        measureContainer.innerHTML = testHtml;
+
+        if (measureContainer.scrollHeight > targetHeight && currentHtml !== '') {
+          pagesCreated.push(currentHtml);
+          currentHtml = pText;
+          measureContainer.innerHTML = pText;
+        } else {
+          currentHtml = testHtml;
+        }
+      });
+      if (currentHtml) pagesCreated.push(currentHtml);
+      if (pagesCreated.length === 0) pagesCreated = [''];
+
+      pagesData = pagesCreated.map(html => ({ html: html, isPlaceholder: false }));
+      renderPages();
+      saveToLocalStorageSilent();
+      showToast(`📂 텍스트를 총 ${pagesData.length}개 페이지로 불러왔습니다`);
+    };
+    reader.readAsText(files[0]);
+  }
+
+  /* 텍스트 공유하기 */
+  async function shareNoteContent() {
+    saveAllPagesState();
+    let shareText = '';
+    const sel = window.getSelection();
+
+    if (sel && !sel.isCollapsed && sel.toString().trim() !== '') {
+      shareText = sel.toString().trim();
+    } else {
+      shareText = pagesData.map((p, idx) => `[PAGE ${idx + 1}]\n` + (p.isPlaceholder ? '' : p.html.replace(/<br\s*[\/]?>/gi, '\n').replace(/<[^>]+>/g, ''))).join('\n\n');
+    }
+
+    if (!shareText) {
+      showToast('⚠️ 공유할 내용이 없습니다');
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Yslide 원고 공유', text: shareText });
+        showToast('📤 공유 완료');
+      } catch (e) {
+        if (e.name !== 'AbortError') copyToClipboardFallback(shareText);
+      }
+    } else {
+      copyToClipboardFallback(shareText);
+    }
+  }
+
+  function copyToClipboardFallback(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 텍스트가 클립보드에 복사되었습니다');
+      });
+    }
+  }
+
+  /* 문서 인쇄 */
+  function printNoteDocument() {
+    saveAllPagesState();
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = '';
+
+    pagesData.forEach((page, idx) => {
+      const sheet = document.createElement('div');
+      sheet.className = 'print-page-sheet';
+      sheet.innerHTML = `
+        <div class="print-page-header">[ PAGE ${idx + 1} / ${pagesData.length} ]</div>
+        <div>${page.isPlaceholder ? '' : (page.html || '')}</div>
+      `;
+      printArea.appendChild(sheet);
+    });
+
+    window.print();
   }
 
   /* 미리보기 및 전체보기 */
