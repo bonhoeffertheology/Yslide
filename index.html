@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Yslide">
 <link rel="apple-touch-icon" href="https://api.iconify.design/fluent-emoji:memo.svg">
 
-<!-- PWA Manifest 인라인 생성 연결 -->
+<!-- PWA Manifest 연결 -->
 <link id="manifest-link" rel="manifest">
 
 <!-- KoPubWorld 및 Pretendard CDN 로드 -->
@@ -144,7 +144,6 @@
     box-shadow: 0 0 10px rgba(234, 88, 12, 0.6);
   }
 
-  /* 색상 팔레트 */
   .color-btn {
     width: 24px;
     height: 24px;
@@ -229,7 +228,7 @@
   }
   #main-viewport.view-scroll::-webkit-scrollbar { display: none; }
 
-  /* 메인 뷰포트 (가로 페이지 모드 / 스와이프) */
+  /* 메인 뷰포트 (가로 페이지 모드) */
   #main-viewport.view-page {
     overflow-x: auto;
     overflow-y: hidden;
@@ -297,7 +296,7 @@
   }
   .page-del-btn:hover { color: #ef4444; }
 
-  /* 텍스트 편집 영역 */
+  /* 텍스트 편집 영역 (오버플로우 숨김 & 규격 고정) */
   .page-editor {
     flex: 1;
     width: 100%;
@@ -309,7 +308,7 @@
     line-height: 1.55;
     outline: none;
     white-space: pre-wrap;
-    word-break: keep-all;
+    word-break: break-word;
     overflow-y: hidden;
     cursor: text;
     font-family: var(--active-font);
@@ -376,7 +375,7 @@
     font-size: 26px;
     line-height: 1.55;
     white-space: pre-wrap;
-    word-break: keep-all;
+    word-break: break-word;
     overflow: hidden;
     display: none;
     box-sizing: border-box;
@@ -412,46 +411,6 @@
     z-index: 6000;
   }
 
-  /* 스마트 붙여넣기 모달 */
-  #paste-modal {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.75);
-    z-index: 8000;
-    justify-content: center;
-    align-items: center;
-  }
-  .modal-box {
-    background: #1e1e1e;
-    border: 1px solid #444;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .modal-textarea {
-    width: 100%;
-    height: 220px;
-    background: #111;
-    border: 1px solid #333;
-    border-radius: 6px;
-    color: #fff;
-    padding: 12px;
-    font-size: 16px;
-    font-family: inherit;
-    resize: none;
-    outline: none;
-  }
-  .modal-btns {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-
   /* 인쇄 영역 */
   #print-area { display: none; }
 
@@ -464,7 +423,7 @@
       color: #000000 !important;
       height: auto !important;
     }
-    #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #paste-modal {
+    #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast {
       display: none !important;
     }
     #print-area {
@@ -480,7 +439,7 @@
       font-size: 18pt !important;
       line-height: 1.6 !important;
       white-space: pre-wrap !important;
-      word-break: keep-all !important;
+      word-break: break-word !important;
       font-family: var(--active-font);
     }
     .print-page-sheet:last-child {
@@ -498,7 +457,6 @@
     }
   }
 
-  /* 토스트 메시지 */
   #toast {
     position: fixed;
     bottom: 30px;
@@ -523,10 +481,8 @@
 
 <!-- 상단 2단 툴바 -->
 <div id="header-toolbar">
-  <!-- 1단: 서식 및 뷰 컨트롤 -->
   <div class="toolbar-row toolbar-row-top">
     <div class="tool-group">
-      <!-- 자간 좁게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="4" y1="12" x2="10" y2="12"></line>
@@ -535,7 +491,6 @@
           <polyline points="17 9 14 12 17 15"></polyline>
         </svg>
       </button>
-      <!-- 자간 넓게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="10" y1="12" x2="4" y2="12"></line>
@@ -547,7 +502,6 @@
 
       <div class="divider"></div>
 
-      <!-- 줄간격 좁게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="9 6 12 9 15 6"></polyline>
@@ -556,7 +510,6 @@
           <line x1="12" y1="22" x2="12" y2="15"></line>
         </svg>
       </button>
-      <!-- 줄간격 넓게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="8 6 12 2 16 6"></polyline>
@@ -568,19 +521,16 @@
 
       <div class="divider"></div>
 
-      <!-- 글꼴 순환 선택 -->
       <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">기본</button>
 
-      <!-- 굵게(Bold) 버튼 -->
-      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBold()" title="볼드체 (굵게)">
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBold()" title="볼드체">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
           <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
         </svg>
       </button>
 
-      <!-- 기울임(Italic) 버튼 -->
-      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleItalic()" title="이탤릭체 (기울임)">
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleItalic()" title="이탤릭체">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="19" y1="4" x2="10" y2="4"></line>
           <line x1="14" y1="20" x2="5" y2="20"></line>
@@ -588,8 +538,7 @@
         </svg>
       </button>
 
-      <!-- 일괄 적용 버튼 -->
-      <button id="btn-batch-mode" class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBatchMode()" title="모든 페이지 일괄 적용 모드 토글">
+      <button id="btn-batch-mode" class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBatchMode()" title="일괄 적용 모드">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
           <polyline points="2 17 12 22 22 17"></polyline>
@@ -599,8 +548,7 @@
 
       <div class="divider"></div>
 
-      <!-- 스크롤 / 페이지 모드 전환 버튼 -->
-      <button id="btn-view-mode" class="btn-icon" onclick="toggleViewMode()" title="세로 스크롤 / 가로 페이지 모드 전환">
+      <button id="btn-view-mode" class="btn-icon" onclick="toggleViewMode()" title="스크롤 / 페이지 모드">
         <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
@@ -609,8 +557,7 @@
 
       <div class="divider"></div>
 
-      <!-- PWA 앱 홈화면 설치 버튼 -->
-      <button id="btn-install-app" class="btn-icon" onclick="promptInstallApp()" style="display:none; background:#0284c7; border-color:#38bdf8;" title="홈 화면에 앱 설치">
+      <button id="btn-install-app" class="btn-icon" onclick="promptInstallApp()" style="display:none; background:#0284c7; border-color:#38bdf8;" title="앱 설치">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
           <polyline points="7 10 12 15 17 10"></polyline>
@@ -620,18 +567,8 @@
     </div>
   </div>
 
-  <!-- 2단: 기능 및 입출력 제어 -->
   <div class="toolbar-row">
     <div class="tool-group">
-      <!-- 스마트 붙여넣기 모달 열기 버튼 -->
-      <button class="btn-icon" onclick="openPasteModal()" title="긴 글 스마트 분할 붙여넣기">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-      </button>
-
-      <!-- 파일 불러오기 -->
       <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
@@ -639,7 +576,6 @@
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
 
-      <!-- 저장 -->
       <button class="btn-icon" onclick="saveNoteData()" title="저장">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -648,7 +584,6 @@
         </svg>
       </button>
 
-      <!-- 공유 -->
       <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="18" cy="5" r="3"></circle>
@@ -659,7 +594,6 @@
         </svg>
       </button>
 
-      <!-- 인쇄 -->
       <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -668,8 +602,7 @@
         </svg>
       </button>
 
-      <!-- Gemini AI 영문 번역 -->
-      <button class="btn-icon" onclick="translateSelectedTextWithGemini()" title="선택 텍스트 영어로 번역 (Gemini AI)">
+      <button class="btn-icon" onclick="translateSelectedTextWithGemini()" title="영어 번역 (Gemini AI)">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
@@ -677,16 +610,14 @@
         </svg>
       </button>
 
-      <!-- 되돌리기 -->
-      <button class="btn-icon" onclick="undo()" title="실행 취소 / 되돌리기 (Ctrl+Z)">
+      <button class="btn-icon" onclick="undo()" title="실행 취소 / 되돌리기">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M3 7v6h6"></path>
           <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
         </svg>
       </button>
 
-      <!-- 다시실행 -->
-      <button class="btn-icon" onclick="redo()" title="다시 실행 (Ctrl+Y)">
+      <button class="btn-icon" onclick="redo()" title="다시 실행">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M21 7v6h-6"></path>
           <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
@@ -695,8 +626,7 @@
 
       <div class="divider"></div>
 
-      <!-- 연속 버튼 및 색상 팔레트 -->
-      <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
+      <button id="btn-continuous" onclick="toggleContinuousMode()" title="연속 채색">연속</button>
       <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
       <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
       <div class="color-btn c-yellow" onmousedown="event.preventDefault()" onclick="selectColor('#ffb703', this)" title="황금 주황"></div>
@@ -705,7 +635,6 @@
 
       <div class="divider"></div>
 
-      <!-- 글자 크기 -->
       <div class="size-box">
         <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
         <span id="size-display">26</span>
@@ -721,7 +650,7 @@
         </svg>
       </button>
 
-      <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">
+      <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="전체보기">
         <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
@@ -748,25 +677,13 @@
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
 </div>
 
-<!-- 스마트 붙여넣기 모달 -->
-<div id="paste-modal" style="display:none;">
-  <div class="modal-box">
-    <h3 style="color:#fff; font-size:16px;">📋 긴 글 자동 분할 붙여넣기</h3>
-    <textarea id="modal-paste-input" class="modal-textarea" placeholder="여기에 긴 글을 붙여넣으세요..."></textarea>
-    <div class="modal-btns">
-      <button onclick="closePasteModal()" style="background:#333;">취소</button>
-      <button onclick="confirmModalPaste()" style="background:#0284c7; color:#fff;">페이지로 분할 삽입</button>
-    </div>
-  </div>
-</div>
-
 <!-- 인쇄 전용 컨테이너 -->
 <div id="print-area"></div>
 
 <div id="toast"></div>
 
 <script>
-  /* PWA 설정 */
+  /* PWA Manifest & Service Worker */
   const manifestData = {
     name: "Yslide Note",
     short_name: "Yslide",
@@ -809,7 +726,7 @@
     }
   }
 
-  /* 메인 상태 */
+  /* 글로벌 상태 */
   const PLACEHOLDER_TEXT = "여기를 클릭하여 글을 작성하거나 긴 글을 붙여넣으세요.";
 
   const FONT_LIST = [
@@ -840,7 +757,8 @@
   let undoStack = [];
   let redoStack = [];
   const MAX_HISTORY = 40;
-  let cascadeTimer = null;
+  let isReflowing = false;
+  let reflowTimer = null;
 
   const viewport = document.getElementById('main-viewport');
   const readerViewport = document.getElementById('reader-viewport');
@@ -860,7 +778,7 @@
     if (savedMode) viewMode = savedMode;
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v20');
+    const saved = localStorage.getItem('yslide_note_pages_v21');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -956,7 +874,7 @@
     if (btnFontCycle) btnFontCycle.innerText = current.name;
   }
 
-  /* 렌더링 및 입력 이벤트 바인딩 */
+  /* 렌더링 */
   function renderPages() {
     viewport.innerHTML = '';
     pagesData.forEach((page, index) => {
@@ -995,8 +913,9 @@
         }
       });
 
-      // 엔터 및 타이핑 시 실시간 넘침 연쇄 밀림 감지
+      // 한글 HWP 스타일 연속 유기적 리플로우 (Input 감지)
       editor.addEventListener('input', () => {
+        if (isReflowing) return;
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
           pagesData[index].isPlaceholder = false;
@@ -1005,33 +924,33 @@
         pagesData[index].html = editor.innerHTML;
         saveToLocalStorageSilent();
 
-        // 높이가 넘치면 즉시 연쇄 밀림 실행 (커서 안정화 디바운스)
-        if (editor.scrollHeight > (editor.clientHeight + 12)) {
-          if (cascadeTimer) clearTimeout(cascadeTimer);
-          cascadeTimer = setTimeout(() => {
-            cascadeFlowFrom(index);
-          }, 300);
+        // 높이가 넘치거나 엔터로 줄바꿈 발생 시 연쇄 재배치
+        if (editor.scrollHeight > (editor.clientHeight + 4)) {
+          if (reflowTimer) clearTimeout(reflowTimer);
+          reflowTimer = setTimeout(() => {
+            triggerContinuousReflow(index);
+          }, 80);
         }
       });
 
-      // 붙여넣기 시 즉시 분할 배분
+      // 붙여넣기 시 전체 문서 연속 분할
       editor.addEventListener('paste', (e) => {
+        e.preventDefault();
         let text = '';
         if (e.clipboardData || window.clipboardData) {
           const cd = e.clipboardData || window.clipboardData;
           text = cd.getData('text/plain') || cd.getData('text');
         }
 
-        if (text && text.length > 30) {
-          e.preventDefault();
-          if (editor.classList.contains('is-placeholder')) {
-            editor.classList.remove('is-placeholder');
-            pagesData[index].isPlaceholder = false;
-          }
-          
-          // 현재 커서 위치 또는 뒤쪽으로 텍스트 추가 후 연쇄 분할
+        if (editor.classList.contains('is-placeholder')) {
+          editor.classList.remove('is-placeholder');
+          pagesData[index].isPlaceholder = false;
+          pagesData[index].html = '';
+        }
+
+        if (text) {
           document.execCommand('insertText', false, text);
-          cascadeFlowFrom(index);
+          triggerContinuousReflow(index);
         }
       });
 
@@ -1053,20 +972,25 @@
     updatePageInfo();
   }
 
-  /* 연쇄 밀림(Cascading Flow) 핵심 알고리즘 */
-  function cascadeFlowFrom(startIndex) {
+  /* 연속 문서 흐름 페이지네이션 엔진 (Continuous Flow Engine) */
+  function triggerContinuousReflow(fromIndex = 0) {
+    if (isReflowing) return;
+    isReflowing = true;
+
     saveAllPagesState();
 
-    // startIndex부터 끝까지 모든 텍스트를 하나로 결합
-    let combinedHtml = [];
-    for (let i = startIndex; i < pagesData.length; i++) {
-      if (!pagesData[i].isPlaceholder && pagesData[i].html) {
-        combinedHtml.push(pagesData[i].html);
-      }
-    }
-    const fullSource = combinedHtml.join('<br>');
+    // 전체 페이지들의 모든 내용을 단 하나의 연속된 HTML 스트림으로 결합
+    let fullHtml = pagesData
+      .map(p => (p.isPlaceholder ? '' : p.html))
+      .filter(h => h && h.trim() !== '')
+      .join('<br>');
 
-    // 측정용 임시 엘리먼트
+    if (!fullHtml.trim()) {
+      isReflowing = false;
+      return;
+    }
+
+    // 측정용 실체 DOM
     const testCard = document.createElement('div');
     testCard.className = 'note-page-card';
     testCard.style.position = 'fixed';
@@ -1084,8 +1008,8 @@
 
     const maxHeight = testEditor.clientHeight || 822;
 
-    // 단락별 분할 재배치
-    const rawLines = fullSource.split(/<br\s*[\/]?>/gi);
+    // 단락 및 줄바꿈 토큰 분해 (문단 강제 절단 없이 한 줄/단어 단위 결합)
+    const rawLines = fullHtml.split(/<br\s*[\/]?>/gi);
     let newPages = [];
     let curHtml = '';
     testEditor.innerHTML = '';
@@ -1093,6 +1017,7 @@
     for (let i = 0; i < rawLines.length; i++) {
       const line = rawLines[i];
 
+      // 엔터(빈 줄) 처리
       if (line === '') {
         const candidate = curHtml ? `${curHtml}<br>` : '';
         testEditor.innerHTML = candidate || '<br>';
@@ -1106,22 +1031,23 @@
         continue;
       }
 
+      // 문단을 추가해보고 페이지 높이를 초과하지 않으면 그대로 담음 (여러 문단이 한 페이지에 연속 배치됨)
       const candidate = curHtml ? `${curHtml}<br>${line}` : line;
       testEditor.innerHTML = candidate;
 
       if (testEditor.scrollHeight <= maxHeight) {
         curHtml = candidate;
       } else {
-        // 문단이 길어서 넘칠 때 단어 단위 분할
+        // 문단 중간에서 페이지가 넘어가는 경우 단어 단위로 세밀하게 쪼개어 다음 페이지로 자연스럽게 이음
         const words = line.split(' ');
         let tempParagraph = '';
 
         for (let j = 0; j < words.length; j++) {
           const word = words[j];
           const nextTemp = tempParagraph ? `${tempParagraph} ${word}` : word;
-          const candidateHtml = curHtml ? `${curHtml}<br>${nextTemp}` : nextTemp;
+          const wordCandidate = curHtml ? `${curHtml}<br>${nextTemp}` : nextTemp;
 
-          testEditor.innerHTML = candidateHtml;
+          testEditor.innerHTML = wordCandidate;
 
           if (testEditor.scrollHeight <= maxHeight) {
             tempParagraph = nextTemp;
@@ -1152,19 +1078,20 @@
 
     if (newPages.length === 0) newPages = [''];
 
-    // startIndex 이후의 데이터들을 새로운 페이지 배열로 전면 교체
-    const formattedNewPages = newPages.map(h => ({ html: h, isPlaceholder: false }));
-    pagesData.splice(startIndex, pagesData.length - startIndex, ...formattedNewPages);
+    // 페이지 데이터 전면 갱신
+    pagesData = newPages.map(h => ({ html: h, isPlaceholder: false }));
 
     renderPages();
     pushHistory();
     saveToLocalStorageSilent();
 
-    // 현재 편집 중이던 위치로 포커스 유지
-    const targetEditor = document.querySelectorAll('.page-editor')[startIndex];
-    if (targetEditor) {
-      targetEditor.focus();
+    // 편집 위치 포커스 복원
+    const editors = document.querySelectorAll('.page-editor');
+    if (editors[fromIndex]) {
+      editors[fromIndex].focus();
     }
+
+    isReflowing = false;
   }
 
   /* 현재 활성 페이지 인덱스 */
@@ -1277,34 +1204,7 @@
     pushHistory();
   }
 
-  /* 스마트 붙여넣기 모달 */
-  function openPasteModal() {
-    document.getElementById('paste-modal').style.display = 'flex';
-    const ta = document.getElementById('modal-paste-input');
-    ta.value = '';
-    ta.focus();
-  }
-
-  function closePasteModal() {
-    document.getElementById('paste-modal').style.display = 'none';
-  }
-
-  function confirmModalPaste() {
-    const text = document.getElementById('modal-paste-input').value;
-    closePasteModal();
-    if (!text || !text.trim()) return;
-    
-    const idx = getCurrentPageIndex();
-    const formatted = text.replace(/\n/g, '<br>');
-    if (pagesData[idx].isPlaceholder) {
-      pagesData[idx].html = formatted;
-    } else {
-      pagesData[idx].html = pagesData[idx].html ? `${pagesData[idx].html}<br>${formatted}` : formatted;
-    }
-    cascadeFlowFrom(idx);
-  }
-
-  /* Gemini 번역 */
+  /* Gemini 영문 번역 */
   async function translateSelectedTextWithGemini() {
     let targetRange = null;
     const sel = window.getSelection();
@@ -1339,9 +1239,9 @@
 
     const promptText = `Translate the provided HTML text naturally into dignified, accurate English.
 Rules:
-1. Maintain all existing HTML tags (<font>, <span>, <b>, <i>, <br>) and color styles intact.
+1. Maintain all existing HTML tags intact.
 2. Only translate the human readable text content.
-3. Return ONLY the translated raw HTML without any markdown formatting or code block wrappers (\`\`\`html).
+3. Return ONLY the translated raw HTML without markdown code block wrappers.
 
 HTML to Translate:
 ${originalHtml}`;
@@ -1380,8 +1280,7 @@ ${originalHtml}`;
         while ((node = wrapper.firstChild)) frag.appendChild(node);
         targetRange.insertNode(frag);
 
-        saveAllPagesState();
-        pushHistory();
+        triggerContinuousReflow(getCurrentPageIndex());
         showToast('✨ 영어 번역이 완료되었습니다');
       } else {
         showToast('⚠️ 번역 결과를 받지 못했습니다');
@@ -1533,6 +1432,7 @@ ${originalHtml}`;
   function changeFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     updateFontSize();
+    triggerContinuousReflow(0);
   }
 
   function updateFontSize() {
@@ -1602,7 +1502,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v20', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v21', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1641,7 +1541,7 @@ ${originalHtml}`;
       } catch (err) {}
 
       pagesData = [{ html: raw.replace(/\n/g, '<br>'), isPlaceholder: false }];
-      cascadeFlowFrom(0);
+      triggerContinuousReflow(0);
     };
     reader.readAsText(files[0]);
   }
