@@ -3,47 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Samsung Notes Web</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
-<style>
-  :root {
-    --bg-main: #141414;
-    --panel-bg: #1f1f1f;
-    --border-color: #333333;
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Yslide Note</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 <style>
   :root {
-    --bg-main: #000000;
+    --bg-main: #0a0a0a;
     --panel-bg: #181818;
-    --border-color: #2e2e2e;
+    --border-color: #333333;
+    --page-bg: #141414;
+    --page-border: #444444;
+    --text-color: #ffffff;
     --accent: #38bdf8;
-    --text-primary: #ffffff;
-    --page-width: 860px;
-    --page-height: 1180px;
-    --page-bg: #121212;
+    --page-width: 820px;
+    --page-height: 1160px;
     --ui-font: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  
+
   html, body {
     width: 100%;
     height: 100%;
     position: fixed;
     overflow: hidden;
     background-color: var(--bg-main);
-    color: var(--text-primary);
+    color: var(--text-color);
     font-family: var(--ui-font);
   }
 
-  /* 상단 툴바 */
+  /* 상단 툴바 (깨짐 방지 및 가로 스크롤 대응) */
   #header-toolbar {
     position: fixed;
     top: 0;
@@ -56,17 +44,26 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 16px;
-    z-index: 100;
+    z-index: 1000;
     user-select: none;
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 12px;
+  }
+  #header-toolbar::-webkit-scrollbar { display: none; }
+
+  .tool-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
-  .tool-group { display: flex; align-items: center; gap: 8px; }
-
   button {
-    height: 34px;
+    height: 36px;
     padding: 0 12px;
     background-color: #262626;
-    border: 1px solid #404040;
+    border: 1px solid #484848;
     border-radius: 6px;
     color: #e5e5e5;
     font-size: 13px;
@@ -76,19 +73,26 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
+    flex-shrink: 0;
     transition: all 0.15s ease;
     font-family: var(--ui-font);
   }
   button:hover { background-color: #333333; }
   button:active { transform: scale(0.97); }
 
-  .divider { width: 1px; height: 20px; background-color: var(--border-color); margin: 0 2px; }
+  .divider {
+    width: 1px;
+    height: 22px;
+    background-color: var(--border-color);
+    margin: 0 2px;
+    flex-shrink: 0;
+  }
 
-  /* 연속 모드 버튼 활성화 */
+  /* 연속 버튼 활성화 */
   #btn-continuous.active {
-    background-color: #ea580c;
-    border-color: #f97316;
-    color: #ffffff;
+    background-color: #ea580c !important;
+    border-color: #f97316 !important;
+    color: #ffffff !important;
     box-shadow: 0 0 10px rgba(234, 88, 12, 0.6);
   }
 
@@ -97,8 +101,9 @@
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    border: 2px solid #555;
+    border: 2px solid #555555;
     cursor: pointer;
+    flex-shrink: 0;
     transition: transform 0.15s ease;
   }
   .color-btn.selected {
@@ -112,15 +117,17 @@
   .c-blue { background-color: #38bdf8; }
   .c-green { background-color: #4ade80; }
 
-  /* 글자 크기 조절 */
+  /* 글자 크기 제어 */
   .size-box {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     background-color: #262626;
-    border: 1px solid #404040;
+    border: 1px solid #484848;
     border-radius: 6px;
     padding: 2px 4px;
     gap: 4px;
+    height: 36px;
+    flex-shrink: 0;
   }
   .btn-size-step {
     width: 26px;
@@ -128,8 +135,8 @@
     padding: 0;
     background: transparent;
     border: none;
-    color: #ccc;
-    font-size: 14px;
+    color: #cccccc;
+    font-size: 15px;
   }
   #size-display {
     font-size: 13px;
@@ -139,7 +146,7 @@
     color: #38bdf8;
   }
 
-  /* 메인 뷰포트 */
+  /* 메인 스크롤 뷰포트 */
   #main-viewport {
     position: absolute;
     top: 56px;
@@ -152,98 +159,105 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 30px 0 100px 0;
-    gap: 28px;
+    padding: 32px 16px 120px 16px;
+    gap: 36px;
     -webkit-overflow-scrolling: touch;
   }
   #main-viewport::-webkit-scrollbar { display: none; }
 
-  /* 노트 시트 카드 */
+  /* 명확한 페이지 시트 카드 (경계선 강조) */
   .note-page-card {
-    width: var(--page-width);
+    width: 100%;
+    max-width: var(--page-width);
     min-height: var(--page-height);
     height: var(--page-height);
     background-color: var(--page-bg);
-    border: 1px solid #242424;
-    border-radius: 6px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.9);
+    border: 2px solid var(--page-border); /* 명확한 경계선 */
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.05);
     position: relative;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
     overflow: hidden;
   }
 
   .page-header {
-    height: 38px;
-    border-bottom: 1px dashed #282828;
+    height: 42px;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #333333;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
-    color: #666;
+    color: #888888;
     user-select: none;
+    flex-shrink: 0;
   }
 
   .page-del-btn {
     background: transparent;
     border: none;
-    color: #888;
+    color: #777777;
     font-size: 13px;
     cursor: pointer;
-    padding: 2px 6px;
+    padding: 4px 8px;
     height: auto;
   }
   .page-del-btn:hover { color: #ef4444; }
 
-  /* 페이지 텍스트 에디터 */
+  /* 텍스트 편집 영역 */
   .page-editor {
     flex: 1;
     width: 100%;
-    padding: 32px 40px;
+    height: calc(100% - 42px);
+    padding: 36px 44px;
     color: #ffffff;
-    font-size: 24px;
-    line-height: 1.5;
+    font-size: 26px;
+    line-height: 1.55;
     outline: none;
     white-space: pre-wrap;
     word-break: keep-all;
     overflow-y: auto;
+    cursor: text;
+    pointer-events: auto !important;
   }
   .page-editor::-webkit-scrollbar { display: none; }
 
   body.paint-mode .page-editor {
-    cursor: crosshair;
+    cursor: crosshair !important;
     user-select: none;
     -webkit-user-select: none;
   }
 
-  /* 하단 플로팅 독 */
+  /* 하단 고정 독 */
   #bottom-dock {
     position: fixed;
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(26, 26, 26, 0.9);
-    border: 1px solid #444;
-    padding: 6px 16px;
+    background: rgba(26, 26, 26, 0.92);
+    border: 1px solid #444444;
+    padding: 6px 18px;
     border-radius: 30px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.8);
-    z-index: 100;
+    gap: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+    z-index: 1000;
     backdrop-filter: blur(8px);
   }
   #page-info { font-size: 13px; font-weight: bold; color: #d1d5db; }
 
-  /* 전체화면 슬라이드 뷰포트 (미리보기 & 전체보기) */
+  /* 전체화면 슬라이드 뷰포트 */
   #reader-container {
     display: none;
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: #000000;
-    z-index: 2000;
+    z-index: 5000;
     user-select: none;
     overflow: hidden;
   }
@@ -261,12 +275,12 @@
     max-width: var(--page-width);
     height: 92vh;
     background-color: var(--page-bg);
-    border: 1px solid #333;
+    border: 1px solid #383838;
     border-radius: 8px;
-    padding: 40px 48px;
+    padding: 44px 50px;
     color: #ffffff;
-    font-size: 26px;
-    line-height: 1.55;
+    font-size: 28px;
+    line-height: 1.6;
     white-space: pre-wrap;
     word-break: keep-all;
     overflow-y: auto;
@@ -278,7 +292,7 @@
 
   .touch-zone {
     position: absolute; top: 0; bottom: 0; width: 40%;
-    cursor: pointer; z-index: 2500;
+    cursor: pointer; z-index: 5500;
   }
   #touch-left { left: 0; }
   #touch-right { right: 0; }
@@ -286,17 +300,17 @@
   #exit-reader-btn {
     position: absolute; top: 18px; right: 24px;
     width: 44px; height: 44px; border-radius: 50%;
-    background: rgba(40, 40, 40, 0.85); border: 1px solid #666;
-    color: #fff; font-size: 20px; font-weight: bold;
-    cursor: pointer; z-index: 3000;
+    background: rgba(40, 40, 40, 0.85); border: 1px solid #666666;
+    color: #ffffff; font-size: 20px; font-weight: bold;
+    cursor: pointer; z-index: 6000;
   }
 
   #reader-page-badge {
     position: absolute; top: 22px; left: 24px;
-    background: rgba(30, 30, 30, 0.85); border: 1px solid #444;
+    background: rgba(30, 30, 30, 0.85); border: 1px solid #444444;
     padding: 6px 14px; border-radius: 12px;
     color: #ffb703; font-size: 14px; font-weight: bold;
-    z-index: 3000;
+    z-index: 6000;
   }
 
   /* 토스트 메시지 */
@@ -306,7 +320,7 @@
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     background: rgba(30, 30, 30, 0.95);
-    border: 1px solid #555;
+    border: 1px solid #555555;
     color: #38bdf8;
     padding: 8px 18px;
     border-radius: 20px;
@@ -315,7 +329,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s, transform 0.2s;
-    z-index: 5000;
+    z-index: 7000;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
@@ -325,7 +339,7 @@
 <!-- 상단 툴바 -->
 <div id="header-toolbar">
   <div class="tool-group">
-    <button id="btn-continuous" onclick="toggleContinuousMode()" title="여러 글자를 터치하여 연속으로 색칠">연속</button>
+    <button id="btn-continuous" onclick="toggleContinuousMode()" title="글자를 터치하여 연속으로 색칠">연속</button>
     <div class="divider"></div>
     <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
     <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
@@ -335,7 +349,7 @@
     <div class="divider"></div>
     <div class="size-box">
       <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
-      <span id="size-display">24</span>
+      <span id="size-display">26</span>
       <button class="btn-size-step" onclick="changeFontSize(2)">+</button>
     </div>
   </div>
@@ -343,7 +357,7 @@
   <div class="tool-group">
     <button onclick="saveNoteData()">💾 저장</button>
     <div class="divider"></div>
-    <button onclick="startPreviewCurrentPage()" title="현재 보고 있는 페이지 바로보기">👁️ 미리보기</button>
+    <button onclick="startPreviewCurrentPage()" title="현재 페이지 바로보기">👁️ 미리보기</button>
     <button onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">▶ 전체보기</button>
   </div>
 </div>
@@ -351,9 +365,9 @@
 <!-- 메인 에디터 뷰포트 -->
 <div id="main-viewport"></div>
 
-<!-- 하단 독 -->
+<!-- 하단 고정 독 -->
 <div id="bottom-dock">
-  <span id="page-info">1 / 1</span>
+  <span id="page-info">1 페이지</span>
   <button onclick="addNewPage()">➕ 새 페이지</button>
 </div>
 
@@ -373,7 +387,7 @@
   let isContinuousMode = false;
   let isPainting = false;
   let lastPaintedKey = '';
-  let currentFontSize = 24;
+  let currentFontSize = 26;
   let currentReaderIndex = 0;
   let isReaderOpen = false;
 
@@ -383,23 +397,22 @@
   const readerViewport = document.getElementById('reader-viewport');
 
   function init() {
-    const saved = localStorage.getItem('yslide_note_pages');
+    const saved = localStorage.getItem('yslide_note_v2');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
       } catch (e) {
-        pagesData = [{ html: '첫 번째 페이지 내용을 입력하세요.' }];
+        pagesData = [{ html: '' }];
       }
     } else {
       pagesData = [
-        { html: '<b>Yslide Note</b>에 오신 것을 환영합니다.<br><br>1. 글자를 선택하고 색상을 변경할 수 있습니다.<br>2. <b>[연속]</b> 버튼을 누르면 단어나 글자를 터치/드래그하는 곳마다 즉시 색상이 칠해집니다.<br>3. <b>[미리보기]</b>나 <b>[전체보기]</b>를 눌러 프리젠테이션 모드를 활용해보세요.' }
+        { html: '여기를 클릭하여 원고나 노트를 작성하세요.<br><br>1. 글자를 드래그하여 색상을 변경할 수 있습니다.<br>2. <b>[연속]</b> 버튼을 누르면 단어를 터치하는 곳마다 즉시 지정한 색상으로 변경됩니다.<br>3. <b>[미리보기]</b>나 <b>[전체보기]</b>로 프레젠테이션을 진행할 수 있습니다.' }
       ];
     }
     renderPages();
     updateFontSize();
   }
 
-  /* 페이지 시트 렌더링 */
   function renderPages() {
     viewport.innerHTML = '';
     pagesData.forEach((page, index) => {
@@ -419,7 +432,7 @@
       editor.contentEditable = 'true';
       editor.spellcheck = false;
       editor.style.fontSize = `${currentFontSize}px`;
-      editor.innerHTML = page.html;
+      editor.innerHTML = page.html || '';
 
       editor.addEventListener('input', () => {
         pagesData[index].html = editor.innerHTML;
@@ -436,7 +449,6 @@
     updatePageInfo();
   }
 
-  /* 연속 터치 단어 색칠 기능 */
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
       let range;
@@ -494,7 +506,6 @@
       }
     }
 
-    // 터치 이벤트
     editorEl.addEventListener('touchstart', (e) => {
       if (isContinuousMode) {
         isPainting = true;
@@ -510,7 +521,6 @@
       }
     }, { passive: false });
 
-    // 마우스 이벤트
     editorEl.addEventListener('mousedown', (e) => {
       if (isContinuousMode) {
         isPainting = true;
@@ -536,7 +546,6 @@
     lastPaintedKey = '';
   });
 
-  /* 색상 선택 및 연속 모드 토글 */
   function selectColor(color, el) {
     activeColor = color;
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
@@ -557,7 +566,7 @@
     if (isContinuousMode) {
       btn.classList.add('active');
       document.body.classList.add('paint-mode');
-      showToast('🎨 연속 채색 모드 켜짐 (글자를 터치하세요)');
+      showToast('🎨 연속 채색 모드 (글자를 터치하세요)');
     } else {
       btn.classList.remove('active');
       document.body.classList.remove('paint-mode');
@@ -565,7 +574,6 @@
     }
   }
 
-  /* 글자 크기 변경 */
   function changeFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     updateFontSize();
@@ -578,19 +586,22 @@
     });
   }
 
-  /* 페이지 관리 */
   function addNewPage() {
     saveAllPagesState();
     pagesData.push({ html: '' });
     renderPages();
     const lastCard = document.querySelector('.note-page-card:last-child');
-    if (lastCard) lastCard.scrollIntoView({ behavior: 'smooth' });
+    if (lastCard) {
+      lastCard.scrollIntoView({ behavior: 'smooth' });
+      const ed = lastCard.querySelector('.page-editor');
+      if (ed) ed.focus();
+    }
     showToast('📄 새 페이지가 추가되었습니다');
   }
 
   function deletePage(index) {
     if (pagesData.length <= 1) {
-      showToast('⚠️ 최소 1개 페이지는 유지해야 합니다');
+      showToast('⚠️ 최소 1개 페이지는 유지되어야 합니다');
       return;
     }
     pagesData.splice(index, 1);
@@ -614,24 +625,23 @@
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_v2', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
   function saveNoteData() {
     saveAllPagesState();
-    showToast('💾 노트가 안전하게 저장되었습니다');
+    showToast('💾 저장되었습니다');
   }
 
-  /* 미리보기 및 전체보기 (프레젠테이션) */
   function startPreviewCurrentPage() {
     saveAllPagesState();
     let targetIndex = 0;
     const cards = document.querySelectorAll('.note-page-card');
-    const viewportTop = viewport.scrollTop + 60;
+    const viewportCenter = viewport.scrollTop + (viewport.clientHeight / 2);
 
     cards.forEach((card, idx) => {
-      if (card.offsetTop <= viewportTop) {
+      if (card.offsetTop <= viewportCenter) {
         targetIndex = idx;
       }
     });
@@ -659,7 +669,7 @@
       const sheet = document.createElement('div');
       sheet.className = `slide-sheet ${idx === currentReaderIndex ? 'active' : ''}`;
       sheet.style.fontSize = `${currentFontSize + 2}px`;
-      sheet.innerHTML = page.html;
+      sheet.innerHTML = page.html || '';
       readerViewport.appendChild(sheet);
     });
   }
@@ -718,382 +728,6 @@
   }
 
   init();
-</script>
-</body>
-</html>
-    --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --page-bg: #ffffff;
-    --page-width: 800px;
-    --page-height: 1130px;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Pretendard', sans-serif;
-    background-color: var(--bg-main);
-    color: var(--text-primary);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  /* 상단 메인 툴바 */
-  #header-toolbar {
-    height: 52px;
-    background-color: var(--panel-bg);
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    z-index: 100;
-  }
-
-  .tool-row { display: flex; align-items: center; gap: 6px; }
-
-  button {
-    height: 32px;
-    padding: 0 10px;
-    background-color: #2b2b2b;
-    border: 1px solid #404040;
-    border-radius: 6px;
-    color: #d1d5db;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    user-select: none;
-    transition: background 0.15s;
-  }
-  button:hover { background-color: #383838; color: #fff; }
-  button.active { background-color: var(--accent); border-color: #60a5fa; color: #fff; }
-
-  .divider { width: 1px; height: 18px; background-color: var(--border-color); margin: 0 4px; }
-
-  /* 펜/형광펜 옵션 */
-  .color-circle {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid #555;
-    cursor: pointer;
-  }
-  .color-circle.selected { border-color: #ffffff; transform: scale(1.15); }
-  .c-black { background-color: #111111; }
-  .c-blue { background-color: #2563eb; }
-  .c-red { background-color: #dc2626; }
-  .c-yellow { background-color: #facc15; }
-
-  /* 메인 컨테이너 */
-  #main-viewport {
-    flex: 1;
-    overflow-y: auto;
-    background-color: #0d0d0d;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 24px 0 80px 0;
-    gap: 20px;
-  }
-
-  /* 삼성노트 스타일 A4 페이지 시트 */
-  .note-page-card {
-    width: var(--page-width);
-    height: var(--page-height);
-    background-color: var(--page-bg);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
-    position: relative;
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  /* 줄/모눈 템플릿 레이어 */
-  .page-template {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 1;
-  }
-  .template-ruled {
-    background-image: linear-gradient(#e2e8f0 1px, transparent 1px);
-    background-size: 100% 32px;
-    margin-top: 50px;
-  }
-  .template-grid {
-    background-size: 24px 24px;
-    background-image: 
-      linear-gradient(to right, #f1f5f9 1px, transparent 1px),
-      linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
-  }
-
-  /* 텍스트 편집 레이어 */
-  .text-layer {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    padding: 50px 48px;
-    font-size: 18px;
-    line-height: 32px;
-    color: #1e293b;
-    outline: none;
-    white-space: pre-wrap;
-    word-break: keep-all;
-    z-index: 2;
-  }
-
-  /* S펜 / 손글씨 드로잉 캔버스 */
-  .drawing-canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 3;
-    pointer-events: none;
-  }
-  body.mode-draw .drawing-canvas { pointer-events: auto; cursor: crosshair; }
-  body.mode-text .drawing-canvas { pointer-events: none; }
-
-  /* 하단 플로팅 페이지 컨트롤러 */
-  #page-dock {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(30, 30, 30, 0.9);
-    border: 1px solid #444;
-    padding: 6px 14px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-    z-index: 1000;
-  }
-  #page-counter { font-size: 13px; font-weight: bold; color: #e5e5e5; }
-</style>
-</head>
-<body class="mode-text">
-
-<!-- 상단 툴바 -->
-<div id="header-toolbar">
-  <div class="tool-row">
-    <button id="btn-mode-text" class="active" onclick="setMode('text')">⌨️ 텍스트</button>
-    <button id="btn-mode-pen" onclick="setMode('pen')">🖊️ 펜</button>
-    <button id="btn-mode-highlighter" onclick="setMode('highlighter')">🖍️ 형광펜</button>
-    <button id="btn-mode-eraser" onclick="setMode('eraser')">🧹 지우개</button>
-    <div class="divider"></div>
-    <div class="color-circle c-black selected" onclick="setColor('#111111', this)"></div>
-    <div class="color-circle c-blue" onclick="setColor('#2563eb', this)"></div>
-    <div class="color-circle c-red" onclick="setColor('#dc2626', this)"></div>
-    <div class="color-circle c-yellow" onclick="setColor('#facc15', this)"></div>
-  </div>
-
-  <div class="tool-row">
-    <button onclick="toggleTemplate()">📑 양식 변경</button>
-    <div class="divider"></div>
-    <button onclick="saveNote()">💾 저장</button>
-    <button onclick="printOrExportPDF()">🖨️ PDF/인쇄</button>
-  </div>
-</div>
-
-<!-- 메인 노트 페이지 뷰포트 -->
-<div id="main-viewport"></div>
-
-<!-- 하단 고정 페이지 컨트롤러 -->
-<div id="page-dock">
-  <span id="page-counter">1 / 1</span>
-  <button onclick="addNewPage()">➕ 페이지 추가</button>
-</div>
-
-<script>
-  let currentMode = 'text'; // 'text', 'pen', 'highlighter', 'eraser'
-  let drawColor = '#111111';
-  let penWidth = 3;
-  let currentTemplate = 'ruled'; // 'blank', 'ruled', 'grid'
-  let pagesData = [];
-
-  const viewport = document.getElementById('main-viewport');
-
-  function initApp() {
-    const saved = localStorage.getItem('samsung_notes_data');
-    if (saved) {
-      try {
-        pagesData = JSON.parse(saved);
-      } catch (e) {
-        pagesData = [{ text: '', drawing: null }];
-      }
-    } else {
-      pagesData = [
-        { text: '삼성노트 웹 에디터에 오신 것을 환영합니다.\n\n상단 툴바에서 텍스트 입력과 S펜 스타일 드로잉 모드를 전환할 수 있습니다.', drawing: null }
-      ];
-    }
-    renderAllPages();
-  }
-
-  function renderAllPages() {
-    viewport.innerHTML = '';
-    pagesData.forEach((pageData, index) => {
-      const pageCard = document.createElement('div');
-      pageCard.className = 'note-page-card';
-      pageCard.id = `page-${index}`;
-
-      // 템플릿 레이어
-      const templateLayer = document.createElement('div');
-      templateLayer.className = `page-template template-${currentTemplate}`;
-      pageCard.appendChild(templateLayer);
-
-      // 텍스트 레이어
-      const textLayer = document.createElement('div');
-      textLayer.className = 'text-layer';
-      textLayer.contentEditable = 'true';
-      textLayer.spellcheck = false;
-      textLayer.innerHTML = pageData.text || '';
-      textLayer.oninput = () => {
-        pagesData[index].text = textLayer.innerHTML;
-      };
-      pageCard.appendChild(textLayer);
-
-      // 캔버스 드로잉 레이어
-      const canvas = document.createElement('canvas');
-      canvas.className = 'drawing-canvas';
-      canvas.width = 800;
-      canvas.height = 1130;
-      pageCard.appendChild(canvas);
-
-      setupCanvasEvents(canvas, index);
-
-      // 저장된 드로잉 복원
-      if (pageData.drawing) {
-        const img = new Image();
-        img.onload = () => canvas.getContext('2d').drawImage(img, 0, 0);
-        img.src = pageData.drawing;
-      }
-
-      viewport.appendChild(pageCard);
-    });
-
-    updatePageCount();
-  }
-
-  function setupCanvasEvents(canvas, pageIndex) {
-    const ctx = canvas.getContext('2d');
-    let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
-
-    function startDraw(e) {
-      if (currentMode === 'text') return;
-      isDrawing = true;
-      const rect = canvas.getBoundingClientRect();
-      lastX = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-      lastY = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-    }
-
-    function draw(e) {
-      if (!isDrawing || currentMode === 'text') return;
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-      const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(x, y);
-
-      if (currentMode === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 20;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-      } else if (currentMode === 'highlighter') {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = drawColor === '#111111' ? 'rgba(250, 204, 21, 0.4)' : drawColor + '66';
-        ctx.lineWidth = 18;
-        ctx.lineCap = 'square';
-        ctx.stroke();
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = drawColor;
-        ctx.lineWidth = penWidth;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-      }
-
-      lastX = x;
-      lastY = y;
-    }
-
-    function stopDraw() {
-      if (!isDrawing) return;
-      isDrawing = false;
-      pagesData[pageIndex].drawing = canvas.toDataURL();
-    }
-
-    canvas.addEventListener('mousedown', startDraw);
-    canvas.addEventListener('mousemove', draw);
-    window.addEventListener('mouseup', stopDraw);
-
-    canvas.addEventListener('touchstart', startDraw, { passive: false });
-    canvas.addEventListener('touchmove', draw, { passive: false });
-    window.addEventListener('touchend', stopDraw);
-  }
-
-  function setMode(mode) {
-    currentMode = mode;
-    document.body.className = `mode-${mode === 'text' ? 'text' : 'draw'}`;
-    document.querySelectorAll('#header-toolbar button').forEach(b => b.classList.remove('active'));
-    
-    if (mode === 'text') document.getElementById('btn-mode-text').classList.add('active');
-    if (mode === 'pen') document.getElementById('btn-mode-pen').classList.add('active');
-    if (mode === 'highlighter') document.getElementById('btn-mode-highlighter').classList.add('active');
-    if (mode === 'eraser') document.getElementById('btn-mode-eraser').classList.add('active');
-  }
-
-  function setColor(color, el) {
-    drawColor = color;
-    document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
-    el.classList.add('selected');
-    if (currentMode === 'text' || currentMode === 'eraser') setMode('pen');
-  }
-
-  function toggleTemplate() {
-    const templates = ['blank', 'ruled', 'grid'];
-    let idx = templates.indexOf(currentTemplate);
-    currentTemplate = templates[(idx + 1) % templates.length];
-    
-    document.querySelectorAll('.page-template').forEach(t => {
-      t.className = `page-template template-${currentTemplate}`;
-    });
-  }
-
-  function addNewPage() {
-    pagesData.push({ text: '', drawing: null });
-    renderAllPages();
-    const lastPage = document.querySelector('.note-page-card:last-child');
-    if (lastPage) lastPage.scrollIntoView({ behavior: 'smooth' });
-  }
-
-  function updatePageCount() {
-    document.getElementById('page-counter').innerText = `총 ${pagesData.length} 페이지`;
-  }
-
-  function saveNote() {
-    try {
-      localStorage.setItem('samsung_notes_data', JSON.stringify(pagesData));
-      alert('💾 노트가 성공적으로 저장되었습니다.');
-    } catch (e) {
-      alert('⚠️ 용량 제한으로 인해 브라우저 저장에 실패했습니다.');
-    }
-  }
-
-  function printOrExportPDF() {
-    window.print();
-  }
-
-  initApp();
 </script>
 </body>
 </html>
