@@ -2,505 +2,389 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Web Slide Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Samsung Notes Web</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 <style>
   :root {
-    --bg-dark: #121212;
-    --panel-bg: #1e1e1e;
+    --bg-main: #141414;
+    --panel-bg: #1f1f1f;
     --border-color: #333333;
-    --accent-color: #38bdf8;
-    --text-main: #f3f4f6;
-    --text-muted: #9ca3af;
-    --slide-w: 960px;
-    --slide-h: 540px;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --page-bg: #ffffff;
+    --page-width: 800px;
+    --page-height: 1130px;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Pretendard', sans-serif;
-    background-color: var(--bg-dark);
-    color: var(--text-main);
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    height: 100vh;
     overflow: hidden;
   }
 
-  /* 상단 툴바 */
-  #toolbar {
-    height: 56px;
+  /* 상단 메인 툴바 */
+  #header-toolbar {
+    height: 52px;
     background-color: var(--panel-bg);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 16px;
-    gap: 8px;
-    user-select: none;
     z-index: 100;
   }
-  .tool-group { display: flex; align-items: center; gap: 6px; }
+
+  .tool-row { display: flex; align-items: center; gap: 6px; }
+
   button {
-    height: 34px;
-    padding: 0 12px;
-    background-color: #2c2c2c;
-    border: 1px solid #444;
+    height: 32px;
+    padding: 0 10px;
+    background-color: #2b2b2b;
+    border: 1px solid #404040;
     border-radius: 6px;
-    color: #e5e5e5;
+    color: #d1d5db;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    transition: all 0.15s;
+    gap: 4px;
+    user-select: none;
+    transition: background 0.15s;
   }
-  button:hover { background-color: #3a3a3a; border-color: #666; }
-  button:active { transform: scale(0.97); }
-  .btn-accent { background-color: #0284c7; border-color: #38bdf8; color: #fff; }
-  .btn-accent:hover { background-color: #0369a1; }
-  .divider { width: 1px; height: 20px; background-color: var(--border-color); margin: 0 4px; }
-  
-  /* 색상/폰트 제어 */
-  .color-picker {
-    width: 30px; height: 30px; border-radius: 6px; border: 1px solid #444;
-    cursor: pointer; background: transparent; padding: 0;
-  }
+  button:hover { background-color: #383838; color: #fff; }
+  button.active { background-color: var(--accent); border-color: #60a5fa; color: #fff; }
 
-  /* 메인 작업 영역 */
-  #main-container {
-    display: flex;
+  .divider { width: 1px; height: 18px; background-color: var(--border-color); margin: 0 4px; }
+
+  /* 펜/형광펜 옵션 */
+  .color-circle {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #555;
+    cursor: pointer;
+  }
+  .color-circle.selected { border-color: #ffffff; transform: scale(1.15); }
+  .c-black { background-color: #111111; }
+  .c-blue { background-color: #2563eb; }
+  .c-red { background-color: #dc2626; }
+  .c-yellow { background-color: #facc15; }
+
+  /* 메인 컨테이너 */
+  #main-viewport {
     flex: 1;
-    height: calc(100vh - 56px);
-    overflow: hidden;
-  }
-
-  /* 좌측 슬라이드 썸네일 패널 */
-  #thumbnails-panel {
-    width: 200px;
-    background-color: var(--panel-bg);
-    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
+    background-color: #0d0d0d;
     display: flex;
     flex-direction: column;
-    padding: 12px;
-    gap: 12px;
-    overflow-y: auto;
-    user-select: none;
-  }
-  .thumb-card {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    background-color: #262626;
-    border: 2px solid #444;
-    border-radius: 6px;
-    cursor: pointer;
-    position: relative;
-    display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: bold;
-    color: var(--text-muted);
-    transition: all 0.15s;
+    padding: 24px 0 80px 0;
+    gap: 20px;
   }
-  .thumb-card.active { border-color: var(--accent-color); color: #fff; background-color: #333; }
-  .thumb-num { position: absolute; top: 4px; left: 6px; font-size: 11px; opacity: 0.7; }
-  .thumb-del {
-    position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
-    border: none; background: rgba(0,0,0,0.6); color: #ef4444; border-radius: 4px;
-    cursor: pointer; display: none; font-size: 11px; padding: 0;
-  }
-  .thumb-card:hover .thumb-del { display: flex; }
 
-  /* 중앙 슬라이드 캔버스 영역 */
-  #canvas-area {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #0d0d0d;
+  /* 삼성노트 스타일 A4 페이지 시트 */
+  .note-page-card {
+    width: var(--page-width);
+    height: var(--page-height);
+    background-color: var(--page-bg);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
     position: relative;
-    overflow: hidden;
-  }
-  #slide-frame {
-    width: var(--slide-w);
-    height: var(--slide-h);
-    background-color: #ffffff;
-    color: #111111;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-    position: relative;
-    border-radius: 4px;
+    border-radius: 2px;
     overflow: hidden;
   }
 
-  /* 캔버스 내 텍스트 상자/도형 요소 */
-  .slide-element {
+  /* 줄/모눈 템플릿 레이어 */
+  .page-template {
     position: absolute;
-    min-width: 80px;
-    min-height: 40px;
-    padding: 10px;
-    cursor: move;
-    border: 1px dashed transparent;
-    outline: none;
-    box-sizing: border-box;
-    word-break: keep-all;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 1;
   }
-  .slide-element:hover { border-color: rgba(56, 189, 248, 0.4); }
-  .slide-element:focus, .slide-element.selected {
-    border: 1px solid var(--accent-color);
-    box-shadow: 0 0 0 1px var(--accent-color);
+  .template-ruled {
+    background-image: linear-gradient(#e2e8f0 1px, transparent 1px);
+    background-size: 100% 32px;
+    margin-top: 50px;
+  }
+  .template-grid {
+    background-size: 24px 24px;
+    background-image: 
+      linear-gradient(to right, #f1f5f9 1px, transparent 1px),
+      linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
   }
 
-  /* 전체화면 프레젠테이션 모드 */
-  #presentation-layer {
-    display: none;
+  /* 텍스트 편집 레이어 */
+  .text-layer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    padding: 50px 48px;
+    font-size: 18px;
+    line-height: 32px;
+    color: #1e293b;
+    outline: none;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    z-index: 2;
+  }
+
+  /* S펜 / 손글씨 드로잉 캔버스 */
+  .drawing-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 3;
+    pointer-events: none;
+  }
+  body.mode-draw .drawing-canvas { pointer-events: auto; cursor: crosshair; }
+  body.mode-text .drawing-canvas { pointer-events: none; }
+
+  /* 하단 플로팅 페이지 컨트롤러 */
+  #page-dock {
     position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    background-color: #000000;
-    z-index: 10000;
-    justify-content: center;
-    align-items: center;
-  }
-  #presentation-stage {
-    width: 100%;
-    height: 100%;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #444;
+    padding: 6px 14px;
+    border-radius: 20px;
     display: flex;
-    justify-content: center;
     align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    z-index: 1000;
   }
-  #presentation-content {
-    width: var(--slide-w);
-    height: var(--slide-h);
-    position: relative;
-    background-color: #fff;
-    transform-origin: center center;
-  }
-  #btn-exit-present {
-    position: fixed; top: 16px; right: 16px;
-    width: 40px; height: 40px; border-radius: 50%;
-    background: rgba(40,40,40,0.8); border: 1px solid #666;
-    color: #fff; font-size: 18px; cursor: pointer; z-index: 10001;
-  }
-  #present-nav-left, #present-nav-right {
-    position: absolute; top: 0; bottom: 0; width: 40%;
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
-  #present-nav-left { left: 0; }
-  #present-nav-right { right: 0; }
-  
-  #page-indicator {
-    position: fixed; bottom: 16px; left: 20px;
-    background: rgba(0,0,0,0.7); padding: 4px 12px;
-    border-radius: 12px; font-size: 13px; font-weight: bold; color: #fff;
-  }
+  #page-counter { font-size: 13px; font-weight: bold; color: #e5e5e5; }
 </style>
 </head>
-<body>
+<body class="mode-text">
 
 <!-- 상단 툴바 -->
-<div id="toolbar">
-  <div class="tool-group">
-    <button onclick="addSlide()">➕ 슬라이드 추가</button>
+<div id="header-toolbar">
+  <div class="tool-row">
+    <button id="btn-mode-text" class="active" onclick="setMode('text')">⌨️ 텍스트</button>
+    <button id="btn-mode-pen" onclick="setMode('pen')">🖊️ 펜</button>
+    <button id="btn-mode-highlighter" onclick="setMode('highlighter')">🖍️ 형광펜</button>
+    <button id="btn-mode-eraser" onclick="setMode('eraser')">🧹 지우개</button>
     <div class="divider"></div>
-    <button onclick="addTextBox()">🔤 텍스트 상자</button>
-    <button onclick="addCardBox()">📦 카드 도형</button>
-    <div class="divider"></div>
-    <label title="슬라이드 배경색" style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-muted);">
-      배경 <input type="color" class="color-picker" value="#ffffff" onchange="changeSlideBackground(this.value)">
-    </label>
+    <div class="color-circle c-black selected" onclick="setColor('#111111', this)"></div>
+    <div class="color-circle c-blue" onclick="setColor('#2563eb', this)"></div>
+    <div class="color-circle c-red" onclick="setColor('#dc2626', this)"></div>
+    <div class="color-circle c-yellow" onclick="setColor('#facc15', this)"></div>
   </div>
 
-  <div class="tool-group">
-    <button onclick="saveSlidesToJSON()">💾 저장 (.json)</button>
-    <button onclick="document.getElementById('file-upload').click()">📂 불러오기</button>
-    <input type="file" id="file-upload" accept=".json" style="display:none;" onchange="loadSlidesFromJSON(this.files)">
+  <div class="tool-row">
+    <button onclick="toggleTemplate()">📑 양식 변경</button>
     <div class="divider"></div>
-    <button class="btn-accent" onclick="startPresentation()">▶ 프레젠테이션 (전체화면)</button>
+    <button onclick="saveNote()">💾 저장</button>
+    <button onclick="printOrExportPDF()">🖨️ PDF/인쇄</button>
   </div>
 </div>
 
-<!-- 메인 작업 영역 -->
-<div id="main-container">
-  <!-- 좌측 썸네일 리스트 -->
-  <div id="thumbnails-panel"></div>
+<!-- 메인 노트 페이지 뷰포트 -->
+<div id="main-viewport"></div>
 
-  <!-- 중앙 캔버스 -->
-  <div id="canvas-area">
-    <div id="slide-frame"></div>
-  </div>
-</div>
-
-<!-- 전체화면 프레젠테이션 레이어 -->
-<div id="presentation-layer">
-  <button id="btn-exit-present" onclick="exitPresentation()" title="프레젠테이션 종료 (ESC)">✕</button>
-  <div id="present-nav-left" onclick="prevSlide()"></div>
-  <div id="present-nav-right" onclick="nextSlide()"></div>
-  <div id="presentation-stage">
-    <div id="presentation-content"></div>
-  </div>
-  <div id="page-indicator"><span id="curr-idx">1</span> / <span id="total-idx">1</span></div>
+<!-- 하단 고정 페이지 컨트롤러 -->
+<div id="page-dock">
+  <span id="page-counter">1 / 1</span>
+  <button onclick="addNewPage()">➕ 페이지 추가</button>
 </div>
 
 <script>
-  let slidesData = [
-    {
-      background: "#ffffff",
-      html: `
-        <div class="slide-element" contenteditable="true" style="top: 140px; left: 80px; width: 800px; font-size: 38px; font-weight: bold; color: #111111;">
-          새로운 슬라이드 제목
-        </div>
-        <div class="slide-element" contenteditable="true" style="top: 220px; left: 80px; width: 800px; font-size: 20px; color: #666666;">
-          텍스트를 클릭하여 수정하거나 상단 버튼으로 요소를 추가하세요.
-        </div>
-      `
-    }
-  ];
-  let currentSlideIndex = 0;
-  let isPresenting = false;
+  let currentMode = 'text'; // 'text', 'pen', 'highlighter', 'eraser'
+  let drawColor = '#111111';
+  let penWidth = 3;
+  let currentTemplate = 'ruled'; // 'blank', 'ruled', 'grid'
+  let pagesData = [];
 
-  const slideFrame = document.getElementById('slide-frame');
-  const thumbsPanel = document.getElementById('thumbnails-panel');
+  const viewport = document.getElementById('main-viewport');
 
-  function init() {
-    renderThumbnails();
-    renderCurrentSlide();
-  }
-
-  function renderThumbnails() {
-    thumbsPanel.innerHTML = '';
-    slidesData.forEach((slide, idx) => {
-      const thumb = document.createElement('div');
-      thumb.className = `thumb-card ${idx === currentSlideIndex ? 'active' : ''}`;
-      thumb.innerHTML = `
-        <span class="thumb-num">${idx + 1}</span>
-        ${idx + 1} 슬라이드
-        <button class="thumb-del" onclick="deleteSlide(${idx}, event)">✕</button>
-      `;
-      thumb.onclick = () => selectSlide(idx);
-      thumbsPanel.appendChild(thumb);
-    });
-  }
-
-  function renderCurrentSlide() {
-    saveCurrentSlideState();
-    const data = slidesData[currentSlideIndex];
-    slideFrame.style.backgroundColor = data.background || '#ffffff';
-    slideFrame.innerHTML = data.html;
-    attachElementDragEvents();
-  }
-
-  function saveCurrentSlideState() {
-    if (slidesData[currentSlideIndex]) {
-      slidesData[currentSlideIndex].html = slideFrame.innerHTML;
-    }
-  }
-
-  function selectSlide(idx) {
-    saveCurrentSlideState();
-    currentSlideIndex = idx;
-    renderThumbnails();
-    renderCurrentSlide();
-  }
-
-  function addSlide() {
-    saveCurrentSlideState();
-    slidesData.push({
-      background: "#ffffff",
-      html: `
-        <div class="slide-element" contenteditable="true" style="top: 60px; left: 60px; width: 800px; font-size: 32px; font-weight: bold; color: #111111;">
-          제목을 입력하세요
-        </div>
-      `
-    });
-    currentSlideIndex = slidesData.length - 1;
-    renderThumbnails();
-    renderCurrentSlide();
-  }
-
-  function deleteSlide(idx, e) {
-    e.stopPropagation();
-    if (slidesData.length <= 1) {
-      alert("최소 하나의 슬라이드가 필요합니다.");
-      return;
-    }
-    slidesData.splice(idx, 1);
-    currentSlideIndex = Math.max(0, currentSlideIndex - 1);
-    renderThumbnails();
-    renderCurrentSlide();
-  }
-
-  function addTextBox() {
-    const el = document.createElement('div');
-    el.className = 'slide-element';
-    el.contentEditable = "true";
-    el.style.top = '150px';
-    el.style.left = '100px';
-    el.style.width = '400px';
-    el.style.fontSize = '22px';
-    el.style.color = '#111111';
-    el.innerText = '새 텍스트 내용';
-    slideFrame.appendChild(el);
-    attachElementDragEvents();
-    el.focus();
-  }
-
-  function addCardBox() {
-    const el = document.createElement('div');
-    el.className = 'slide-element';
-    el.contentEditable = "true";
-    el.style.top = '120px';
-    el.style.left = '100px';
-    el.style.width = '320px';
-    el.style.height = '180px';
-    el.style.backgroundColor = '#f1f5f9';
-    el.style.borderRadius = '8px';
-    el.style.fontSize = '16px';
-    el.style.color = '#334155';
-    el.innerHTML = '<b>카드 박스</b><br><br>내용을 구성하세요.';
-    slideFrame.appendChild(el);
-    attachElementDragEvents();
-  }
-
-  function changeSlideBackground(color) {
-    slidesData[currentSlideIndex].background = color;
-    slideFrame.style.backgroundColor = color;
-  }
-
-  /* 마우스 드래그 이동 기능 */
-  function attachElementDragEvents() {
-    const elements = slideFrame.querySelectorAll('.slide-element');
-    elements.forEach(el => {
-      el.onmousedown = function(e) {
-        if (e.target !== el && e.target.isContentEditable && document.activeElement === e.target) return;
-        
-        let startX = e.clientX;
-        let startY = e.clientY;
-        let origLeft = el.offsetLeft;
-        let origTop = el.offsetTop;
-
-        function onMouseMove(moveEvent) {
-          let dx = moveEvent.clientX - startX;
-          let dy = moveEvent.clientY - startY;
-          el.style.left = `${origLeft + dx}px`;
-          el.style.top = `${origTop + dy}px`;
-        }
-
-        function onMouseUp() {
-          document.removeEventListener('mousemove', onMouseMove);
-          document.removeEventListener('mouseup', onMouseUp);
-          saveCurrentSlideState();
-        }
-
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-      };
-    });
-  }
-
-  /* 프레젠테이션 (전체화면) 기능 */
-  function startPresentation() {
-    saveCurrentSlideState();
-    isPresenting = true;
-    const layer = document.getElementById('presentation-layer');
-    layer.style.display = 'flex';
-    updatePresentationView();
-
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
-  }
-
-  function updatePresentationView() {
-    const content = document.getElementById('presentation-content');
-    const cur = slidesData[currentSlideIndex];
-    content.style.backgroundColor = cur.background || '#ffffff';
-    content.innerHTML = cur.html;
-    
-    // 전체화면 비율 맞춤 스케일링
-    const scaleX = window.innerWidth / 960;
-    const scaleY = window.innerHeight / 540;
-    const scale = Math.min(scaleX, scaleY) * 0.95;
-    content.style.transform = `scale(${scale})`;
-
-    document.getElementById('curr-idx').innerText = currentSlideIndex + 1;
-    document.getElementById('total-idx').innerText = slidesData.length;
-  }
-
-  function nextSlide() {
-    if (currentSlideIndex < slidesData.length - 1) {
-      currentSlideIndex++;
-      updatePresentationView();
-    }
-  }
-
-  function prevSlide() {
-    if (currentSlideIndex > 0) {
-      currentSlideIndex--;
-      updatePresentationView();
-    }
-  }
-
-  function exitPresentation() {
-    isPresenting = false;
-    document.getElementById('presentation-layer').style.display = 'none';
-    if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
-    }
-    renderThumbnails();
-    renderCurrentSlide();
-  }
-
-  window.addEventListener('keydown', (e) => {
-    if (isPresenting) {
-      if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) {
-        e.preventDefault();
-        nextSlide();
-      } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) {
-        e.preventDefault();
-        prevSlide();
-      } else if (e.key === 'Escape') {
-        exitPresentation();
-      }
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    if (isPresenting) updatePresentationView();
-  });
-
-  /* JSON 저장 및 불러오기 */
-  function saveSlidesToJSON() {
-    saveCurrentSlideState();
-    const blob = new Blob([JSON.stringify(slidesData, null, 2)], { type: "application/json" });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `slides_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  function loadSlidesFromJSON(files) {
-    if (!files || files.length === 0) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
+  function initApp() {
+    const saved = localStorage.getItem('samsung_notes_data');
+    if (saved) {
       try {
-        const parsed = JSON.parse(e.target.result);
-        if (Array.isArray(parsed)) {
-          slidesData = parsed;
-          currentSlideIndex = 0;
-          renderThumbnails();
-          renderCurrentSlide();
-        }
-      } catch (err) {
-        alert("올바른 슬라이드 데이터 파일이 아닙니다.");
+        pagesData = JSON.parse(saved);
+      } catch (e) {
+        pagesData = [{ text: '', drawing: null }];
       }
-    };
-    reader.readAsText(files[0]);
+    } else {
+      pagesData = [
+        { text: '삼성노트 웹 에디터에 오신 것을 환영합니다.\n\n상단 툴바에서 텍스트 입력과 S펜 스타일 드로잉 모드를 전환할 수 있습니다.', drawing: null }
+      ];
+    }
+    renderAllPages();
   }
 
-  init();
+  function renderAllPages() {
+    viewport.innerHTML = '';
+    pagesData.forEach((pageData, index) => {
+      const pageCard = document.createElement('div');
+      pageCard.className = 'note-page-card';
+      pageCard.id = `page-${index}`;
+
+      // 템플릿 레이어
+      const templateLayer = document.createElement('div');
+      templateLayer.className = `page-template template-${currentTemplate}`;
+      pageCard.appendChild(templateLayer);
+
+      // 텍스트 레이어
+      const textLayer = document.createElement('div');
+      textLayer.className = 'text-layer';
+      textLayer.contentEditable = 'true';
+      textLayer.spellcheck = false;
+      textLayer.innerHTML = pageData.text || '';
+      textLayer.oninput = () => {
+        pagesData[index].text = textLayer.innerHTML;
+      };
+      pageCard.appendChild(textLayer);
+
+      // 캔버스 드로잉 레이어
+      const canvas = document.createElement('canvas');
+      canvas.className = 'drawing-canvas';
+      canvas.width = 800;
+      canvas.height = 1130;
+      pageCard.appendChild(canvas);
+
+      setupCanvasEvents(canvas, index);
+
+      // 저장된 드로잉 복원
+      if (pageData.drawing) {
+        const img = new Image();
+        img.onload = () => canvas.getContext('2d').drawImage(img, 0, 0);
+        img.src = pageData.drawing;
+      }
+
+      viewport.appendChild(pageCard);
+    });
+
+    updatePageCount();
+  }
+
+  function setupCanvasEvents(canvas, pageIndex) {
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function startDraw(e) {
+      if (currentMode === 'text') return;
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      lastX = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+      lastY = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    }
+
+    function draw(e) {
+      if (!isDrawing || currentMode === 'text') return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+      const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+
+      if (currentMode === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = 20;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      } else if (currentMode === 'highlighter') {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = drawColor === '#111111' ? 'rgba(250, 204, 21, 0.4)' : drawColor + '66';
+        ctx.lineWidth = 18;
+        ctx.lineCap = 'square';
+        ctx.stroke();
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = drawColor;
+        ctx.lineWidth = penWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+
+      lastX = x;
+      lastY = y;
+    }
+
+    function stopDraw() {
+      if (!isDrawing) return;
+      isDrawing = false;
+      pagesData[pageIndex].drawing = canvas.toDataURL();
+    }
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stopDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    window.addEventListener('touchend', stopDraw);
+  }
+
+  function setMode(mode) {
+    currentMode = mode;
+    document.body.className = `mode-${mode === 'text' ? 'text' : 'draw'}`;
+    document.querySelectorAll('#header-toolbar button').forEach(b => b.classList.remove('active'));
+    
+    if (mode === 'text') document.getElementById('btn-mode-text').classList.add('active');
+    if (mode === 'pen') document.getElementById('btn-mode-pen').classList.add('active');
+    if (mode === 'highlighter') document.getElementById('btn-mode-highlighter').classList.add('active');
+    if (mode === 'eraser') document.getElementById('btn-mode-eraser').classList.add('active');
+  }
+
+  function setColor(color, el) {
+    drawColor = color;
+    document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    if (currentMode === 'text' || currentMode === 'eraser') setMode('pen');
+  }
+
+  function toggleTemplate() {
+    const templates = ['blank', 'ruled', 'grid'];
+    let idx = templates.indexOf(currentTemplate);
+    currentTemplate = templates[(idx + 1) % templates.length];
+    
+    document.querySelectorAll('.page-template').forEach(t => {
+      t.className = `page-template template-${currentTemplate}`;
+    });
+  }
+
+  function addNewPage() {
+    pagesData.push({ text: '', drawing: null });
+    renderAllPages();
+    const lastPage = document.querySelector('.note-page-card:last-child');
+    if (lastPage) lastPage.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function updatePageCount() {
+    document.getElementById('page-counter').innerText = `총 ${pagesData.length} 페이지`;
+  }
+
+  function saveNote() {
+    try {
+      localStorage.setItem('samsung_notes_data', JSON.stringify(pagesData));
+      alert('💾 노트가 성공적으로 저장되었습니다.');
+    } catch (e) {
+      alert('⚠️ 용량 제한으로 인해 브라우저 저장에 실패했습니다.');
+    }
+  }
+
+  function printOrExportPDF() {
+    window.print();
+  }
+
+  initApp();
 </script>
 </body>
 </html>
