@@ -32,7 +32,6 @@
     --toolbar-height: 96px;
     --page-width: 820px;
     --page-height: 928px;
-    --editor-height: 822px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
     --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
   }
@@ -293,7 +292,7 @@
     cursor: default;
   }
 
-  /* 페이지 제목 입력 칸 (가운데 정렬) */
+  /* 페이지 제목 입력 칸 */
   .page-title-input {
     width: 100%;
     background: transparent;
@@ -787,6 +786,7 @@
   let redoStack = [];
   const MAX_HISTORY = 40;
   let isReflowing = false;
+  let reflowDebounceTimer = null;
 
   const viewport = document.getElementById('main-viewport');
   const readerViewport = document.getElementById('reader-viewport');
@@ -795,7 +795,7 @@
   const iconViewMode = document.getElementById('icon-view-mode');
   const btnBatchMode = document.getElementById('btn-batch-mode');
 
-  // 상주 측정용 컨테이너 (Layout Thrashing 방지)
+  // 상주 측정용 컨테이너
   let permanentMeasureBox = null;
 
   function getMeasureBox() {
@@ -805,6 +805,8 @@
       permanentMeasureBox.style.position = 'fixed';
       permanentMeasureBox.style.top = '0';
       permanentMeasureBox.style.left = '0';
+      permanentMeasureBox.style.width = '820px';
+      permanentMeasureBox.style.padding = '32px 44px';
       permanentMeasureBox.style.visibility = 'hidden';
       permanentMeasureBox.style.zIndex = '-99999';
       permanentMeasureBox.style.pointerEvents = 'none';
@@ -828,10 +830,16 @@
     if (savedMode) viewMode = savedMode;
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v24');
+    // 손상된 대량 페이지 캐시 감지 및 안전 복구
+    const saved = localStorage.getItem('yslide_note_pages_v25');
     if (saved) {
       try {
-        pagesData = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 500) {
+          pagesData = parsed;
+        } else {
+          pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true }];
+        }
       } catch (e) {
         pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true }];
       }
@@ -924,7 +932,7 @@
     if (btnFontCycle) btnFontCycle.innerText = current.name;
   }
 
-  /* ================== 전역 커서 위치 추적기 (Caret Anchor) ================== */
+  /* 전역 커서 위치 추적 */
   function getCaretGlobalOffset(focusedEditor) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !focusedEditor) return null;
@@ -949,7 +957,6 @@
     }
     if (!found) offsetInEditor = focusedEditor.innerText.length;
 
-    // 현재 에디터 이전 페이지들의 텍스트 길이 합산
     const card = focusedEditor.closest('.note-page-card');
     const pageIdx = card ? parseInt(card.dataset.index, 10) : 0;
 
@@ -957,7 +964,7 @@
     const allEditors = document.querySelectorAll('.page-editor');
     for (let i = 0; i < pageIdx; i++) {
       if (allEditors[i]) {
-        priorLength += (allEditors[i].innerText.length + 1); // 페이지 구분자 감안
+        priorLength += (allEditors[i].innerText.length + 1);
       }
     }
 
@@ -1078,7 +1085,7 @@
         }
       });
 
-      // 엔터 및 타이핑 시 즉각적 연속 유기적 리플로우
+      // 실시간 안전 입력 처리
       editor.addEventListener('input', (e) => {
         if (isReflowing) return;
         if (editor.classList.contains('is-placeholder')) {
@@ -1089,12 +1096,17 @@
         pagesData[index].html = editor.innerHTML;
         saveToLocalStorageSilent();
 
-        // 사용자가 엔터를 치거나 글자를 입력할 때 즉시 전체 문서 유기적 재배치
-        const caretPos = getCaretGlobalOffset(editor);
-        continuousUnifiedReflow(caretPos);
+        // 높이가 넘치거나 변경 시 안전 지연 분할
+        if (editor.scrollHeight > (editor.clientHeight + 4)) {
+          if (reflowDebounceTimer) clearTimeout(reflowDebounceTimer);
+          reflowDebounceTimer = setTimeout(() => {
+            const caretPos = getCaretGlobalOffset(editor);
+            safeContinuousReflow(caretPos);
+          }, 120);
+        }
       });
 
-      // 붙여넣기 시 즉시 분할
+      // 안전한 스마트 붙여넣기
       editor.addEventListener('paste', (e) => {
         e.preventDefault();
         let text = '';
@@ -1110,9 +1122,10 @@
         }
 
         if (text) {
-          document.execCommand('insertText', false, text);
+          const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+          document.execCommand('insertHTML', false, formatted);
           const caretPos = getCaretGlobalOffset(editor);
-          continuousUnifiedReflow(caretPos);
+          safeContinuousReflow(caretPos);
         }
       });
 
@@ -1134,14 +1147,13 @@
     updatePageInfo();
   }
 
-  /* ================== HWP/삼성노트 스타일 유기적 연속 스트림 엔진 ================== */
-  function continuousUnifiedReflow(savedCaretOffset = null) {
+  /* ================== 무한루프 방지 고속 이진 스트림 분할 엔진 ================== */
+  function safeContinuousReflow(savedCaretOffset = null) {
     if (isReflowing) return;
     isReflowing = true;
 
     saveAllPagesState();
 
-    // 전체 페이지의 텍스트를 단 하나의 연속된 HTML 스트림으로 결합
     let fullHtml = pagesData
       .map(p => (p.isPlaceholder ? '' : p.html))
       .filter(h => h && h.trim() !== '')
@@ -1153,33 +1165,73 @@
     }
 
     const measureBox = getMeasureBox();
-    const maxHeight = 822; // 에디터 순수 가용 높이
+    const maxHeight = 822;
 
-    // 문단을 강제로 쪼개지 않고 전체 스트림을 토큰(단어 및 개행) 단위로 순차 패킹
-    const tokens = fullHtml.split(/(<br\s*[\/]?>|\s+)/gi).filter(t => t !== undefined && t !== '');
-    
+    // 안전한 줄바꿈 단위 분할
+    const lines = fullHtml.split(/<br\s*[\/]?>/gi);
     let newPagesHtml = [];
     let curHtml = '';
     measureBox.innerHTML = '';
 
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      const candidate = curHtml + token;
+    const MAX_PAGE_LIMIT = 300; // 최대 300페이지 안전 가드
+
+    for (let i = 0; i < lines.length; i++) {
+      if (newPagesHtml.length >= MAX_PAGE_LIMIT) {
+        showToast('⚠️ 최대 페이지 한도에 도달했습니다');
+        break;
+      }
+
+      const line = lines[i];
+
+      // 빈 줄 (엔터)
+      if (line === '') {
+        const candidate = curHtml ? `${curHtml}<br>` : '';
+        measureBox.innerHTML = candidate || '<br>';
+        if (measureBox.scrollHeight > maxHeight && curHtml !== '') {
+          newPagesHtml.push(curHtml);
+          curHtml = '';
+          measureBox.innerHTML = '';
+        } else {
+          curHtml = candidate;
+        }
+        continue;
+      }
+
+      // 1. 문단 전체를 먼저 시도 (여러 문단이 한 페이지에 연속으로 꽉 차게 들어감)
+      const candidate = curHtml ? `${curHtml}<br>${line}` : line;
       measureBox.innerHTML = candidate;
 
-      // 높이가 허용되는 한 여러 문단이든 빈 줄이든 계속 같은 페이지에 채움
       if (measureBox.scrollHeight <= maxHeight) {
         curHtml = candidate;
       } else {
-        // 페이지가 가득 찼을 때만 다음 페이지로 넘김
-        if (curHtml.trim() !== '') {
-          newPagesHtml.push(curHtml);
-          curHtml = token.replace(/^(<br\s*[\/]?>|\s+)/gi, '');
-          measureBox.innerHTML = curHtml;
-        } else {
-          newPagesHtml.push(token);
-          curHtml = '';
-          measureBox.innerHTML = '';
+        // 2. 넘칠 경우 단어 단위로 쪼개어 다음 페이지로 자연스럽게 넘김
+        const words = line.split(' ');
+        let tempLine = '';
+
+        for (let j = 0; j < words.length; j++) {
+          const word = words[j];
+          const nextTemp = tempLine ? `${tempLine} ${word}` : word;
+          const wordCandidate = curHtml ? `${curHtml}<br>${nextTemp}` : nextTemp;
+
+          measureBox.innerHTML = wordCandidate;
+
+          if (measureBox.scrollHeight <= maxHeight) {
+            tempLine = nextTemp;
+          } else {
+            if (curHtml !== '') {
+              newPagesHtml.push(curHtml);
+              curHtml = tempLine ? `${tempLine}` : '';
+              tempLine = word;
+              measureBox.innerHTML = tempLine;
+            } else {
+              if (tempLine) newPagesHtml.push(tempLine);
+              tempLine = word;
+            }
+          }
+        }
+
+        if (tempLine) {
+          curHtml = curHtml ? `${curHtml}<br>${tempLine}` : tempLine;
         }
       }
     }
@@ -1190,7 +1242,7 @@
 
     if (newPagesHtml.length === 0) newPagesHtml = [''];
 
-    // 페이지 개수나 내용이 변경되었는지 검사 (불필요한 DOM 재생성 방지)
+    // 변경 여부 확인 후 신속 반영
     const hasChanged = newPagesHtml.length !== pagesData.length || 
       newPagesHtml.some((html, idx) => pagesData[idx] && pagesData[idx].html !== html);
 
@@ -1204,7 +1256,6 @@
       renderPages();
       saveToLocalStorageSilent();
 
-      // 커서 위치 완벽 복원
       if (savedCaretOffset !== null) {
         restoreCaretGlobalOffset(savedCaretOffset);
       }
@@ -1398,7 +1449,7 @@ ${originalHtml}`;
         while ((node = wrapper.firstChild)) frag.appendChild(node);
         targetRange.insertNode(frag);
 
-        continuousUnifiedReflow();
+        safeContinuousReflow();
         showToast('✨ 영어 번역이 완료되었습니다');
       } else {
         showToast('⚠️ 번역 결과를 받지 못했습니다');
@@ -1550,7 +1601,7 @@ ${originalHtml}`;
   function changeFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     updateFontSize();
-    continuousUnifiedReflow();
+    safeContinuousReflow();
   }
 
   function updateFontSize() {
@@ -1624,7 +1675,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v24', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v25', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1652,7 +1703,7 @@ ${originalHtml}`;
       pushHistory();
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 500) {
           pagesData = parsed;
           renderPages();
           pushHistory();
@@ -1662,8 +1713,8 @@ ${originalHtml}`;
         }
       } catch (err) {}
 
-      pagesData = [{ title: '', html: raw.replace(/\n/g, '<br>'), isPlaceholder: false }];
-      continuousUnifiedReflow();
+      pagesData = [{ title: '', html: raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>'), isPlaceholder: false }];
+      safeContinuousReflow();
     };
     reader.readAsText(files[0]);
   }
