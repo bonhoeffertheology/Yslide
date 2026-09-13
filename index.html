@@ -31,7 +31,7 @@
     font-family: var(--ui-font);
   }
 
-  /* 상단 툴바 (깨짐 방지 및 가로 스크롤 대응) */
+  /* 상단 툴바 */
   #header-toolbar {
     position: fixed;
     top: 0;
@@ -165,14 +165,13 @@
   }
   #main-viewport::-webkit-scrollbar { display: none; }
 
-  /* 명확한 페이지 시트 카드 (경계선 강조) */
+  /* 페이지 시트 카드 */
   .note-page-card {
     width: 100%;
     max-width: var(--page-width);
-    min-height: var(--page-height);
     height: var(--page-height);
     background-color: var(--page-bg);
-    border: 2px solid var(--page-border); /* 명확한 경계선 */
+    border: 2px solid var(--page-border);
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.05);
     position: relative;
@@ -208,7 +207,7 @@
   }
   .page-del-btn:hover { color: #ef4444; }
 
-  /* 텍스트 편집 영역 */
+  /* 텍스트 편집 영역 (페이지 넘침 방지) */
   .page-editor {
     flex: 1;
     width: 100%;
@@ -220,11 +219,9 @@
     outline: none;
     white-space: pre-wrap;
     word-break: keep-all;
-    overflow-y: auto;
+    overflow: hidden;
     cursor: text;
-    pointer-events: auto !important;
   }
-  .page-editor::-webkit-scrollbar { display: none; }
 
   body.paint-mode .page-editor {
     cursor: crosshair !important;
@@ -283,11 +280,10 @@
     line-height: 1.6;
     white-space: pre-wrap;
     word-break: keep-all;
-    overflow-y: auto;
+    overflow: hidden;
     display: none;
     box-sizing: border-box;
   }
-  .slide-sheet::-webkit-scrollbar { display: none; }
   .slide-sheet.active { display: block; }
 
   .touch-zone {
@@ -332,6 +328,21 @@
     z-index: 7000;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 페이지 계산용 숨김 컨테이너 */
+  #measure-container {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
+    top: -99999px;
+    left: -99999px;
+    width: calc(var(--page-width) - 88px);
+    padding: 0;
+    font-size: 26px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: keep-all;
+  }
 </style>
 </head>
 <body>
@@ -380,6 +391,9 @@
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
 </div>
 
+<!-- 분량 측정용 숨김 컨테이너 -->
+<div id="measure-container"></div>
+
 <div id="toast"></div>
 
 <script>
@@ -395,9 +409,10 @@
 
   const viewport = document.getElementById('main-viewport');
   const readerViewport = document.getElementById('reader-viewport');
+  const measureContainer = document.getElementById('measure-container');
 
   function init() {
-    const saved = localStorage.getItem('yslide_note_v2');
+    const saved = localStorage.getItem('yslide_note_pages_v3');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -406,7 +421,7 @@
       }
     } else {
       pagesData = [
-        { html: '여기를 클릭하여 원고나 노트를 작성하세요.<br><br>1. 글자를 드래그하여 색상을 변경할 수 있습니다.<br>2. <b>[연속]</b> 버튼을 누르면 단어를 터치하는 곳마다 즉시 지정한 색상으로 변경됩니다.<br>3. <b>[미리보기]</b>나 <b>[전체보기]</b>로 프레젠테이션을 진행할 수 있습니다.' }
+        { html: '여기를 클릭하여 긴 글을 붙여넣어 보세요.<br><br>페이지 높이를 초과하는 글은 <b>끝날 때까지 자동으로 여러 페이지로 분할 생성</b>됩니다.' }
       ];
     }
     renderPages();
@@ -439,6 +454,11 @@
         saveToLocalStorageSilent();
       });
 
+      // 긴 글 붙여넣기 시 자동 페이지 분할 처리
+      editor.addEventListener('paste', (e) => {
+        handleSmartPaste(e, index);
+      });
+
       attachContinuousEvents(editor, index);
 
       card.appendChild(header);
@@ -449,6 +469,57 @@
     updatePageInfo();
   }
 
+  /* 긴 텍스트 붙여넣기 시 자동 페이지 분할 */
+  function handleSmartPaste(e, startIndex) {
+    e.preventDefault();
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const text = clipboardData.getData('text/plain');
+    if (!text) return;
+
+    // 측정용 컨테이너 설정
+    measureContainer.style.fontSize = `${currentFontSize}px`;
+    measureContainer.style.lineHeight = '1.55';
+    const targetHeight = 1160 - 42 - 72; // 카드 높이 - 헤더 - 상하 패딩
+
+    const paragraphs = text.split('\n');
+    let pagesCreated = [];
+    let currentHtml = '';
+
+    measureContainer.innerHTML = '';
+
+    paragraphs.forEach((p) => {
+      const pText = p.trim();
+      const testHtml = currentHtml ? `${currentHtml}<br>${pText}` : pText;
+      measureContainer.innerHTML = testHtml;
+
+      if (measureContainer.scrollHeight > targetHeight && currentHtml !== '') {
+        pagesCreated.push(currentHtml);
+        currentHtml = pText;
+        measureContainer.innerHTML = pText;
+      } else {
+        currentHtml = testHtml;
+      }
+    });
+
+    if (currentHtml) {
+      pagesCreated.push(currentHtml);
+    }
+
+    if (pagesCreated.length === 0) pagesCreated = [''];
+
+    // 기존 시작 페이지를 첫 번째 분할 본문으로 교체 후 뒤쪽에 나머지 페이지들 연속 삽입
+    pagesData[startIndex].html = pagesCreated[0];
+    if (pagesCreated.length > 1) {
+      const restPages = pagesCreated.slice(1).map(content => ({ html: content }));
+      pagesData.splice(startIndex + 1, 0, ...restPages);
+    }
+
+    renderPages();
+    saveToLocalStorageSilent();
+    showToast(`📄 분량에 맞게 총 ${pagesCreated.length}개 페이지로 자동 분할되었습니다`);
+  }
+
+  /* 연속 터치 단어 채색 */
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
       let range;
@@ -625,15 +696,16 @@
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_v2', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v3', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
   function saveNoteData() {
     saveAllPagesState();
-    showToast('💾 저장되었습니다');
+    showToast('💾 안전하게 저장되었습니다');
   }
 
+  /* 미리보기 및 전체보기 */
   function startPreviewCurrentPage() {
     saveAllPagesState();
     let targetIndex = 0;
