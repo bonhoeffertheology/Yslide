@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 
 <!-- PWA 설정 및 캐시 무효화 -->
-<link rel="manifest" href="manifest.json?v=2026_page_sync_perfect_v73">
+<link rel="manifest" href="manifest.json?v=2026_page_sync_perfect_v74">
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -66,7 +66,7 @@
     justify-content: center;
     padding: 0 16px;
     border-bottom: 1px solid #333;
-    z-index: 1000;
+    z-index: 100;
     gap: 6px;
     pointer-events: auto;
     font-family: var(--ui-font) !important;
@@ -229,7 +229,6 @@
     z-index: 10;
   }
 
-  /* 1. 세로 스크롤 모드 */
   #editor-container.mode-scroll {
     overflow-y: auto;
     overflow-x: hidden;
@@ -238,7 +237,6 @@
   }
   #editor-container.mode-scroll::-webkit-scrollbar { display: none; }
 
-  /* 2. 가로 페이지 넘김 모드 */
   #editor-container.mode-page {
     overflow-x: auto;
     overflow-y: hidden;
@@ -347,7 +345,7 @@
     font-family: var(--ui-font) !important;
   }
 
-  /* 단일 원본 에디터 */
+  /* 단일 원본 에디터: 상하 여백을 없애고 픽셀 기준을 슬라이드 단위와 완벽히 동기화 */
   #main-editor {
     position: relative;
     z-index: 2;
@@ -385,7 +383,7 @@
     right: 6px;
     bottom: 20px;
     width: 28px;
-    z-index: 500;
+    z-index: 50;
     display: flex;
     justify-content: center;
     user-select: none;
@@ -422,7 +420,7 @@
     border-radius: 20px;
     font-size: 15px;
     font-weight: bold;
-    z-index: 550;
+    z-index: 60;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -431,7 +429,7 @@
   }
   #quick-scroll-badge.show { opacity: 1; }
 
-  /* 전체화면 슬라이드 뷰포트 (활성화 시에만 화면 점유) */
+  /* 전체화면 슬라이드 뷰포트 */
   #reader-container {
     display: none;
     height: 100vh;
@@ -440,7 +438,7 @@
     top: 0;
     left: 0;
     background-color: #000000;
-    z-index: 9999;
+    z-index: 500;
     user-select: none;
     overflow: hidden;
   }
@@ -480,7 +478,7 @@
 
   /* 전체화면 터치 네비게이션 */
   .touch-zone {
-    position: absolute; top: 0; bottom: 0; width: 50%; z-index: 10005;
+    position: absolute; top: 0; bottom: 0; width: 50%; z-index: 600;
     cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
   #touch-left { left: 0; }
@@ -492,7 +490,7 @@
     background: rgba(45, 45, 45, 0.75); border: 1px solid #777;
     color: #fff; font-size: 22px; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
-    z-index: 10010; cursor: pointer; padding: 0;
+    z-index: 700; cursor: pointer; padding: 0;
     font-family: var(--ui-font) !important;
   }
   #exit-btn:active { background: rgba(239, 68, 68, 0.9); }
@@ -500,7 +498,7 @@
   #page-info {
     position: absolute; top: 18px; left: 24px; font-size: 15px;
     background: rgba(30, 30, 30, 0.75); padding: 5px 14px; border-radius: 12px;
-    color: #ffb703; font-weight: bold; z-index: 10010; user-select: none; pointer-events: none;
+    color: #ffb703; font-weight: bold; z-index: 700; user-select: none; pointer-events: none;
     border: 1px solid #333;
     font-family: var(--ui-font) !important;
   }
@@ -521,7 +519,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 20000;
+    z-index: 1000;
     font-family: var(--ui-font) !important;
   }
   #toast-msg.show {
@@ -534,7 +532,7 @@
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: rgba(0, 0, 0, 0.85);
-    z-index: 15000;
+    z-index: 800;
     justify-content: center;
     align-items: center;
     font-family: var(--ui-font) !important;
@@ -851,7 +849,6 @@
   ];
   let currentFontIndex = 0;
 
-  // 1번(기본): 86% / 2번: 72%
   const RATIO_STEPS = [0.86, 0.72];
   const TOOLBAR_HEIGHT = 96;
   let heightStepIndex = 0;
@@ -934,7 +931,6 @@
     }
   });
 
-  /* 세로 스크롤 ↔ 가로 페이지 넘김 모드 전환 */
   function toggleEditorViewMode() {
     if (editorViewMode === 'scroll') {
       editorViewMode = 'page';
@@ -968,14 +964,12 @@
     }
   }
 
-  /* 1:1 완벽 일치 총 슬라이드 수 산출 */
   function getAccurateSlideMetrics() {
     const rawHeight = Math.max(0, editor.scrollHeight);
     const count = Math.max(1, Math.ceil(rawHeight / currentSlideHeight) || 1);
     return { count };
   }
 
-  /* 스크롤 눈금선과 1:1 완벽 일치하는 페이지 카드 렌더링 */
   function renderEditorPages(preserveFocusIndex = null) {
     if (!editorPagesWrapper) return;
 
@@ -1840,379 +1834,4 @@ ${content}`;
 
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
-        pushHistory();
-        editor.innerHTML = translatedHtml;
-        pushHistory();
-        saveEditorContent();
-        updateSlideIndicators();
-        updateScrollThumbPosition();
-        showQuickToast(`✨ ${targetLang}(으)로 번역이 완료되었습니다!`);
-      } else {
-        showQuickToast("⚠️ 번역 결과를 받지 못했습니다.");
-      }
-    } catch (err) {
-      alert("네트워크 오류로 번역에 실패했습니다: " + err.message);
-    }
-  }
-
-  function getStoredDocuments() {
-    try {
-      const stored = localStorage.getItem('yslide_saved_archive');
-      return stored ? JSON.parse(stored) : [];
-    } catch(e) {
-      return [];
-    }
-  }
-
-  function saveDocumentToArchive(contentHtml) {
-    try {
-      const archive = getStoredDocuments();
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = contentHtml;
-      const firstLine = (tempDiv.textContent || '').trim().split('\n')[0] || '제목 없는 설교';
-      const title = firstLine.substring(0, 30);
-
-      const now = new Date();
-      const timeStr = `${now.getFullYear()}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-      const newDoc = {
-        id: 'doc_' + Date.now(),
-        title: title,
-        preview: (tempDiv.textContent || '').substring(0, 80),
-        date: timeStr,
-        html: contentHtml
-      };
-
-      archive.unshift(newDoc);
-      if (archive.length > 50) archive.pop();
-      localStorage.setItem('yslide_saved_archive', JSON.stringify(archive));
-    } catch(e){}
-  }
-
-  function openStorageModal() {
-    renderDocumentGrid();
-    document.getElementById('storage-modal').style.display = 'flex';
-  }
-
-  function closeStorageModal() {
-    document.getElementById('storage-modal').style.display = 'none';
-  }
-
-  function renderDocumentGrid() {
-    const grid = document.getElementById('doc-grid');
-    const docs = getStoredDocuments();
-
-    if (docs.length === 0) {
-      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #777; padding: 60px 0;">보관된 문서가 없습니다.<br>상단 💾 버튼을 누르면 이 보관함에 자동 저장됩니다.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    docs.forEach(doc => {
-      const card = document.createElement('div');
-      card.className = 'doc-card';
-      card.innerHTML = `
-        <button class="doc-del-btn" title="삭제" onclick="deleteStoredDoc('${doc.id}', event)">✕</button>
-        <div>
-          <div class="doc-title">${doc.title}</div>
-          <div class="doc-preview">${doc.preview}</div>
-        </div>
-        <div class="doc-footer">
-          <span>${doc.date}</span>
-        </div>
-      `;
-      card.onclick = () => loadDocumentFromArchive(doc.id);
-      grid.appendChild(card);
-    });
-  }
-
-  function loadDocumentFromArchive(docId) {
-    const docs = getStoredDocuments();
-    const target = docs.find(d => d.id === docId);
-    if (!target) return;
-
-    editor.innerHTML = target.html || (Array.isArray(target.data) ? target.data.join('<br>') : '');
-    pushHistory();
-    saveEditorContent();
-    updateSlideIndicators();
-    updateScrollThumbPosition();
-    if (editorViewMode === 'page') renderEditorPages();
-    closeStorageModal();
-    showQuickToast("📂 문서를 불러왔습니다");
-  }
-
-  function deleteStoredDoc(docId, e) {
-    e.stopPropagation();
-    let docs = getStoredDocuments();
-    docs = docs.filter(d => d.id !== docId);
-    try { localStorage.setItem('yslide_saved_archive', JSON.stringify(docs)); } catch(err){}
-    renderDocumentGrid();
-  }
-
-  async function saveToFile() {
-    const content = editor.innerHTML;
-    if (editor.innerText.trim() === '') {
-      showQuickToast("⚠️ 저장할 내용이 없습니다.");
-      return;
-    }
-
-    saveDocumentToArchive(content);
-
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-    const defaultFilename = `Yslide_${dateStr}.txt`;
-
-    if (window.showSaveFilePicker) {
-      try {
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: defaultFilename,
-          types: [{
-            description: '텍스트 파일 (.txt, .json)',
-            accept: { 'text/plain': ['.txt', '.json'] }
-          }]
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        showQuickToast("💾 파일이 저장되었습니다");
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-      }
-    }
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = defaultFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    showQuickToast("💾 파일이 저장되었습니다");
-  }
-
-  function handleFiles(files) {
-    if (!files || files.length === 0) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const raw = e.target.result;
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          editor.innerHTML = parsed.join('<br>');
-          pushHistory();
-          saveEditorContent();
-          updateSlideIndicators();
-          updateScrollThumbPosition();
-          if (editorViewMode === 'page') renderEditorPages();
-          saveDocumentToArchive(editor.innerHTML);
-          showQuickToast("📂 파일을 불러왔습니다");
-          return;
-        }
-      } catch (err) {}
-      editor.innerHTML = raw.replace(/\n/g, '<br>');
-      pushHistory();
-      saveEditorContent();
-      updateSlideIndicators();
-      updateScrollThumbPosition();
-      if (editorViewMode === 'page') renderEditorPages();
-      saveDocumentToArchive(editor.innerHTML);
-      showQuickToast("📂 텍스트를 불러왔습니다");
-    };
-    reader.readAsText(files[0], 'utf-8');
-  }
-
-  function printSermonDocument() {
-    if (editor.innerText.trim() === '') {
-      showQuickToast("⚠️ 인쇄할 내용이 없습니다.");
-      return;
-    }
-
-    updateSlideIndicators();
-    const printContainer = document.getElementById('print-container');
-    printContainer.innerHTML = '';
-
-    const { count } = getAccurateSlideMetrics();
-
-    for (let i = 0; i < count; i++) {
-      const pageDiv = document.createElement('div');
-      pageDiv.className = 'print-slide-page';
-
-      const headerDiv = document.createElement('div');
-      headerDiv.className = 'print-slide-header';
-      headerDiv.innerText = `[ ${i + 1} / ${count} ]`;
-
-      const viewWrap = document.createElement('div');
-      viewWrap.style.height = `${currentSlideHeight}px`;
-      viewWrap.style.overflow = 'hidden';
-      viewWrap.style.position = 'relative';
-
-      const canvasCopy = document.createElement('div');
-      canvasCopy.className = 'print-slide-body';
-      canvasCopy.innerHTML = editor.innerHTML;
-      canvasCopy.style.position = 'absolute';
-      canvasCopy.style.top = `-${currentSlideHeight * i}px`;
-      canvasCopy.style.left = '0';
-      canvasCopy.style.width = '100%';
-      canvasCopy.style.padding = '0 var(--content-padding-x)';
-
-      viewWrap.appendChild(canvasCopy);
-      pageDiv.appendChild(headerDiv);
-      pageDiv.appendChild(viewWrap);
-      printContainer.appendChild(pageDiv);
-    }
-
-    window.print();
-  }
-
-  /* 전체화면 슬라이드 렌더링: 에디터 점선 영역과 1:1 완벽 일치 */
-  function renderReaderSlides() {
-    if (!readerViewport) return;
-    readerViewport.innerHTML = '';
-    
-    const { count } = getAccurateSlideMetrics();
-    totalSlideCount = count;
-
-    for (let i = 0; i < totalSlideCount; i++) {
-      const slide = document.createElement('div');
-      slide.className = `slide-page ${i === currentPageIndex ? 'active' : ''}`;
-      slide.id = `slide-page-${i}`;
-      
-      const innerWrap = document.createElement('div');
-      innerWrap.style.position = 'relative';
-      innerWrap.style.width = '100%';
-      innerWrap.style.maxWidth = 'var(--content-max-width)';
-      innerWrap.style.height = `${currentSlideHeight}px`;
-      innerWrap.style.overflow = 'hidden';
-      innerWrap.style.margin = '0 auto';
-      
-      const content = document.createElement('div');
-      content.style.position = 'absolute';
-      content.style.top = `-${currentSlideHeight * i}px`;
-      content.style.left = '0';
-      content.style.width = '100%';
-      content.style.padding = '0 var(--content-padding-x)';
-      content.style.fontSize = 'var(--font-size)';
-      content.style.lineHeight = 'var(--line-height)';
-      content.style.fontWeight = '500';
-      content.style.wordBreak = 'keep-all';
-      content.style.whiteSpace = 'pre-wrap';
-      content.style.color = '#ffffff';
-      content.innerHTML = editor.innerHTML;
-      
-      innerWrap.appendChild(content);
-      slide.appendChild(innerWrap);
-      readerViewport.appendChild(slide);
-    }
-  }
-
-  function startSermonMode(targetPageIndex = 0) {
-    if (editor.innerText.trim() === '') return;
-
-    currentPageIndex = Math.min(Math.max(0, targetPageIndex), totalSlideCount - 1);
-    renderReaderSlides();
-    updateReaderUI();
-
-    document.getElementById('reader-container').style.display = 'block';
-    isReaderMode = true;
-
-    try {
-      const docEl = document.documentElement;
-      if (docEl.requestFullscreen) docEl.requestFullscreen().catch(()=>{});
-      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-    } catch(e){}
-  }
-
-  function startPreviewCurrentSlide() {
-    let currentSlideIndex = 0;
-    if (editorViewMode === 'page') {
-      const scrollLeft = editorContainer.scrollLeft;
-      const width = window.innerWidth || editorContainer.clientWidth || 1;
-      currentSlideIndex = Math.round(scrollLeft / width);
-    } else {
-      const currentViewY = editorContainer.scrollTop;
-      currentSlideIndex = Math.max(0, Math.floor(currentViewY / currentSlideHeight));
-    }
-    startSermonMode(currentSlideIndex);
-  }
-
-  function exitSermonMode() {
-    document.getElementById('reader-container').style.display = 'none';
-    isReaderMode = false;
-
-    try {
-      if (document.exitFullscreen && document.fullscreenElement) {
-        document.exitFullscreen().catch(()=>{});
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      }
-    } catch(e){}
-  }
-
-  function updateReaderUI() {
-    document.querySelectorAll('.slide-page').forEach((el, idx) => {
-      if (idx === currentPageIndex) el.classList.add('active');
-      else el.classList.remove('active');
-    });
-    document.getElementById('curr-page').innerText = currentPageIndex + 1;
-    document.getElementById('total-page').innerText = totalSlideCount;
-  }
-
-  function nextPage() {
-    if (currentPageIndex < totalSlideCount - 1) {
-      currentPageIndex++;
-      updateReaderUI();
-    }
-  }
-  function prevPage() {
-    if (currentPageIndex > 0) {
-      currentPageIndex--;
-      updateReaderUI();
-    }
-  }
-
-  window.addEventListener('keydown', (e) => {
-    if (!isReaderMode) return;
-    
-    const nextKeys = ['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter', 'Space'];
-    const prevKeys = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
-
-    if (nextKeys.includes(e.key)) {
-      e.preventDefault();
-      nextPage();
-    } else if (prevKeys.includes(e.key)) {
-      e.preventDefault();
-      prevPage();
-    } else if (e.key === 'Escape') {
-      exitSermonMode();
-    }
-  });
-
-  /* 안전한 순차 초기화 */
-  function initApp() {
-    try {
-      const savedSize = localStorage.getItem('yslide_font_size');
-      currentFontSize = savedSize ? parseInt(savedSize, 10) : 30;
-      applyFontSize(currentFontSize);
-
-      const savedStep = localStorage.getItem('yslide_height_step');
-      heightStepIndex = savedStep !== null ? (parseInt(savedStep, 10) % 2) : 0;
-
-      const saved = localStorage.getItem('yslide_final_v63') || localStorage.getItem('yslide_final_v62') || localStorage.getItem('yslide_final_v61') || localStorage.getItem('yslide_final_v60');
-      if (saved) {
-        editor.innerHTML = saved;
-      }
-      pushHistory();
-    } catch(e){}
-
-    applySlideHeightByStep(heightStepIndex, false);
-    updateSlideIndicators();
-    updateScrollThumbPosition();
-  }
-
-  initApp();
-</script>
-</body>
-</html>
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*
