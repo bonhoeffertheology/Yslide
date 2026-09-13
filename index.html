@@ -32,6 +32,7 @@
     --toolbar-height: 96px;
     --page-width: 820px;
     --page-height: 928px;
+    --editor-height: 822px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
     --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
   }
@@ -313,7 +314,7 @@
     color: #38bdf8;
   }
 
-  /* 텍스트 편집 영역 (오버플로우 숨김 & 규격 고정) */
+  /* 텍스트 편집 영역 */
   .page-editor {
     flex: 1;
     width: 100%;
@@ -786,7 +787,6 @@
   let redoStack = [];
   const MAX_HISTORY = 40;
   let isReflowing = false;
-  let reflowTimer = null;
 
   const viewport = document.getElementById('main-viewport');
   const readerViewport = document.getElementById('reader-viewport');
@@ -794,6 +794,28 @@
   const btnViewMode = document.getElementById('btn-view-mode');
   const iconViewMode = document.getElementById('icon-view-mode');
   const btnBatchMode = document.getElementById('btn-batch-mode');
+
+  // 상주 측정용 컨테이너 (Layout Thrashing 방지)
+  let permanentMeasureBox = null;
+
+  function getMeasureBox() {
+    if (!permanentMeasureBox) {
+      permanentMeasureBox = document.createElement('div');
+      permanentMeasureBox.className = 'page-editor';
+      permanentMeasureBox.style.position = 'fixed';
+      permanentMeasureBox.style.top = '0';
+      permanentMeasureBox.style.left = '0';
+      permanentMeasureBox.style.visibility = 'hidden';
+      permanentMeasureBox.style.zIndex = '-99999';
+      permanentMeasureBox.style.pointerEvents = 'none';
+      document.body.appendChild(permanentMeasureBox);
+    }
+    permanentMeasureBox.style.fontSize = `${currentFontSize}px`;
+    permanentMeasureBox.style.fontFamily = FONT_LIST[currentFontIndex].family;
+    permanentMeasureBox.style.letterSpacing = `${globalLetterSpacing}px`;
+    permanentMeasureBox.style.lineHeight = `${globalLineHeight}`;
+    return permanentMeasureBox;
+  }
 
   function init() {
     const savedFont = localStorage.getItem('yslide_note_font_idx');
@@ -806,7 +828,7 @@
     if (savedMode) viewMode = savedMode;
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v23');
+    const saved = localStorage.getItem('yslide_note_pages_v24');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -902,6 +924,105 @@
     if (btnFontCycle) btnFontCycle.innerText = current.name;
   }
 
+  /* ================== 전역 커서 위치 추적기 (Caret Anchor) ================== */
+  function getCaretGlobalOffset(focusedEditor) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !focusedEditor) return null;
+    const range = sel.getRangeAt(0);
+
+    let offsetInEditor = 0;
+    const treeWalker = document.createTreeWalker(focusedEditor, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, null, false);
+    let curr;
+    let found = false;
+
+    while ((curr = treeWalker.nextNode())) {
+      if (curr === range.startContainer) {
+        offsetInEditor += range.startOffset;
+        found = true;
+        break;
+      }
+      if (curr.nodeType === Node.TEXT_NODE) {
+        offsetInEditor += curr.textContent.length;
+      } else if (curr.nodeName === 'BR') {
+        offsetInEditor += 1;
+      }
+    }
+    if (!found) offsetInEditor = focusedEditor.innerText.length;
+
+    // 현재 에디터 이전 페이지들의 텍스트 길이 합산
+    const card = focusedEditor.closest('.note-page-card');
+    const pageIdx = card ? parseInt(card.dataset.index, 10) : 0;
+
+    let priorLength = 0;
+    const allEditors = document.querySelectorAll('.page-editor');
+    for (let i = 0; i < pageIdx; i++) {
+      if (allEditors[i]) {
+        priorLength += (allEditors[i].innerText.length + 1); // 페이지 구분자 감안
+      }
+    }
+
+    return priorLength + offsetInEditor;
+  }
+
+  function restoreCaretGlobalOffset(targetGlobalOffset) {
+    if (targetGlobalOffset === null) return;
+    const allEditors = document.querySelectorAll('.page-editor');
+    let accumulated = 0;
+    let targetEditor = null;
+    let localOffset = 0;
+
+    for (let i = 0; i < allEditors.length; i++) {
+      const ed = allEditors[i];
+      const len = ed.innerText.length;
+      if (accumulated + len >= targetGlobalOffset || i === allEditors.length - 1) {
+        targetEditor = ed;
+        localOffset = Math.max(0, targetGlobalOffset - accumulated);
+        break;
+      }
+      accumulated += (len + 1);
+    }
+
+    if (!targetEditor) return;
+    targetEditor.focus();
+
+    const sel = window.getSelection();
+    const range = document.createRange();
+    let currentCount = 0;
+    let set = false;
+
+    const treeWalker = document.createTreeWalker(targetEditor, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, null, false);
+    let curr;
+
+    while ((curr = treeWalker.nextNode())) {
+      if (curr.nodeType === Node.TEXT_NODE) {
+        const textLen = curr.textContent.length;
+        if (currentCount + textLen >= localOffset) {
+          range.setStart(curr, Math.min(localOffset - currentCount, textLen));
+          range.collapse(true);
+          set = true;
+          break;
+        }
+        currentCount += textLen;
+      } else if (curr.nodeName === 'BR') {
+        if (currentCount + 1 >= localOffset) {
+          range.setStartAfter(curr);
+          range.collapse(true);
+          set = true;
+          break;
+        }
+        currentCount += 1;
+      }
+    }
+
+    if (!set) {
+      range.selectNodeContents(targetEditor);
+      range.collapse(false);
+    }
+
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
   /* 렌더링 */
   function renderPages() {
     viewport.innerHTML = '';
@@ -910,7 +1031,6 @@
       card.className = 'note-page-card';
       card.dataset.index = index;
 
-      // 상단 헤더: 좌측 [PAGE], 중앙 별도 제목 입력 칸 (가운데 정렬)
       const header = document.createElement('div');
       header.className = 'page-header';
       
@@ -934,7 +1054,6 @@
       header.appendChild(titleInput);
       header.appendChild(emptyRight);
 
-      // 본문 에디터
       const editor = document.createElement('div');
       editor.className = 'page-editor';
       editor.contentEditable = 'true';
@@ -959,8 +1078,8 @@
         }
       });
 
-      // 삼성노트/한글 스타일 연속 유기적 리플로우
-      editor.addEventListener('input', () => {
+      // 엔터 및 타이핑 시 즉각적 연속 유기적 리플로우
+      editor.addEventListener('input', (e) => {
         if (isReflowing) return;
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
@@ -970,15 +1089,12 @@
         pagesData[index].html = editor.innerHTML;
         saveToLocalStorageSilent();
 
-        if (editor.scrollHeight > (editor.clientHeight + 4)) {
-          if (reflowTimer) clearTimeout(reflowTimer);
-          reflowTimer = setTimeout(() => {
-            triggerContinuousReflow(index);
-          }, 80);
-        }
+        // 사용자가 엔터를 치거나 글자를 입력할 때 즉시 전체 문서 유기적 재배치
+        const caretPos = getCaretGlobalOffset(editor);
+        continuousUnifiedReflow(caretPos);
       });
 
-      // 붙여넣기 시 문단 강제 절단 없이 연속 분할
+      // 붙여넣기 시 즉시 분할
       editor.addEventListener('paste', (e) => {
         e.preventDefault();
         let text = '';
@@ -995,7 +1111,8 @@
 
         if (text) {
           document.execCommand('insertText', false, text);
-          triggerContinuousReflow(index);
+          const caretPos = getCaretGlobalOffset(editor);
+          continuousUnifiedReflow(caretPos);
         }
       });
 
@@ -1017,14 +1134,14 @@
     updatePageInfo();
   }
 
-  /* 문단 강제 분리 없는 100% 연속 스트리밍 페이지네이션 엔진 */
-  function triggerContinuousReflow(fromIndex = 0) {
+  /* ================== HWP/삼성노트 스타일 유기적 연속 스트림 엔진 ================== */
+  function continuousUnifiedReflow(savedCaretOffset = null) {
     if (isReflowing) return;
     isReflowing = true;
 
     saveAllPagesState();
 
-    // 전체 페이지들의 모든 내용을 하나의 연속된 텍스트 스트림으로 결합
+    // 전체 페이지의 텍스트를 단 하나의 연속된 HTML 스트림으로 결합
     let fullHtml = pagesData
       .map(p => (p.isPlaceholder ? '' : p.html))
       .filter(h => h && h.trim() !== '')
@@ -1035,51 +1152,34 @@
       return;
     }
 
-    // 측정용 DOM
-    const testCard = document.createElement('div');
-    testCard.className = 'note-page-card';
-    testCard.style.position = 'fixed';
-    testCard.style.top = '0';
-    testCard.style.left = '0';
-    testCard.style.visibility = 'hidden';
-    testCard.style.zIndex = '-99999';
+    const measureBox = getMeasureBox();
+    const maxHeight = 822; // 에디터 순수 가용 높이
 
-    const testEditor = document.createElement('div');
-    testEditor.className = 'page-editor';
-    testEditor.style.fontSize = `${currentFontSize}px`;
-    testEditor.style.fontFamily = FONT_LIST[currentFontIndex].family;
-    testCard.appendChild(testEditor);
-    document.body.appendChild(testCard);
-
-    // 내부 실제 높이 (822px)
-    const maxHeight = testEditor.clientHeight || 822;
-
-    // 문단을 강제로 나누지 않고 개행(<br>) 및 공백 단위로 토큰화
+    // 문단을 강제로 쪼개지 않고 전체 스트림을 토큰(단어 및 개행) 단위로 순차 패킹
     const tokens = fullHtml.split(/(<br\s*[\/]?>|\s+)/gi).filter(t => t !== undefined && t !== '');
     
     let newPagesHtml = [];
     let curHtml = '';
-    testEditor.innerHTML = '';
+    measureBox.innerHTML = '';
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
       const candidate = curHtml + token;
-      testEditor.innerHTML = candidate;
+      measureBox.innerHTML = candidate;
 
-      // 높이를 초과하지 않으면 계속 같은 페이지에 문단들을 연이어 채움
-      if (testEditor.scrollHeight <= maxHeight) {
+      // 높이가 허용되는 한 여러 문단이든 빈 줄이든 계속 같은 페이지에 채움
+      if (measureBox.scrollHeight <= maxHeight) {
         curHtml = candidate;
       } else {
-        // 높이를 초과하면 현재까지 채운 것을 한 페이지로 완성하고, 넘친 토큰부터 새 페이지 시작
+        // 페이지가 가득 찼을 때만 다음 페이지로 넘김
         if (curHtml.trim() !== '') {
           newPagesHtml.push(curHtml);
-          curHtml = token.replace(/^(<br\s*[\/]?>|\s+)/gi, ''); // 새 페이지 첫머리의 불필요한 공백/개행 제거
-          testEditor.innerHTML = curHtml;
+          curHtml = token.replace(/^(<br\s*[\/]?>|\s+)/gi, '');
+          measureBox.innerHTML = curHtml;
         } else {
-          // 단일 토큰 자체가 한 페이지를 넘는 경우
           newPagesHtml.push(token);
           curHtml = '';
-          testEditor.innerHTML = '';
+          measureBox.innerHTML = '';
         }
       }
     }
@@ -1088,24 +1188,26 @@
       newPagesHtml.push(curHtml);
     }
 
-    document.body.removeChild(testCard);
-
     if (newPagesHtml.length === 0) newPagesHtml = [''];
 
-    // 기존 페이지 제목 보존
-    pagesData = newPagesHtml.map((h, idx) => ({
-      title: (pagesData[idx] && pagesData[idx].title) ? pagesData[idx].title : '',
-      html: h,
-      isPlaceholder: false
-    }));
+    // 페이지 개수나 내용이 변경되었는지 검사 (불필요한 DOM 재생성 방지)
+    const hasChanged = newPagesHtml.length !== pagesData.length || 
+      newPagesHtml.some((html, idx) => pagesData[idx] && pagesData[idx].html !== html);
 
-    renderPages();
-    pushHistory();
-    saveToLocalStorageSilent();
+    if (hasChanged) {
+      pagesData = newPagesHtml.map((h, idx) => ({
+        title: (pagesData[idx] && pagesData[idx].title) ? pagesData[idx].title : '',
+        html: h,
+        isPlaceholder: false
+      }));
 
-    const editors = document.querySelectorAll('.page-editor');
-    if (editors[fromIndex]) {
-      editors[fromIndex].focus();
+      renderPages();
+      saveToLocalStorageSilent();
+
+      // 커서 위치 완벽 복원
+      if (savedCaretOffset !== null) {
+        restoreCaretGlobalOffset(savedCaretOffset);
+      }
     }
 
     isReflowing = false;
@@ -1296,7 +1398,7 @@ ${originalHtml}`;
         while ((node = wrapper.firstChild)) frag.appendChild(node);
         targetRange.insertNode(frag);
 
-        triggerContinuousReflow(getCurrentPageIndex());
+        continuousUnifiedReflow();
         showToast('✨ 영어 번역이 완료되었습니다');
       } else {
         showToast('⚠️ 번역 결과를 받지 못했습니다');
@@ -1448,7 +1550,7 @@ ${originalHtml}`;
   function changeFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     updateFontSize();
-    triggerContinuousReflow(0);
+    continuousUnifiedReflow();
   }
 
   function updateFontSize() {
@@ -1522,7 +1624,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v23', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v24', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1561,7 +1663,7 @@ ${originalHtml}`;
       } catch (err) {}
 
       pagesData = [{ title: '', html: raw.replace(/\n/g, '<br>'), isPlaceholder: false }];
-      triggerContinuousReflow(0);
+      continuousUnifiedReflow();
     };
     reader.readAsText(files[0]);
   }
