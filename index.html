@@ -15,7 +15,7 @@
     --text-color: #ffffff;
     --accent: #38bdf8;
     --page-width: 820px;
-    --page-height: 1160px;
+    --page-height: 928px; /* 기존 1160px의 80%로 축소 */
     --ui-font: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
@@ -165,7 +165,7 @@
   }
   #main-viewport::-webkit-scrollbar { display: none; }
 
-  /* 페이지 시트 카드 */
+  /* 페이지 시트 카드 (80% 높이 반영) */
   .note-page-card {
     width: 100%;
     max-width: var(--page-width);
@@ -207,12 +207,12 @@
   }
   .page-del-btn:hover { color: #ef4444; }
 
-  /* 텍스트 편집 영역 (페이지 넘침 방지) */
+  /* 텍스트 편집 영역 */
   .page-editor {
     flex: 1;
     width: 100%;
     height: calc(100% - 42px);
-    padding: 36px 44px;
+    padding: 32px 44px;
     color: #ffffff;
     font-size: 26px;
     line-height: 1.55;
@@ -270,14 +270,14 @@
   .slide-sheet {
     width: 100%;
     max-width: var(--page-width);
-    height: 92vh;
+    height: var(--page-height);
     background-color: var(--page-bg);
     border: 1px solid #383838;
     border-radius: 8px;
-    padding: 44px 50px;
+    padding: 32px 44px;
     color: #ffffff;
-    font-size: 28px;
-    line-height: 1.6;
+    font-size: 26px;
+    line-height: 1.55;
     white-space: pre-wrap;
     word-break: keep-all;
     overflow: hidden;
@@ -286,9 +286,15 @@
   }
   .slide-sheet.active { display: block; }
 
+  /* 화면 좌우 50% 분할 터치 네비게이션 */
   .touch-zone {
-    position: absolute; top: 0; bottom: 0; width: 40%;
-    cursor: pointer; z-index: 5500;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    cursor: pointer;
+    z-index: 5500;
+    -webkit-tap-highlight-color: transparent;
   }
   #touch-left { left: 0; }
   #touch-right { right: 0; }
@@ -329,7 +335,7 @@
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  /* 페이지 계산용 숨김 컨테이너 */
+  /* 페이지 분할 측정용 컨테이너 */
   #measure-container {
     position: absolute;
     visibility: hidden;
@@ -385,7 +391,9 @@
 <!-- 전체화면 모드 레이어 -->
 <div id="reader-container">
   <button id="exit-reader-btn" onclick="exitReaderMode()" title="닫기 (ESC)">✕</button>
+  <!-- 좌측 50% 터치: 이전 페이지 -->
   <div class="touch-zone" id="touch-left" onclick="prevSlide()"></div>
+  <!-- 우측 50% 터치: 다음 페이지 -->
   <div class="touch-zone" id="touch-right" onclick="nextSlide()"></div>
   <div id="reader-viewport"></div>
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
@@ -412,7 +420,7 @@
   const measureContainer = document.getElementById('measure-container');
 
   function init() {
-    const saved = localStorage.getItem('yslide_note_pages_v3');
+    const saved = localStorage.getItem('yslide_note_pages_v4');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -421,7 +429,7 @@
       }
     } else {
       pagesData = [
-        { html: '여기를 클릭하여 긴 글을 붙여넣어 보세요.<br><br>페이지 높이를 초과하는 글은 <b>끝날 때까지 자동으로 여러 페이지로 분할 생성</b>됩니다.' }
+        { html: '여기를 클릭하여 글을 작성하거나 붙여넣으세요.<br><br>1. 에디터 페이지의 길이가 <b>80% 비율(928px)</b>로 컴팩트하게 조정되었습니다.<br>2. <b>전체화면 모드</b>에서 <b>화면의 왼쪽 반</b>을 누르면 이전 페이지로, <b>오른쪽 반</b>을 누르면 다음 페이지로 이동합니다.' }
       ];
     }
     renderPages();
@@ -454,7 +462,7 @@
         saveToLocalStorageSilent();
       });
 
-      // 긴 글 붙여넣기 시 자동 페이지 분할 처리
+      // 긴 글 붙여넣기 시 80% 높이에 맞게 자동 분할
       editor.addEventListener('paste', (e) => {
         handleSmartPaste(e, index);
       });
@@ -469,17 +477,16 @@
     updatePageInfo();
   }
 
-  /* 긴 텍스트 붙여넣기 시 자동 페이지 분할 */
+  /* 80% 높이에 맞춘 스마트 텍스트 분할 */
   function handleSmartPaste(e, startIndex) {
     e.preventDefault();
     const clipboardData = e.clipboardData || window.clipboardData;
     const text = clipboardData.getData('text/plain');
     if (!text) return;
 
-    // 측정용 컨테이너 설정
     measureContainer.style.fontSize = `${currentFontSize}px`;
     measureContainer.style.lineHeight = '1.55';
-    const targetHeight = 1160 - 42 - 72; // 카드 높이 - 헤더 - 상하 패딩
+    const targetHeight = 928 - 42 - 64; // 80% 높이(928px) - 헤더 - 상하 패딩
 
     const paragraphs = text.split('\n');
     let pagesCreated = [];
@@ -507,7 +514,6 @@
 
     if (pagesCreated.length === 0) pagesCreated = [''];
 
-    // 기존 시작 페이지를 첫 번째 분할 본문으로 교체 후 뒤쪽에 나머지 페이지들 연속 삽입
     pagesData[startIndex].html = pagesCreated[0];
     if (pagesCreated.length > 1) {
       const restPages = pagesCreated.slice(1).map(content => ({ html: content }));
@@ -516,7 +522,7 @@
 
     renderPages();
     saveToLocalStorageSilent();
-    showToast(`📄 분량에 맞게 총 ${pagesCreated.length}개 페이지로 자동 분할되었습니다`);
+    showToast(`📄 총 ${pagesCreated.length}개 페이지로 분할되었습니다`);
   }
 
   /* 연속 터치 단어 채색 */
@@ -696,7 +702,7 @@
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v3', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v4', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -740,7 +746,7 @@
     pagesData.forEach((page, idx) => {
       const sheet = document.createElement('div');
       sheet.className = `slide-sheet ${idx === currentReaderIndex ? 'active' : ''}`;
-      sheet.style.fontSize = `${currentFontSize + 2}px`;
+      sheet.style.fontSize = `${currentFontSize}px`;
       sheet.innerHTML = page.html || '';
       readerViewport.appendChild(sheet);
     });
