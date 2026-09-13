@@ -137,7 +137,8 @@
     flex-shrink: 0;
   }
 
-  #btn-continuous.active {
+  /* 활성화 버튼 스타일 (오렌지 강조) */
+  #btn-continuous.active, #btn-batch-mode.active {
     background-color: #ea580c !important;
     border-color: #f97316 !important;
     color: #ffffff !important;
@@ -523,7 +524,7 @@
 
 <!-- 상단 2단 툴바 -->
 <div id="header-toolbar">
-  <!-- 1단: 자간, 줄간격, 글꼴, 스크롤/페이지 모드 전환, 앱 설치 버튼 -->
+  <!-- 1단: 자간, 줄간격, 글꼴, 볼드, 이탤릭, 일괄적용, 스크롤/페이지 모드, 앱 설치 -->
   <div class="toolbar-row toolbar-row-top">
     <div class="tool-group">
       <!-- 자간 좁게 -->
@@ -570,6 +571,32 @@
 
       <!-- 글꼴 순환 선택 (기본 / KoPub 돋움 / KoPub 바탕) -->
       <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">기본</button>
+
+      <!-- 굵게(Bold) 버튼 -->
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBold()" title="볼드체 (굵게)">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+          <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+        </svg>
+      </button>
+
+      <!-- 기울임(Italic) 버튼 -->
+      <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleItalic()" title="이탤릭체 (기울임)">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <line x1="19" y1="4" x2="10" y2="4"></line>
+          <line x1="14" y1="20" x2="5" y2="20"></line>
+          <line x1="15" y1="4" x2="9" y2="20"></line>
+        </svg>
+      </button>
+
+      <!-- 일괄 적용 버튼 (Layers 아이콘) -->
+      <button id="btn-batch-mode" class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBatchMode()" title="모든 페이지 일괄 적용 모드 토글">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </button>
 
       <div class="divider"></div>
 
@@ -647,7 +674,7 @@
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
       </button>
 
@@ -759,7 +786,6 @@
   const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
   document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
 
-  // 서비스 워커 인라인 등록
   if ('serviceWorker' in navigator) {
     const swCode = `
       self.addEventListener('install', e => self.skipWaiting());
@@ -770,7 +796,6 @@
     navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
   }
 
-  // PWA 설치 프롬프트 캐치
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -803,12 +828,19 @@
 
   let activeColor = '#ef4444';
   let isContinuousMode = false;
+  let isBatchMode = false; // 일괄 적용 모드
   let isPainting = false;
   let lastPaintedKey = '';
   let currentFontSize = 26;
   let currentReaderIndex = 0;
   let isReaderOpen = false;
   let savedSelectionRange = null;
+
+  // 전체 기본 스타일 상태
+  let globalLetterSpacing = 0;
+  let globalLineHeight = 1.55;
+  let globalIsBold = false;
+  let globalIsItalic = false;
 
   let viewMode = 'scroll'; // 'scroll' 또는 'page'
 
@@ -824,6 +856,7 @@
   const btnFontCycle = document.getElementById('btn-font-cycle');
   const btnViewMode = document.getElementById('btn-view-mode');
   const iconViewMode = document.getElementById('icon-view-mode');
+  const btnBatchMode = document.getElementById('btn-batch-mode');
 
   function init() {
     const savedFont = localStorage.getItem('yslide_note_font_idx');
@@ -838,7 +871,7 @@
     }
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v18');
+    const saved = localStorage.getItem('yslide_note_pages_v19');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -852,6 +885,17 @@
     pushHistory();
     renderPages();
     updateFontSize();
+  }
+
+  function toggleBatchMode() {
+    isBatchMode = !isBatchMode;
+    if (isBatchMode) {
+      btnBatchMode.classList.add('active');
+      showToast('🌐 일괄 적용 모드 ON (모든 페이지에 동시 적용)');
+    } else {
+      btnBatchMode.classList.remove('active');
+      showToast('📄 단일 적용 모드 ON (현재/선택 페이지만 적용)');
+    }
   }
 
   function toggleViewMode() {
@@ -962,7 +1006,6 @@
         }
       });
 
-      // 텍스트 입력 및 태블릿 기본 붙여넣기 넘침 감지
       editor.addEventListener('input', () => {
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
@@ -984,7 +1027,6 @@
         }, 500);
       });
 
-      // 붙여넣기 가로채기
       editor.addEventListener('paste', (e) => {
         let text = '';
         if (e.clipboardData || window.clipboardData) {
@@ -1030,7 +1072,171 @@
     }
   });
 
-  /* 실제 DOM 렌더링 기반 100% 신뢰성 자동 분할 엔진 */
+  /* 현재 활성화/포커스된 페이지 인덱스 찾기 */
+  function getCurrentPageIndex() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      let node = sel.anchorNode;
+      while (node && node !== document.body) {
+        if (node.classList && node.classList.contains('note-page-card')) {
+          return parseInt(node.dataset.index, 10) || 0;
+        }
+        node = node.parentNode;
+      }
+    }
+    return 0;
+  }
+
+  /* 볼드체(굵게) 토글 */
+  function toggleBold() {
+    pushHistory();
+    if (isBatchMode) {
+      globalIsBold = !globalIsBold;
+      document.querySelectorAll('.page-editor').forEach(ed => {
+        ed.style.fontWeight = globalIsBold ? 'bold' : 'normal';
+      });
+      showToast(globalIsBold ? '전체 볼드체 적용' : '전체 볼드체 해제');
+    } else {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) {
+        document.execCommand('bold', false, null);
+      } else {
+        const idx = getCurrentPageIndex();
+        const editor = document.querySelectorAll('.page-editor')[idx];
+        if (editor) {
+          const cur = editor.style.fontWeight === 'bold';
+          editor.style.fontWeight = cur ? 'normal' : 'bold';
+          showToast(cur ? '해당 페이지 볼드 해제' : '해당 페이지 볼드 적용');
+        }
+      }
+    }
+    saveAllPagesState();
+    pushHistory();
+  }
+
+  /* 이탤릭체(기울임) 토글 */
+  function toggleItalic() {
+    pushHistory();
+    if (isBatchMode) {
+      globalIsItalic = !globalIsItalic;
+      document.querySelectorAll('.page-editor').forEach(ed => {
+        ed.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
+      });
+      showToast(globalIsItalic ? '전체 이탤릭체 적용' : '전체 이탤릭체 해제');
+    } else {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) {
+        document.execCommand('italic', false, null);
+      } else {
+        const idx = getCurrentPageIndex();
+        const editor = document.querySelectorAll('.page-editor')[idx];
+        if (editor) {
+          const cur = editor.style.fontStyle === 'italic';
+          editor.style.fontStyle = cur ? 'normal' : 'italic';
+          showToast(cur ? '해당 페이지 이탤릭 해제' : '해당 페이지 이탤릭 적용');
+        }
+      }
+    }
+    saveAllPagesState();
+    pushHistory();
+  }
+
+  /* 자간 조절 */
+  function adjustLetterSpacing(delta) {
+    pushHistory();
+    if (isBatchMode) {
+      globalLetterSpacing = parseFloat((globalLetterSpacing + delta).toFixed(1));
+      document.querySelectorAll('.page-editor').forEach(ed => {
+        ed.style.letterSpacing = `${globalLetterSpacing}px`;
+      });
+      showToast(`전체 자간: ${globalLetterSpacing}px`);
+    } else {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        let targetSpan = null;
+        let node = range.commonAncestorContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+        if (node && node.tagName === 'SPAN' && node.style.letterSpacing) {
+          targetSpan = node;
+          let cur = parseFloat(targetSpan.style.letterSpacing) || 0;
+          targetSpan.style.letterSpacing = `${(cur + delta).toFixed(1)}px`;
+        } else {
+          targetSpan = document.createElement('span');
+          targetSpan.style.letterSpacing = `${delta.toFixed(1)}px`;
+          const frag = range.extractContents();
+          targetSpan.appendChild(frag);
+          range.insertNode(targetSpan);
+        }
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetSpan);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        const idx = getCurrentPageIndex();
+        const editor = document.querySelectorAll('.page-editor')[idx];
+        if (editor) {
+          let cur = parseFloat(editor.style.letterSpacing) || 0;
+          let next = parseFloat((cur + delta).toFixed(1));
+          editor.style.letterSpacing = `${next}px`;
+          showToast(`페이지 ${idx + 1} 자간: ${next}px`);
+        }
+      }
+    }
+    saveAllPagesState();
+    pushHistory();
+  }
+
+  /* 줄간격 조절 */
+  function adjustLineHeight(delta) {
+    pushHistory();
+    if (isBatchMode) {
+      globalLineHeight = parseFloat(Math.max(0.8, globalLineHeight + delta).toFixed(2));
+      document.querySelectorAll('.page-editor').forEach(ed => {
+        ed.style.lineHeight = `${globalLineHeight}`;
+      });
+      showToast(`전체 줄간격: ${globalLineHeight}`);
+    } else {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        let targetSpan = null;
+        let node = range.commonAncestorContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+        if (node && node.tagName === 'SPAN' && node.style.lineHeight) {
+          targetSpan = node;
+          let cur = parseFloat(targetSpan.style.lineHeight) || 1.55;
+          targetSpan.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
+        } else {
+          targetSpan = document.createElement('span');
+          targetSpan.style.display = 'inline-block';
+          targetSpan.style.lineHeight = `${Math.max(0.8, 1.55 + delta).toFixed(2)}`;
+          const frag = range.extractContents();
+          targetSpan.appendChild(frag);
+          range.insertNode(targetSpan);
+        }
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetSpan);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        const idx = getCurrentPageIndex();
+        const editor = document.querySelectorAll('.page-editor')[idx];
+        if (editor) {
+          let cur = parseFloat(editor.style.lineHeight) || 1.55;
+          let next = parseFloat(Math.max(0.8, cur + delta).toFixed(2));
+          editor.style.lineHeight = `${next}`;
+          showToast(`페이지 ${idx + 1} 줄간격: ${next}`);
+        }
+      }
+    }
+    saveAllPagesState();
+    pushHistory();
+  }
+
+  /* 실제 DOM 렌더링 기반 자동 분할 엔진 */
   function reflowTextIntoPages(rawText, targetIndex = 0) {
     if (!rawText || !rawText.trim()) return;
 
@@ -1247,72 +1453,6 @@ ${originalHtml}`;
     }
   }
 
-  function adjustLetterSpacing(delta) {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      showToast('⚠️ 텍스트를 먼저 드래그하여 선택하세요');
-      return;
-    }
-    pushHistory();
-    const range = sel.getRangeAt(0);
-    let targetSpan = null;
-    let node = range.commonAncestorContainer;
-    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-
-    if (node && node.tagName === 'SPAN' && node.style.letterSpacing) {
-      targetSpan = node;
-      let cur = parseFloat(targetSpan.style.letterSpacing) || 0;
-      targetSpan.style.letterSpacing = `${(cur + delta).toFixed(1)}px`;
-    } else {
-      targetSpan = document.createElement('span');
-      targetSpan.style.letterSpacing = `${delta.toFixed(1)}px`;
-      const frag = range.extractContents();
-      targetSpan.appendChild(frag);
-      range.insertNode(targetSpan);
-    }
-
-    const newRange = document.createRange();
-    newRange.selectNodeContents(targetSpan);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    saveAllPagesState();
-    pushHistory();
-  }
-
-  function adjustLineHeight(delta) {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      showToast('⚠️ 텍스트를 먼저 드래그하여 선택하세요');
-      return;
-    }
-    pushHistory();
-    const range = sel.getRangeAt(0);
-    let targetSpan = null;
-    let node = range.commonAncestorContainer;
-    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-
-    if (node && node.tagName === 'SPAN' && node.style.lineHeight) {
-      targetSpan = node;
-      let cur = parseFloat(targetSpan.style.lineHeight) || 1.55;
-      targetSpan.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
-    } else {
-      targetSpan = document.createElement('span');
-      targetSpan.style.display = 'inline-block';
-      let cur = 1.55;
-      targetSpan.style.lineHeight = `${Math.max(0.8, cur + delta).toFixed(2)}`;
-      const frag = range.extractContents();
-      targetSpan.appendChild(frag);
-      range.insertNode(targetSpan);
-    }
-
-    const newRange = document.createRange();
-    newRange.selectNodeContents(targetSpan);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    saveAllPagesState();
-    pushHistory();
-  }
-
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
       if (editorEl.classList.contains('is-placeholder')) return;
@@ -1523,7 +1663,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v18', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v19', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
