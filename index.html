@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Yslide Note</title>
+
+<!-- KoPubWorld 및 웹폰트 CDN 로드 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.0/kopubworld.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+
 <style>
   :root {
     --bg-main: #0a0a0a;
@@ -15,8 +19,9 @@
     --text-color: #ffffff;
     --accent: #38bdf8;
     --page-width: 820px;
-    --page-height: 928px; /* 기존 1160px의 80%로 축소 */
-    --ui-font: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+    --page-height: 928px;
+    --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
+    --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -80,6 +85,22 @@
   button:hover { background-color: #333333; }
   button:active { transform: scale(0.97); }
 
+  /* 아이콘 전용 버튼 */
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+  }
+  .icon-svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   .divider {
     width: 1px;
     height: 22px;
@@ -116,6 +137,18 @@
   .c-yellow { background-color: #ffb703; }
   .c-blue { background-color: #38bdf8; }
   .c-green { background-color: #4ade80; }
+
+  /* 글꼴 순환 버튼 */
+  .btn-font {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #d1d5db;
+    background-color: #262626;
+    border: 1px solid #484848;
+    border-radius: 6px;
+  }
 
   /* 글자 크기 제어 */
   .size-box {
@@ -165,7 +198,7 @@
   }
   #main-viewport::-webkit-scrollbar { display: none; }
 
-  /* 페이지 시트 카드 (80% 높이 반영) */
+  /* 페이지 시트 카드 */
   .note-page-card {
     width: 100%;
     max-width: var(--page-width);
@@ -221,6 +254,12 @@
     word-break: keep-all;
     overflow: hidden;
     cursor: text;
+    font-family: var(--active-font);
+  }
+
+  /* 안내문 상태 스타일 */
+  .page-editor.is-placeholder {
+    color: #666666 !important;
   }
 
   body.paint-mode .page-editor {
@@ -283,10 +322,11 @@
     overflow: hidden;
     display: none;
     box-sizing: border-box;
+    font-family: var(--active-font);
   }
   .slide-sheet.active { display: block; }
 
-  /* 화면 좌우 50% 분할 터치 네비게이션 */
+  /* 좌우 50% 분할 터치 */
   .touch-zone {
     position: absolute;
     top: 0;
@@ -348,6 +388,7 @@
     line-height: 1.55;
     white-space: pre-wrap;
     word-break: keep-all;
+    font-family: var(--active-font);
   }
 </style>
 </head>
@@ -364,6 +405,7 @@
     <div class="color-btn c-blue" onmousedown="event.preventDefault()" onclick="selectColor('#38bdf8', this)" title="밝은 파랑"></div>
     <div class="color-btn c-green" onmousedown="event.preventDefault()" onclick="selectColor('#4ade80', this)" title="밝은 초록"></div>
     <div class="divider"></div>
+    <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">기본글꼴</button>
     <div class="size-box">
       <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
       <span id="size-display">26</span>
@@ -372,10 +414,31 @@
   </div>
 
   <div class="tool-group">
-    <button onclick="saveNoteData()">💾 저장</button>
+    <!-- 저장 아이콘 버튼 -->
+    <button class="btn-icon" onclick="saveNoteData()" title="저장">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+    </button>
+    
     <div class="divider"></div>
-    <button onclick="startPreviewCurrentPage()" title="현재 페이지 바로보기">👁️ 미리보기</button>
-    <button onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">▶ 전체보기</button>
+
+    <!-- 미리보기 아이콘 버튼 -->
+    <button class="btn-icon" onclick="startPreviewCurrentPage()" title="현재 페이지 미리보기">
+      <svg class="icon-svg" viewBox="0 0 24 24">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </button>
+
+    <!-- 전체보기 아이콘 버튼 -->
+    <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">
+      <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      </svg>
+    </button>
   </div>
 </div>
 
@@ -391,9 +454,7 @@
 <!-- 전체화면 모드 레이어 -->
 <div id="reader-container">
   <button id="exit-reader-btn" onclick="exitReaderMode()" title="닫기 (ESC)">✕</button>
-  <!-- 좌측 50% 터치: 이전 페이지 -->
   <div class="touch-zone" id="touch-left" onclick="prevSlide()"></div>
-  <!-- 우측 50% 터치: 다음 페이지 -->
   <div class="touch-zone" id="touch-right" onclick="nextSlide()"></div>
   <div id="reader-viewport"></div>
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
@@ -405,6 +466,15 @@
 <div id="toast"></div>
 
 <script>
+  const PLACEHOLDER_TEXT = "여기를 클릭하여 글을 작성하거나 긴 글을 붙여넣으세요.";
+
+  const FONT_LIST = [
+    { name: "삼성 기본", family: "-apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', sans-serif" },
+    { name: "KoPub 돋움", family: "'KoPubWorld Dotum', sans-serif" },
+    { name: "KoPub 바탕", family: "'KoPubWorld Batang', serif" }
+  ];
+  let currentFontIndex = 0;
+
   let activeColor = '#ef4444';
   let isContinuousMode = false;
   let isPainting = false;
@@ -418,22 +488,40 @@
   const viewport = document.getElementById('main-viewport');
   const readerViewport = document.getElementById('reader-viewport');
   const measureContainer = document.getElementById('measure-container');
+  const btnFontCycle = document.getElementById('btn-font-cycle');
 
   function init() {
-    const saved = localStorage.getItem('yslide_note_pages_v4');
+    const savedFont = localStorage.getItem('yslide_note_font_idx');
+    if (savedFont !== null) {
+      currentFontIndex = parseInt(savedFont, 10) % FONT_LIST.length;
+    }
+    applyCurrentFont();
+
+    const saved = localStorage.getItem('yslide_note_pages_v5');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
       } catch (e) {
-        pagesData = [{ html: '' }];
+        pagesData = [{ html: PLACEHOLDER_TEXT, isPlaceholder: true }];
       }
     } else {
-      pagesData = [
-        { html: '여기를 클릭하여 글을 작성하거나 붙여넣으세요.<br><br>1. 에디터 페이지의 길이가 <b>80% 비율(928px)</b>로 컴팩트하게 조정되었습니다.<br>2. <b>전체화면 모드</b>에서 <b>화면의 왼쪽 반</b>을 누르면 이전 페이지로, <b>오른쪽 반</b>을 누르면 다음 페이지로 이동합니다.' }
-      ];
+      pagesData = [{ html: PLACEHOLDER_TEXT, isPlaceholder: true }];
     }
     renderPages();
     updateFontSize();
+  }
+
+  function cycleFontFamily() {
+    currentFontIndex = (currentFontIndex + 1) % FONT_LIST.length;
+    localStorage.setItem('yslide_note_font_idx', currentFontIndex);
+    applyCurrentFont();
+    showToast(`글꼴: ${FONT_LIST[currentFontIndex].name}`);
+  }
+
+  function applyCurrentFont() {
+    const current = FONT_LIST[currentFontIndex];
+    document.documentElement.style.setProperty('--active-font', current.family);
+    if (btnFontCycle) btnFontCycle.innerText = current.name;
   }
 
   function renderPages() {
@@ -455,15 +543,40 @@
       editor.contentEditable = 'true';
       editor.spellcheck = false;
       editor.style.fontSize = `${currentFontSize}px`;
-      editor.innerHTML = page.html || '';
+      
+      if (page.isPlaceholder || (!page.html && page.html !== '')) {
+        editor.classList.add('is-placeholder');
+        editor.innerHTML = PLACEHOLDER_TEXT;
+      } else {
+        editor.innerHTML = page.html || '';
+      }
+
+      // 터치/클릭 시 안내문 자동 삭제
+      editor.addEventListener('focus', () => {
+        if (editor.classList.contains('is-placeholder') || editor.innerHTML.trim() === PLACEHOLDER_TEXT) {
+          editor.innerHTML = '';
+          editor.classList.remove('is-placeholder');
+          pagesData[index].isPlaceholder = false;
+          pagesData[index].html = '';
+          saveToLocalStorageSilent();
+        }
+      });
 
       editor.addEventListener('input', () => {
+        if (editor.classList.contains('is-placeholder')) {
+          editor.classList.remove('is-placeholder');
+          pagesData[index].isPlaceholder = false;
+        }
         pagesData[index].html = editor.innerHTML;
         saveToLocalStorageSilent();
       });
 
       // 긴 글 붙여넣기 시 80% 높이에 맞게 자동 분할
       editor.addEventListener('paste', (e) => {
+        if (editor.classList.contains('is-placeholder')) {
+          editor.classList.remove('is-placeholder');
+          pagesData[index].isPlaceholder = false;
+        }
         handleSmartPaste(e, index);
       });
 
@@ -477,7 +590,7 @@
     updatePageInfo();
   }
 
-  /* 80% 높이에 맞춘 스마트 텍스트 분할 */
+  /* 80% 높이에 맞춘 텍스트 분할 */
   function handleSmartPaste(e, startIndex) {
     e.preventDefault();
     const clipboardData = e.clipboardData || window.clipboardData;
@@ -486,7 +599,7 @@
 
     measureContainer.style.fontSize = `${currentFontSize}px`;
     measureContainer.style.lineHeight = '1.55';
-    const targetHeight = 928 - 42 - 64; // 80% 높이(928px) - 헤더 - 상하 패딩
+    const targetHeight = 928 - 42 - 64;
 
     const paragraphs = text.split('\n');
     let pagesCreated = [];
@@ -515,8 +628,10 @@
     if (pagesCreated.length === 0) pagesCreated = [''];
 
     pagesData[startIndex].html = pagesCreated[0];
+    pagesData[startIndex].isPlaceholder = false;
+
     if (pagesCreated.length > 1) {
-      const restPages = pagesCreated.slice(1).map(content => ({ html: content }));
+      const restPages = pagesCreated.slice(1).map(content => ({ html: content, isPlaceholder: false }));
       pagesData.splice(startIndex + 1, 0, ...restPages);
     }
 
@@ -528,6 +643,8 @@
   /* 연속 터치 단어 채색 */
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
+      if (editorEl.classList.contains('is-placeholder')) return;
+
       let range;
       if (document.caretRangeFromPoint) {
         range = document.caretRangeFromPoint(clientX, clientY);
@@ -578,6 +695,7 @@
           sel.removeAllRanges();
 
           pagesData[pageIdx].html = editorEl.innerHTML;
+          pagesData[pageIdx].isPlaceholder = false;
           saveToLocalStorageSilent();
         }
       }
@@ -665,7 +783,7 @@
 
   function addNewPage() {
     saveAllPagesState();
-    pagesData.push({ html: '' });
+    pagesData.push({ html: '', isPlaceholder: false });
     renderPages();
     const lastCard = document.querySelector('.note-page-card:last-child');
     if (lastCard) {
@@ -694,7 +812,10 @@
     document.querySelectorAll('.note-page-card').forEach((card, idx) => {
       const editor = card.querySelector('.page-editor');
       if (editor && pagesData[idx]) {
-        pagesData[idx].html = editor.innerHTML;
+        if (!editor.classList.contains('is-placeholder')) {
+          pagesData[idx].html = editor.innerHTML;
+          pagesData[idx].isPlaceholder = false;
+        }
       }
     });
     saveToLocalStorageSilent();
@@ -702,7 +823,7 @@
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v4', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v5', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -747,7 +868,7 @@
       const sheet = document.createElement('div');
       sheet.className = `slide-sheet ${idx === currentReaderIndex ? 'active' : ''}`;
       sheet.style.fontSize = `${currentFontSize}px`;
-      sheet.innerHTML = page.html || '';
+      sheet.innerHTML = page.isPlaceholder ? '' : (page.html || '');
       readerViewport.appendChild(sheet);
     });
   }
