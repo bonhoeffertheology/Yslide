@@ -230,7 +230,6 @@
   }
   #main-viewport.view-page::-webkit-scrollbar { display: none; }
 
-  /* 페이지 모드 시 슬라이드 카드 래퍼 */
   #main-viewport.view-page .page-wrapper {
     flex: 0 0 100vw;
     width: 100vw;
@@ -541,7 +540,6 @@
       <!-- 스크롤 / 페이지 모드 전환 아이콘 버튼 -->
       <button id="btn-view-mode" class="btn-icon" onclick="toggleViewMode()" title="세로 스크롤 / 가로 페이지 모드 전환">
         <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24">
-          <!-- 기본: 스크롤 아이콘 -->
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
         </svg>
@@ -744,11 +742,9 @@
     viewport.className = viewMode === 'scroll' ? 'view-scroll' : 'view-page';
     if (iconViewMode) {
       if (viewMode === 'scroll') {
-        // 스크롤 모드 아이콘 (책/스크롤 형태)
         iconViewMode.innerHTML = '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>';
         btnViewMode.title = "현재: 세로 스크롤 모드 (클릭 시 가로 페이지 모드)";
       } else {
-        // 페이지 모드 아이콘 (단일 페이지 분할 형태)
         iconViewMode.innerHTML = '<rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line>';
         btnViewMode.title = "현재: 가로 페이지 넘김 모드 (클릭 시 세로 스크롤 모드)";
       }
@@ -856,6 +852,7 @@
         }, 500);
       });
 
+      // 태블릿/데스크탑 통합 붙여넣기 이벤트
       editor.addEventListener('paste', (e) => {
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
@@ -893,13 +890,21 @@
     }
   });
 
-  /* 80% 시트 기준 정밀 단어/문자 단위 자동 분할 알고리즘 */
+  /* 태블릿 및 화면 폭 실시간 연동 정밀 텍스트 분할 알고리즘 */
   function paginateText(rawText) {
+    const sampleEditor = document.querySelector('.page-editor');
+    const computedStyle = sampleEditor ? window.getComputedStyle(sampleEditor) : null;
+    const currentWidth = sampleEditor ? sampleEditor.clientWidth : 820;
+
+    measureContainer.style.width = `${currentWidth}px`;
+    if (computedStyle) {
+      measureContainer.style.padding = computedStyle.padding;
+    }
     measureContainer.style.fontSize = `${currentFontSize}px`;
     measureContainer.style.lineHeight = '1.55';
     measureContainer.style.fontFamily = FONT_LIST[currentFontIndex].family;
     
-    // 에디터 내부 가용 높이 (928px - 42px - 64px = 822px)
+    // 에디터 내부 가용 높이 (카드 높이 928px - 헤더 42px - 상하패딩 64px = 822px)
     const maxAllowedHeight = 822;
 
     const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -970,11 +975,47 @@
     return pages.length > 0 ? pages : [''];
   }
 
-  function handleSmartPaste(e, startIndex) {
+  /* 모바일/태블릿 클립보드 호환 붙여넣기 핸들러 */
+  async function handleSmartPaste(e, startIndex) {
+    let text = '';
+
+    if (e.clipboardData || window.clipboardData) {
+      const cd = e.clipboardData || window.clipboardData;
+      text = cd.getData('text/plain');
+    }
+
+    // 모바일/태블릿에서 getData가 비어있을 경우 Navigator API 대체 시도
+    if (!text && navigator.clipboard && navigator.clipboard.readText) {
+      try {
+        text = await navigator.clipboard.readText();
+      } catch (err) {}
+    }
+
+    // 클립보드 데이터에 직접 접근 불가 시(브라우저가 기본 붙여넣기를 강행했을 때) DOM 기반 지연 분할
+    if (!text) {
+      setTimeout(() => {
+        const editors = document.querySelectorAll('.page-editor');
+        const targetEditor = editors[startIndex];
+        if (targetEditor && targetEditor.scrollHeight > 822) {
+          const domText = targetEditor.innerText;
+          const pagesCreated = paginateText(domText);
+          pagesData[startIndex].html = pagesCreated[0];
+          pagesData[startIndex].isPlaceholder = false;
+
+          if (pagesCreated.length > 1) {
+            const restPages = pagesCreated.slice(1).map(content => ({ html: content, isPlaceholder: false }));
+            pagesData.splice(startIndex + 1, 0, ...restPages);
+          }
+          renderPages();
+          pushHistory();
+          saveToLocalStorageSilent();
+          showToast(`📄 총 ${pagesCreated.length}개 페이지로 분할되었습니다`);
+        }
+      }, 10);
+      return;
+    }
+
     e.preventDefault();
-    const clipboardData = e.clipboardData || window.clipboardData;
-    const text = clipboardData ? clipboardData.getData('text/plain') : '';
-    if (!text) return;
 
     const pagesCreated = paginateText(text);
 
