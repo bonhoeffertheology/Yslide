@@ -11,7 +11,716 @@
     --panel-bg: #1f1f1f;
     --border-color: #333333;
     --accent: #2563eb;
-    --accent-hover: #1d4ed8;
+    --accent-hover: #1d4ed8;<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Yslide Note</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+  :root {
+    --bg-main: #000000;
+    --panel-bg: #181818;
+    --border-color: #2e2e2e;
+    --accent: #38bdf8;
+    --text-primary: #ffffff;
+    --page-width: 860px;
+    --page-height: 1180px;
+    --page-bg: #121212;
+    --ui-font: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html, body {
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    overflow: hidden;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--ui-font);
+  }
+
+  /* 상단 툴바 */
+  #header-toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 56px;
+    background-color: var(--panel-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+    user-select: none;
+  }
+
+  .tool-group { display: flex; align-items: center; gap: 8px; }
+
+  button {
+    height: 34px;
+    padding: 0 12px;
+    background-color: #262626;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    color: #e5e5e5;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    font-family: var(--ui-font);
+  }
+  button:hover { background-color: #333333; }
+  button:active { transform: scale(0.97); }
+
+  .divider { width: 1px; height: 20px; background-color: var(--border-color); margin: 0 2px; }
+
+  /* 연속 모드 버튼 활성화 */
+  #btn-continuous.active {
+    background-color: #ea580c;
+    border-color: #f97316;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(234, 88, 12, 0.6);
+  }
+
+  /* 색상 팔레트 */
+  .color-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #555;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .color-btn.selected {
+    border-color: #ffffff;
+    transform: scale(1.2);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  }
+  .c-white { background-color: #ffffff; }
+  .c-red { background-color: #ef4444; }
+  .c-yellow { background-color: #ffb703; }
+  .c-blue { background-color: #38bdf8; }
+  .c-green { background-color: #4ade80; }
+
+  /* 글자 크기 조절 */
+  .size-box {
+    display: flex;
+    align-items: center;
+    background-color: #262626;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 2px 4px;
+    gap: 4px;
+  }
+  .btn-size-step {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: #ccc;
+    font-size: 14px;
+  }
+  #size-display {
+    font-size: 13px;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+    color: #38bdf8;
+  }
+
+  /* 메인 뷰포트 */
+  #main-viewport {
+    position: absolute;
+    top: 56px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: var(--bg-main);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 0 100px 0;
+    gap: 28px;
+    -webkit-overflow-scrolling: touch;
+  }
+  #main-viewport::-webkit-scrollbar { display: none; }
+
+  /* 노트 시트 카드 */
+  .note-page-card {
+    width: var(--page-width);
+    min-height: var(--page-height);
+    height: var(--page-height);
+    background-color: var(--page-bg);
+    border: 1px solid #242424;
+    border-radius: 6px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.9);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .page-header {
+    height: 38px;
+    border-bottom: 1px dashed #282828;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #666;
+    user-select: none;
+  }
+
+  .page-del-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 2px 6px;
+    height: auto;
+  }
+  .page-del-btn:hover { color: #ef4444; }
+
+  /* 페이지 텍스트 에디터 */
+  .page-editor {
+    flex: 1;
+    width: 100%;
+    padding: 32px 40px;
+    color: #ffffff;
+    font-size: 24px;
+    line-height: 1.5;
+    outline: none;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-y: auto;
+  }
+  .page-editor::-webkit-scrollbar { display: none; }
+
+  body.paint-mode .page-editor {
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* 하단 플로팅 독 */
+  #bottom-dock {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26, 26, 26, 0.9);
+    border: 1px solid #444;
+    padding: 6px 16px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+  #page-info { font-size: 13px; font-weight: bold; color: #d1d5db; }
+
+  /* 전체화면 슬라이드 뷰포트 (미리보기 & 전체보기) */
+  #reader-container {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: #000000;
+    z-index: 2000;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  #reader-viewport {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .slide-sheet {
+    width: 100%;
+    max-width: var(--page-width);
+    height: 92vh;
+    background-color: var(--page-bg);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 40px 48px;
+    color: #ffffff;
+    font-size: 26px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-y: auto;
+    display: none;
+    box-sizing: border-box;
+  }
+  .slide-sheet::-webkit-scrollbar { display: none; }
+  .slide-sheet.active { display: block; }
+
+  .touch-zone {
+    position: absolute; top: 0; bottom: 0; width: 40%;
+    cursor: pointer; z-index: 2500;
+  }
+  #touch-left { left: 0; }
+  #touch-right { right: 0; }
+
+  #exit-reader-btn {
+    position: absolute; top: 18px; right: 24px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(40, 40, 40, 0.85); border: 1px solid #666;
+    color: #fff; font-size: 20px; font-weight: bold;
+    cursor: pointer; z-index: 3000;
+  }
+
+  #reader-page-badge {
+    position: absolute; top: 22px; left: 24px;
+    background: rgba(30, 30, 30, 0.85); border: 1px solid #444;
+    padding: 6px 14px; border-radius: 12px;
+    color: #ffb703; font-size: 14px; font-weight: bold;
+    z-index: 3000;
+  }
+
+  /* 토스트 메시지 */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid #555;
+    color: #38bdf8;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 5000;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- 상단 툴바 -->
+<div id="header-toolbar">
+  <div class="tool-group">
+    <button id="btn-continuous" onclick="toggleContinuousMode()" title="여러 글자를 터치하여 연속으로 색칠">연속</button>
+    <div class="divider"></div>
+    <div class="color-btn c-white" onmousedown="event.preventDefault()" onclick="selectColor('#ffffff', this)" title="흰색"></div>
+    <div class="color-btn c-red selected" onmousedown="event.preventDefault()" onclick="selectColor('#ef4444', this)" title="빨간색"></div>
+    <div class="color-btn c-yellow" onmousedown="event.preventDefault()" onclick="selectColor('#ffb703', this)" title="황금 주황"></div>
+    <div class="color-btn c-blue" onmousedown="event.preventDefault()" onclick="selectColor('#38bdf8', this)" title="밝은 파랑"></div>
+    <div class="color-btn c-green" onmousedown="event.preventDefault()" onclick="selectColor('#4ade80', this)" title="밝은 초록"></div>
+    <div class="divider"></div>
+    <div class="size-box">
+      <button class="btn-size-step" onclick="changeFontSize(-2)">-</button>
+      <span id="size-display">24</span>
+      <button class="btn-size-step" onclick="changeFontSize(2)">+</button>
+    </div>
+  </div>
+
+  <div class="tool-group">
+    <button onclick="saveNoteData()">💾 저장</button>
+    <div class="divider"></div>
+    <button onclick="startPreviewCurrentPage()" title="현재 보고 있는 페이지 바로보기">👁️ 미리보기</button>
+    <button onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">▶ 전체보기</button>
+  </div>
+</div>
+
+<!-- 메인 에디터 뷰포트 -->
+<div id="main-viewport"></div>
+
+<!-- 하단 독 -->
+<div id="bottom-dock">
+  <span id="page-info">1 / 1</span>
+  <button onclick="addNewPage()">➕ 새 페이지</button>
+</div>
+
+<!-- 전체화면 모드 레이어 -->
+<div id="reader-container">
+  <button id="exit-reader-btn" onclick="exitReaderMode()" title="닫기 (ESC)">✕</button>
+  <div class="touch-zone" id="touch-left" onclick="prevSlide()"></div>
+  <div class="touch-zone" id="touch-right" onclick="nextSlide()"></div>
+  <div id="reader-viewport"></div>
+  <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let activeColor = '#ef4444';
+  let isContinuousMode = false;
+  let isPainting = false;
+  let lastPaintedKey = '';
+  let currentFontSize = 24;
+  let currentReaderIndex = 0;
+  let isReaderOpen = false;
+
+  let pagesData = [];
+
+  const viewport = document.getElementById('main-viewport');
+  const readerViewport = document.getElementById('reader-viewport');
+
+  function init() {
+    const saved = localStorage.getItem('yslide_note_pages');
+    if (saved) {
+      try {
+        pagesData = JSON.parse(saved);
+      } catch (e) {
+        pagesData = [{ html: '첫 번째 페이지 내용을 입력하세요.' }];
+      }
+    } else {
+      pagesData = [
+        { html: '<b>Yslide Note</b>에 오신 것을 환영합니다.<br><br>1. 글자를 선택하고 색상을 변경할 수 있습니다.<br>2. <b>[연속]</b> 버튼을 누르면 단어나 글자를 터치/드래그하는 곳마다 즉시 색상이 칠해집니다.<br>3. <b>[미리보기]</b>나 <b>[전체보기]</b>를 눌러 프리젠테이션 모드를 활용해보세요.' }
+      ];
+    }
+    renderPages();
+    updateFontSize();
+  }
+
+  /* 페이지 시트 렌더링 */
+  function renderPages() {
+    viewport.innerHTML = '';
+    pagesData.forEach((page, index) => {
+      const card = document.createElement('div');
+      card.className = 'note-page-card';
+      card.dataset.index = index;
+
+      const header = document.createElement('div');
+      header.className = 'page-header';
+      header.innerHTML = `
+        <span>[ PAGE ${index + 1} ]</span>
+        <button class="page-del-btn" onclick="deletePage(${index})">삭제</button>
+      `;
+
+      const editor = document.createElement('div');
+      editor.className = 'page-editor';
+      editor.contentEditable = 'true';
+      editor.spellcheck = false;
+      editor.style.fontSize = `${currentFontSize}px`;
+      editor.innerHTML = page.html;
+
+      editor.addEventListener('input', () => {
+        pagesData[index].html = editor.innerHTML;
+        saveToLocalStorageSilent();
+      });
+
+      attachContinuousEvents(editor, index);
+
+      card.appendChild(header);
+      card.appendChild(editor);
+      viewport.appendChild(card);
+    });
+
+    updatePageInfo();
+  }
+
+  /* 연속 터치 단어 색칠 기능 */
+  function attachContinuousEvents(editorEl, pageIdx) {
+    function paintAtCoord(clientX, clientY) {
+      let range;
+      if (document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(clientX, clientY);
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(clientX, clientY);
+        if (pos) {
+          range = document.createRange();
+          range.setStart(pos.offsetNode, pos.offset);
+          range.collapse(true);
+        }
+      }
+
+      if (!range) return;
+      let node = range.startContainer;
+
+      if (node.nodeType !== Node.TEXT_NODE) {
+        if (node.childNodes.length > 0 && range.startOffset < node.childNodes.length) {
+          node = node.childNodes[range.startOffset];
+          while (node && node.nodeType !== Node.TEXT_NODE && node.firstChild) {
+            node = node.firstChild;
+          }
+        }
+      }
+
+      if (node && node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        const offset = range.startOffset;
+
+        let start = Math.min(offset, text.length > 0 ? text.length - 1 : 0);
+        while (start > 0 && !/\s/.test(text[start - 1])) start--;
+        let end = offset;
+        while (end < text.length && !/\s/.test(text[end])) end++;
+
+        if (start < end) {
+          const key = `${node.textContent}_${start}_${end}`;
+          if (lastPaintedKey === key) return;
+          lastPaintedKey = key;
+
+          const wordRange = document.createRange();
+          wordRange.setStart(node, start);
+          wordRange.setEnd(node, end);
+
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(wordRange);
+
+          document.execCommand('foreColor', false, activeColor);
+          sel.removeAllRanges();
+
+          pagesData[pageIdx].html = editorEl.innerHTML;
+          saveToLocalStorageSilent();
+        }
+      }
+    }
+
+    // 터치 이벤트
+    editorEl.addEventListener('touchstart', (e) => {
+      if (isContinuousMode) {
+        isPainting = true;
+        paintAtCoord(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    editorEl.addEventListener('touchmove', (e) => {
+      if (isContinuousMode && isPainting) {
+        paintAtCoord(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // 마우스 이벤트
+    editorEl.addEventListener('mousedown', (e) => {
+      if (isContinuousMode) {
+        isPainting = true;
+        paintAtCoord(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    editorEl.addEventListener('mousemove', (e) => {
+      if (isContinuousMode && isPainting) {
+        paintAtCoord(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+  }
+
+  window.addEventListener('mouseup', () => {
+    isPainting = false;
+    lastPaintedKey = '';
+  });
+  window.addEventListener('touchend', () => {
+    isPainting = false;
+    lastPaintedKey = '';
+  });
+
+  /* 색상 선택 및 연속 모드 토글 */
+  function selectColor(color, el) {
+    activeColor = color;
+    document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+    if (el) el.classList.add('selected');
+
+    if (!isContinuousMode) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        document.execCommand('foreColor', false, color);
+        saveAllPagesState();
+      }
+    }
+  }
+
+  function toggleContinuousMode() {
+    isContinuousMode = !isContinuousMode;
+    const btn = document.getElementById('btn-continuous');
+    if (isContinuousMode) {
+      btn.classList.add('active');
+      document.body.classList.add('paint-mode');
+      showToast('🎨 연속 채색 모드 켜짐 (글자를 터치하세요)');
+    } else {
+      btn.classList.remove('active');
+      document.body.classList.remove('paint-mode');
+      showToast('⌨️ 일반 텍스트 입력 모드');
+    }
+  }
+
+  /* 글자 크기 변경 */
+  function changeFontSize(delta) {
+    currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
+    updateFontSize();
+  }
+
+  function updateFontSize() {
+    document.getElementById('size-display').innerText = currentFontSize;
+    document.querySelectorAll('.page-editor').forEach(ed => {
+      ed.style.fontSize = `${currentFontSize}px`;
+    });
+  }
+
+  /* 페이지 관리 */
+  function addNewPage() {
+    saveAllPagesState();
+    pagesData.push({ html: '' });
+    renderPages();
+    const lastCard = document.querySelector('.note-page-card:last-child');
+    if (lastCard) lastCard.scrollIntoView({ behavior: 'smooth' });
+    showToast('📄 새 페이지가 추가되었습니다');
+  }
+
+  function deletePage(index) {
+    if (pagesData.length <= 1) {
+      showToast('⚠️ 최소 1개 페이지는 유지해야 합니다');
+      return;
+    }
+    pagesData.splice(index, 1);
+    renderPages();
+    showToast('🗑️ 페이지가 삭제되었습니다');
+  }
+
+  function updatePageInfo() {
+    document.getElementById('page-info').innerText = `${pagesData.length} 페이지`;
+  }
+
+  function saveAllPagesState() {
+    document.querySelectorAll('.note-page-card').forEach((card, idx) => {
+      const editor = card.querySelector('.page-editor');
+      if (editor && pagesData[idx]) {
+        pagesData[idx].html = editor.innerHTML;
+      }
+    });
+    saveToLocalStorageSilent();
+  }
+
+  function saveToLocalStorageSilent() {
+    try {
+      localStorage.setItem('yslide_note_pages', JSON.stringify(pagesData));
+    } catch(e) {}
+  }
+
+  function saveNoteData() {
+    saveAllPagesState();
+    showToast('💾 노트가 안전하게 저장되었습니다');
+  }
+
+  /* 미리보기 및 전체보기 (프레젠테이션) */
+  function startPreviewCurrentPage() {
+    saveAllPagesState();
+    let targetIndex = 0;
+    const cards = document.querySelectorAll('.note-page-card');
+    const viewportTop = viewport.scrollTop + 60;
+
+    cards.forEach((card, idx) => {
+      if (card.offsetTop <= viewportTop) {
+        targetIndex = idx;
+      }
+    });
+
+    startFullPresentation(targetIndex);
+  }
+
+  function startFullPresentation(index = 0) {
+    saveAllPagesState();
+    currentReaderIndex = Math.min(Math.max(0, index), pagesData.length - 1);
+    renderReaderSlides();
+    updateReaderUI();
+
+    document.getElementById('reader-container').style.display = 'block';
+    isReaderOpen = true;
+
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
+
+  function renderReaderSlides() {
+    readerViewport.innerHTML = '';
+    pagesData.forEach((page, idx) => {
+      const sheet = document.createElement('div');
+      sheet.className = `slide-sheet ${idx === currentReaderIndex ? 'active' : ''}`;
+      sheet.style.fontSize = `${currentFontSize + 2}px`;
+      sheet.innerHTML = page.html;
+      readerViewport.appendChild(sheet);
+    });
+  }
+
+  function updateReaderUI() {
+    document.querySelectorAll('.slide-sheet').forEach((el, idx) => {
+      if (idx === currentReaderIndex) el.classList.add('active');
+      else el.classList.remove('active');
+    });
+    document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
+    document.getElementById('reader-total').innerText = pagesData.length;
+  }
+
+  function nextSlide() {
+    if (currentReaderIndex < pagesData.length - 1) {
+      currentReaderIndex++;
+      updateReaderUI();
+    }
+  }
+
+  function prevSlide() {
+    if (currentReaderIndex > 0) {
+      currentReaderIndex--;
+      updateReaderUI();
+    }
+  }
+
+  function exitReaderMode() {
+    document.getElementById('reader-container').style.display = 'none';
+    isReaderOpen = false;
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!isReaderOpen) return;
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) {
+      e.preventDefault();
+      nextSlide();
+    } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) {
+      e.preventDefault();
+      prevSlide();
+    } else if (e.key === 'Escape') {
+      exitReaderMode();
+    }
+  });
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1500);
+  }
+
+  init();
+</script>
+</body>
+</html>
     --text-primary: #f3f4f6;
     --text-secondary: #9ca3af;
     --page-bg: #ffffff;
