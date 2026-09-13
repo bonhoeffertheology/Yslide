@@ -154,7 +154,7 @@
   .c-blue { background-color: #38bdf8; }
   .c-green { background-color: #4ade80; }
 
-  .btn-font {
+  .btn-font, .btn-mode-toggle {
     height: 30px;
     padding: 0 10px;
     font-size: 12px;
@@ -195,24 +195,54 @@
 
   #file-input { display: none; }
 
-  /* 메인 스크롤 뷰포트 */
+  /* 메인 뷰포트 (세로 스크롤 모드) */
   #main-viewport {
     position: absolute;
     top: var(--toolbar-height);
     bottom: 0;
     left: 0;
     right: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
     background-color: var(--bg-main);
     display: flex;
+    -webkit-overflow-scrolling: touch;
+    transition: all 0.2s ease;
+  }
+
+  #main-viewport.view-scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
     flex-direction: column;
     align-items: center;
     padding: 32px 16px 120px 16px;
     gap: 36px;
-    -webkit-overflow-scrolling: touch;
   }
-  #main-viewport::-webkit-scrollbar { display: none; }
+  #main-viewport.view-scroll::-webkit-scrollbar { display: none; }
+
+  /* 메인 뷰포트 (가로 페이지 모드 / 스와이프) */
+  #main-viewport.view-page {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-direction: row;
+    align-items: center;
+    scroll-snap-type: x mandatory;
+    padding: 0;
+    gap: 0;
+  }
+  #main-viewport.view-page::-webkit-scrollbar { display: none; }
+
+  /* 페이지 모드 시 슬라이드 카드 래퍼 */
+  #main-viewport.view-page .page-wrapper {
+    flex: 0 0 100vw;
+    width: 100vw;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    box-sizing: border-box;
+    padding: 16px;
+  }
 
   /* 페이지 시트 카드 */
   .note-page-card {
@@ -458,9 +488,10 @@
 
 <!-- 상단 2단 툴바 -->
 <div id="header-toolbar">
-  <!-- 1단: 자간, 줄간격, 글꼴 -->
+  <!-- 1단: 자간, 줄간격, 글꼴, 스크롤/페이지 모드 전환 -->
   <div class="toolbar-row toolbar-row-top">
     <div class="tool-group">
+      <!-- 자간 좁게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="4" y1="12" x2="10" y2="12"></line>
@@ -469,6 +500,7 @@
           <polyline points="17 9 14 12 17 15"></polyline>
         </svg>
       </button>
+      <!-- 자간 넓게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <line x1="10" y1="12" x2="4" y2="12"></line>
@@ -480,6 +512,7 @@
 
       <div class="divider"></div>
 
+      <!-- 줄간격 좁게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="9 6 12 9 15 6"></polyline>
@@ -488,6 +521,7 @@
           <line x1="12" y1="22" x2="12" y2="15"></line>
         </svg>
       </button>
+      <!-- 줄간격 넓게 -->
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <polyline points="8 6 12 2 16 6"></polyline>
@@ -499,7 +533,13 @@
 
       <div class="divider"></div>
 
+      <!-- 글꼴 순환 선택 -->
       <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">삼성 기본</button>
+
+      <div class="divider"></div>
+
+      <!-- 스크롤 / 페이지 모드 전환 버튼 -->
+      <button id="btn-view-mode" class="btn-mode-toggle" onclick="toggleViewMode()" title="세로 스크롤 / 좌우 페이지 넘김 모드 전환">📜 스크롤 모드</button>
     </div>
   </div>
 
@@ -597,7 +637,7 @@
 </div>
 
 <!-- 메인 에디터 뷰포트 -->
-<div id="main-viewport"></div>
+<div id="main-viewport" class="view-scroll"></div>
 
 <!-- 하단 고정 독 -->
 <div id="bottom-dock">
@@ -641,6 +681,8 @@
   let isReaderOpen = false;
   let savedSelectionRange = null;
 
+  let viewMode = 'scroll'; // 'scroll' (세로) 또는 'page' (좌우 스와이프)
+
   let pagesData = [];
 
   let undoStack = [];
@@ -652,6 +694,7 @@
   const readerViewport = document.getElementById('reader-viewport');
   const measureContainer = document.getElementById('measure-container');
   const btnFontCycle = document.getElementById('btn-font-cycle');
+  const btnViewMode = document.getElementById('btn-view-mode');
 
   function init() {
     const savedFont = localStorage.getItem('yslide_note_font_idx');
@@ -660,7 +703,13 @@
     }
     applyCurrentFont();
 
-    const saved = localStorage.getItem('yslide_note_pages_v12');
+    const savedMode = localStorage.getItem('yslide_note_view_mode');
+    if (savedMode) {
+      viewMode = savedMode;
+    }
+    applyViewModeUI();
+
+    const saved = localStorage.getItem('yslide_note_pages_v13');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -674,6 +723,21 @@
     pushHistory();
     renderPages();
     updateFontSize();
+  }
+
+  function toggleViewMode() {
+    viewMode = viewMode === 'scroll' ? 'page' : 'scroll';
+    localStorage.setItem('yslide_note_view_mode', viewMode);
+    applyViewModeUI();
+    renderPages();
+    showToast(viewMode === 'scroll' ? '📜 세로 스크롤 모드' : '📄 가로 페이지 넘김 모드 (스와이프)');
+  }
+
+  function applyViewModeUI() {
+    viewport.className = viewMode === 'scroll' ? 'view-scroll' : 'view-page';
+    if (btnViewMode) {
+      btnViewMode.innerText = viewMode === 'scroll' ? '📜 스크롤 모드' : '📄 페이지 모드';
+    }
   }
 
   function pushHistory() {
@@ -790,7 +854,15 @@
 
       card.appendChild(header);
       card.appendChild(editor);
-      viewport.appendChild(card);
+
+      if (viewMode === 'page') {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'page-wrapper';
+        wrapper.appendChild(card);
+        viewport.appendChild(wrapper);
+      } else {
+        viewport.appendChild(card);
+      }
     });
 
     updatePageInfo();
@@ -883,7 +955,6 @@
     return pages.length > 0 ? pages : [''];
   }
 
-  /* 긴 텍스트 붙여넣기 이벤트 처리 */
   function handleSmartPaste(e, startIndex) {
     e.preventDefault();
     const clipboardData = e.clipboardData || window.clipboardData;
@@ -906,7 +977,6 @@
     showToast(`📄 텍스트 분량에 맞게 총 ${pagesCreated.length}개 페이지로 분할되었습니다`);
   }
 
-  /* Gemini AI 영문 번역 */
   async function translateSelectedTextWithGemini() {
     let targetRange = null;
     const sel = window.getSelection();
@@ -1219,12 +1289,26 @@ ${originalHtml}`;
     pagesData.push({ html: '', isPlaceholder: false });
     renderPages();
     pushHistory();
-    const lastCard = document.querySelector('.note-page-card:last-child');
-    if (lastCard) {
-      lastCard.scrollIntoView({ behavior: 'smooth' });
-      const ed = lastCard.querySelector('.page-editor');
-      if (ed) ed.focus();
-    }
+
+    setTimeout(() => {
+      if (viewMode === 'page') {
+        const wrappers = document.querySelectorAll('.page-wrapper');
+        const lastWrapper = wrappers[wrappers.length - 1];
+        if (lastWrapper) {
+          lastWrapper.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+          const ed = lastWrapper.querySelector('.page-editor');
+          if (ed) ed.focus();
+        }
+      } else {
+        const lastCard = document.querySelector('.note-page-card:last-child');
+        if (lastCard) {
+          lastCard.scrollIntoView({ behavior: 'smooth' });
+          const ed = lastCard.querySelector('.page-editor');
+          if (ed) ed.focus();
+        }
+      }
+    }, 50);
+
     showToast('📄 새 페이지가 추가되었습니다');
   }
 
@@ -1259,7 +1343,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v12', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v13', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1364,14 +1448,24 @@ ${originalHtml}`;
   function startPreviewCurrentPage() {
     saveAllPagesState();
     let targetIndex = 0;
-    const cards = document.querySelectorAll('.note-page-card');
-    const viewportCenter = viewport.scrollTop + (viewport.clientHeight / 2);
 
-    cards.forEach((card, idx) => {
-      if (card.offsetTop <= viewportCenter) {
-        targetIndex = idx;
-      }
-    });
+    if (viewMode === 'page') {
+      const wrappers = document.querySelectorAll('.page-wrapper');
+      const scrollLeft = viewport.scrollLeft + (viewport.clientWidth / 2);
+      wrappers.forEach((wrap, idx) => {
+        if (wrap.offsetLeft <= scrollLeft) {
+          targetIndex = idx;
+        }
+      });
+    } else {
+      const cards = document.querySelectorAll('.note-page-card');
+      const viewportCenter = viewport.scrollTop + (viewport.clientHeight / 2);
+      cards.forEach((card, idx) => {
+        if (card.offsetTop <= viewportCenter) {
+          targetIndex = idx;
+        }
+      });
+    }
 
     startFullPresentation(targetIndex);
   }
