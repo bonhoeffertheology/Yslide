@@ -465,7 +465,7 @@
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  /* 페이지 분할 측정용 숨김 컨테이너 */
+  /* 페이지 분할 정밀 측정 컨테이너 (실제 카드 너비와 완벽 동기화) */
   #measure-container {
     position: absolute;
     visibility: hidden;
@@ -473,6 +473,7 @@
     top: -99999px;
     left: -99999px;
     width: 820px;
+    max-width: 820px;
     padding: 32px 44px;
     font-size: 26px;
     line-height: 1.55;
@@ -714,7 +715,7 @@
     }
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v14');
+    const saved = localStorage.getItem('yslide_note_pages_v15');
     if (saved) {
       try {
         pagesData = JSON.parse(saved);
@@ -852,14 +853,15 @@
         }, 500);
       });
 
-      // 태블릿/데스크탑 통합 붙여넣기 이벤트
+      // 즉시 기본 붙여넣기 차단 후 정밀 분할 실행
       editor.addEventListener('paste', (e) => {
+        e.preventDefault(); // 기본 붙여넣기 즉시 차단
         if (editor.classList.contains('is-placeholder')) {
           editor.classList.remove('is-placeholder');
           pagesData[index].isPlaceholder = false;
         }
         pushHistory();
-        handleSmartPaste(e, index);
+        handleSmartPasteDirect(e, index);
       });
 
       attachContinuousEvents(editor, index);
@@ -890,23 +892,22 @@
     }
   });
 
-  /* 태블릿 및 화면 폭 실시간 연동 정밀 텍스트 분할 알고리즘 */
+  /* 완벽 높이 계산 기반 텍스트 자동 분할 알고리즘 */
   function paginateText(rawText) {
-    const sampleEditor = document.querySelector('.page-editor');
-    const computedStyle = sampleEditor ? window.getComputedStyle(sampleEditor) : null;
-    const currentWidth = sampleEditor ? sampleEditor.clientWidth : 820;
-
-    measureContainer.style.width = `${currentWidth}px`;
-    if (computedStyle) {
-      measureContainer.style.padding = computedStyle.padding;
-    }
+    // 실제 화면상의 에디터 카드 너비와 일치하도록 컨테이너 폭 고정
+    const testWidth = 820;
+    measureContainer.style.width = `${testWidth}px`;
+    measureContainer.style.maxWidth = `${testWidth}px`;
+    measureContainer.style.padding = '32px 44px';
     measureContainer.style.fontSize = `${currentFontSize}px`;
     measureContainer.style.lineHeight = '1.55';
     measureContainer.style.fontFamily = FONT_LIST[currentFontIndex].family;
     
-    // 에디터 내부 가용 높이 (카드 높이 928px - 헤더 42px - 상하패딩 64px = 822px)
-    const maxAllowedHeight = 822;
+    // 에디터 내부 가용 높이 (카드 전체 928px - 헤더 42px = 886px)
+    // padding 포함 높이 측정 기준: 886px
+    const maxAllowedHeight = 886;
 
+    // 모든 줄바꿈 통일
     const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     let pages = [];
     let currentHtml = '';
@@ -929,12 +930,14 @@
         continue;
       }
 
+      // 문단 전체를 먼저 시도
       const testHtml = currentHtml ? `${currentHtml}<br>${line}` : line;
       measureContainer.innerHTML = testHtml;
 
       if (measureContainer.offsetHeight <= maxAllowedHeight) {
         currentHtml = testHtml;
       } else {
+        // 문단이 넘치는 경우 단어 단위로 쪼개기
         const words = line.split(' ');
         let tempParagraph = '';
 
@@ -956,6 +959,7 @@
               tempParagraph = word;
               measureContainer.innerHTML = tempParagraph;
             } else {
+              // 단어 자체가 한 페이지보다 긴 경우
               if (tempParagraph) pages.push(tempParagraph);
               tempParagraph = word;
             }
@@ -975,47 +979,27 @@
     return pages.length > 0 ? pages : [''];
   }
 
-  /* 모바일/태블릿 클립보드 호환 붙여넣기 핸들러 */
-  async function handleSmartPaste(e, startIndex) {
+  /* 붙여넣기 데이터 추출 및 분할 실행 */
+  async function handleSmartPasteDirect(e, startIndex) {
     let text = '';
 
+    // 1. 이벤트 클립보드 데이터 확인
     if (e.clipboardData || window.clipboardData) {
       const cd = e.clipboardData || window.clipboardData;
-      text = cd.getData('text/plain');
+      text = cd.getData('text/plain') || cd.getData('text');
     }
 
-    // 모바일/태블릿에서 getData가 비어있을 경우 Navigator API 대체 시도
+    // 2. 모바일/태블릿 클립보드 API fallback
     if (!text && navigator.clipboard && navigator.clipboard.readText) {
       try {
         text = await navigator.clipboard.readText();
       } catch (err) {}
     }
 
-    // 클립보드 데이터에 직접 접근 불가 시(브라우저가 기본 붙여넣기를 강행했을 때) DOM 기반 지연 분할
     if (!text) {
-      setTimeout(() => {
-        const editors = document.querySelectorAll('.page-editor');
-        const targetEditor = editors[startIndex];
-        if (targetEditor && targetEditor.scrollHeight > 822) {
-          const domText = targetEditor.innerText;
-          const pagesCreated = paginateText(domText);
-          pagesData[startIndex].html = pagesCreated[0];
-          pagesData[startIndex].isPlaceholder = false;
-
-          if (pagesCreated.length > 1) {
-            const restPages = pagesCreated.slice(1).map(content => ({ html: content, isPlaceholder: false }));
-            pagesData.splice(startIndex + 1, 0, ...restPages);
-          }
-          renderPages();
-          pushHistory();
-          saveToLocalStorageSilent();
-          showToast(`📄 총 ${pagesCreated.length}개 페이지로 분할되었습니다`);
-        }
-      }, 10);
+      showToast('⚠️ 붙여넣을 텍스트를 읽지 못했습니다');
       return;
     }
-
-    e.preventDefault();
 
     const pagesCreated = paginateText(text);
 
@@ -1399,7 +1383,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v14', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v15', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
