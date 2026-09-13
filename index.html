@@ -216,7 +216,7 @@
     background-color: var(--bg-main);
     display: flex;
     -webkit-overflow-scrolling: touch;
-    transition: all 0.2s ease;
+    transition: none; /* 화면 전환 애니메이션으로 인한 튐 방지 */
   }
 
   #main-viewport.view-scroll {
@@ -636,7 +636,7 @@
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
       </button>
 
@@ -847,7 +847,7 @@
     if (savedMode) viewMode = savedMode;
     applyViewModeUI();
 
-    const saved = localStorage.getItem('yslide_note_pages_v28');
+    const saved = localStorage.getItem('yslide_note_pages_v29');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -955,7 +955,7 @@
     if (btnFontCycle) btnFontCycle.innerText = current.name;
   }
 
-  /* 전역 커서 위치 추적 (HTML 기반 정밀 앵커) */
+  /* 전역 커서 위치 추적 */
   function getCaretGlobalOffset(focusedEditor) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !focusedEditor) return null;
@@ -994,6 +994,7 @@
     return priorLength + offsetInEditor;
   }
 
+  /* 화면 스크롤 튐을 원천 방지하는 커서 복원 (preventScroll 옵션 적용) */
   function restoreCaretGlobalOffset(targetGlobalOffset) {
     if (targetGlobalOffset === null) return;
     const allEditors = document.querySelectorAll('.page-editor');
@@ -1013,7 +1014,9 @@
     }
 
     if (!targetEditor) return;
-    targetEditor.focus();
+
+    // 브라우저의 기본 화면 자동 이동 스크롤 차단
+    targetEditor.focus({ preventScroll: true });
 
     const sel = window.getSelection();
     const range = document.createRange();
@@ -1108,7 +1111,7 @@
         }
       });
 
-      // 실시간 입력 처리: 높이가 넘칠 때만 유기적 연쇄 밀림 발동
+      // 실시간 입력 처리 (화면 튐 없는 부드러운 리플로우)
       editor.addEventListener('input', (e) => {
         if (isReflowing) return;
         if (editor.classList.contains('is-placeholder')) {
@@ -1120,7 +1123,6 @@
         saveToLocalStorageSilent();
 
         const maxHeight = getDynamicAvailableHeight();
-        // 실제 높이가 카드 범위를 넘어설 때만 리플로우 실행 (엔터 시 불필요한 통째 넘김 방지)
         if (editor.scrollHeight > (editor.clientHeight + 4) || editor.offsetHeight > maxHeight) {
           if (reflowDebounceTimer) clearTimeout(reflowDebounceTimer);
           reflowDebounceTimer = setTimeout(() => {
@@ -1170,10 +1172,14 @@
     updatePageInfo();
   }
 
-  /* ================== 세밀한 단어/라인 단위 유기적 스트림 엔진 ================== */
+  /* ================== 화면 위치 고정형 유기적 스트림 엔진 ================== */
   function seamlessContinuousReflow(savedCaretOffset = null) {
     if (isReflowing) return;
     isReflowing = true;
+
+    // 현재 사용자가 보고 있는 정확한 뷰포트 스크롤 위치 기록
+    const currentScrollTop = viewport.scrollTop;
+    const currentScrollLeft = viewport.scrollLeft;
 
     saveAllPagesState();
 
@@ -1190,7 +1196,6 @@
     const measureBox = getMeasureBox();
     const MAX_PAGE_HEIGHT = getDynamicAvailableHeight();
 
-    // 문단 단위로 성급하게 끊지 않고 단락들을 분해
     const paragraphs = fullHtml.split(/<br\s*[\/]?>/gi);
     let newPagesHtml = [];
     let curPageHtml = '';
@@ -1213,14 +1218,14 @@
         continue;
       }
 
-      // 1. 문단 전체를 먼저 시도 (공간이 남으면 문단 전체가 그대로 들어감)
+      // 문단 전체 시도
       const testCandidate = curPageHtml ? `${curPageHtml}<br>${p}` : p;
       measureBox.innerHTML = testCandidate;
 
       if (measureBox.offsetHeight <= MAX_PAGE_HEIGHT) {
         curPageHtml = testCandidate;
       } else {
-        // 2. 문단 전체가 안 들어갈 때: 단어 단위로 쪼개어 들어갈 수 있는 줄까지만 채우고 넘치는 줄만 다음 페이지로 넘김
+        // 단어 단위 쪼개기
         const words = p.split(' ');
         let accumulatedParagraph = '';
 
@@ -1234,7 +1239,6 @@
           if (measureBox.offsetHeight <= MAX_PAGE_HEIGHT) {
             accumulatedParagraph = testWord;
           } else {
-            // 현재 페이지 완성 후 새 페이지로 넘김
             if (curPageHtml.trim() !== '') {
               const pageContent = accumulatedParagraph ? (curPageHtml ? `${curPageHtml}<br>${accumulatedParagraph}` : accumulatedParagraph) : curPageHtml;
               newPagesHtml.push(pageContent);
@@ -1242,7 +1246,6 @@
               accumulatedParagraph = word;
               measureBox.innerHTML = accumulatedParagraph;
             } else {
-              // 단일 단어가 길 경우
               if (accumulatedParagraph) newPagesHtml.push(accumulatedParagraph);
               accumulatedParagraph = word;
               measureBox.innerHTML = accumulatedParagraph;
@@ -1274,6 +1277,10 @@
 
       renderPages();
       saveToLocalStorageSilent();
+
+      // 원래 보고 있던 스크롤 위치 완벽 복원 (화면 튐 100% 차단)
+      viewport.scrollTop = currentScrollTop;
+      viewport.scrollLeft = currentScrollLeft;
 
       if (savedCaretOffset !== null) {
         restoreCaretGlobalOffset(savedCaretOffset);
@@ -1694,7 +1701,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v28', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v29', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
