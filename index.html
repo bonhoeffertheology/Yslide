@@ -714,7 +714,7 @@
   </div>
 </div>
 
-<!-- 메인 에디터 뷰포트 (view-scroll 클래스 필수 복구) -->
+<!-- 메인 에디터 뷰포트 (view-scroll 클래스 필수 포함) -->
 <div id="main-viewport" class="view-scroll"></div>
 
 <!-- 드래그 가능한 인터랙티브 플로팅 스크롤바 -->
@@ -997,7 +997,7 @@
       if (savedMode) viewMode = savedMode;
       applyViewModeUI();
 
-      const saved = localStorage.getItem('yslide_note_pages_v43');
+      const saved = localStorage.getItem('yslide_note_pages_v44');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
@@ -1025,6 +1025,17 @@
       updateFloatingScrollbar();
     }, 200);
   });
+
+  function toggleBatchMode() {
+    isBatchMode = !isBatchMode;
+    if (isBatchMode) {
+      btnBatchMode.classList.add('active');
+      showToast('🌐 일괄 적용 모드 ON (모든 페이지 동시 변경)');
+    } else {
+      btnBatchMode.classList.remove('active');
+      showToast('📄 단일 적용 모드 ON (현재 페이지만 변경)');
+    }
+  }
 
   function pushHistory() {
     const stateStr = JSON.stringify(pagesData);
@@ -1074,7 +1085,6 @@
     if (btnFontCycle) btnFontCycle.innerText = current.name;
   }
 
-  /* 전역 커서 위치 정밀 계산 */
   function getCaretGlobalOffset(focusedEditor) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !focusedEditor) return null;
@@ -1113,7 +1123,6 @@
     return priorLength + offsetInEditor;
   }
 
-  /* 커서 위치 복원 */
   function restoreCaretGlobalOffset(targetGlobalOffset) {
     if (targetGlobalOffset === null) return;
     const allEditors = document.querySelectorAll('.page-editor');
@@ -1185,7 +1194,6 @@
     return pre.toString().length === 0;
   }
 
-  /* 렌더링 */
   function renderPages() {
     if (!viewport) return;
     viewport.innerHTML = '';
@@ -1336,7 +1344,6 @@
     updateFloatingScrollbar();
   }
 
-  /* ================== 연속 스트림 엔진 ================== */
   function seamlessContinuousReflow(savedCaretOffset = null) {
     if (isReflowing) return;
     isReflowing = true;
@@ -1468,7 +1475,6 @@
     return 0;
   }
 
-  /* 서식 토글 */
   function toggleBold() {
     pushHistory();
     if (isBatchMode) {
@@ -1563,7 +1569,6 @@
     seamlessContinuousReflow();
   }
 
-  /* Gemini 영문 번역 */
   async function translateSelectedTextWithGemini() {
     let targetRange = null;
     const sel = window.getSelection();
