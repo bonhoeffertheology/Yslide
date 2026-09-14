@@ -31,7 +31,7 @@
     --accent: #38bdf8;
     --toolbar-height: 96px;
     --page-width: min(820px, 92vw);
-    --page-card-height: 80vh;
+    --page-card-height: 80vh; /* 화면 높이의 80% */
     --header-height: 42px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
     --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
@@ -253,7 +253,7 @@
     padding: 12px;
   }
 
-  /* 드래그 가능한 인터랙티브 플로팅 스크롤바 트랙 */
+  /* 드래그 가능한 인터랙티브 플로팅 스크롤바 */
   #floating-scrollbar-track {
     position: fixed;
     top: calc(var(--toolbar-height) + 12px);
@@ -281,7 +281,7 @@
   #floating-scrollbar-thumb.visible { opacity: 0.85; }
   #floating-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.8); }
 
-  /* 개별 페이지 카드 */
+  /* 개별 페이지 카드 프레임 */
   .note-page-card {
     width: var(--page-width);
     max-width: 820px;
@@ -714,7 +714,7 @@
   </div>
 </div>
 
-<!-- 메인 에디터 뷰포트 -->
+<!-- 메인 에디터 뷰포트 (view-scroll 클래스 필수 복구) -->
 <div id="main-viewport" class="view-scroll"></div>
 
 <!-- 드래그 가능한 인터랙티브 플로팅 스크롤바 -->
@@ -865,7 +865,6 @@
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
-  // 마우스/터치 드래그로 스크롤바 움직이기
   let isDraggingThumb = false;
   let dragStartY = 0;
   let startScrollTop = 0;
@@ -918,7 +917,6 @@
 
   window.addEventListener('touchend', () => { isDraggingThumb = false; });
 
-  // 트랙 클릭 시 해당 위치로 점프 스크롤
   scrollbarTrack.addEventListener('click', (e) => {
     if (e.target === scrollbarThumb) return;
     const trackRect = scrollbarTrack.getBoundingClientRect();
@@ -999,7 +997,7 @@
       if (savedMode) viewMode = savedMode;
       applyViewModeUI();
 
-      const saved = localStorage.getItem('yslide_note_pages_v42');
+      const saved = localStorage.getItem('yslide_note_pages_v43');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
@@ -1027,17 +1025,6 @@
       updateFloatingScrollbar();
     }, 200);
   });
-
-  function toggleBatchMode() {
-    isBatchMode = !isBatchMode;
-    if (isBatchMode) {
-      btnBatchMode.classList.add('active');
-      showToast('🌐 일괄 적용 모드 ON (모든 페이지 동시 변경)');
-    } else {
-      btnBatchMode.classList.remove('active');
-      showToast('📄 단일 적용 모드 ON (현재 페이지만 변경)');
-    }
-  }
 
   function pushHistory() {
     const stateStr = JSON.stringify(pagesData);
