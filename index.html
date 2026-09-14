@@ -1631,4 +1631,430 @@ ${originalHtml}`;
       let translatedHtml = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       if (translatedHtml) {
         pushHistory();
-        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*
+        translatedHtml = translatedHtml.replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
+        
+        targetRange.deleteContents();
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = translatedHtml;
+        const frag = document.createDocumentFragment();
+        let node;
+        while ((node = wrapper.firstChild)) frag.appendChild(node);
+        targetRange.insertNode(frag);
+
+        seamlessContinuousReflow(getCurrentPageIndex());
+        showToast('✨ 영어 번역이 완료되었습니다');
+      }
+    } catch (err) {
+      alert("네트워크 오류로 번역에 실패했습니다: " + err.message);
+    }
+  }
+
+  function attachContinuousEvents(editorEl, pageIdx) {
+    function paintAtCoord(clientX, clientY) {
+      if (editorEl.classList.contains('is-placeholder')) return;
+
+      let range;
+      if (document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(clientX, clientY);
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(clientX, clientY);
+        if (pos) {
+          range = document.createRange();
+          range.setStart(pos.offsetNode, pos.offset);
+          range.collapse(true);
+        }
+      }
+
+      if (!range) return;
+      let node = range.startContainer;
+
+      if (node.nodeType !== Node.TEXT_NODE) {
+        if (node.childNodes.length > 0 && range.startOffset < node.childNodes.length) {
+          node = node.childNodes[range.startOffset];
+          while (node && node.nodeType !== Node.TEXT_NODE && node.firstChild) {
+            node = node.firstChild;
+          }
+        }
+      }
+
+      if (node && node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        const offset = range.startOffset;
+
+        let start = Math.min(offset, text.length > 0 ? text.length - 1 : 0);
+        while (start > 0 && !/\s/.test(text[start - 1])) start--;
+        let end = offset;
+        while (end < text.length && !/\s/.test(text[end])) end++;
+
+        if (start < end) {
+          const key = `${node.textContent}_${start}_${end}`;
+          if (lastPaintedKey === key) return;
+          lastPaintedKey = key;
+
+          const wordRange = document.createRange();
+          wordRange.setStart(node, start);
+          wordRange.setEnd(node, end);
+
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(wordRange);
+
+          document.execCommand('foreColor', false, activeColor);
+          sel.removeAllRanges();
+
+          pagesData[pageIdx].html = editorEl.innerHTML;
+          pagesData[pageIdx].isPlaceholder = false;
+          saveToLocalStorageSilent();
+        }
+      }
+    }
+
+    editorEl.addEventListener('touchstart', (e) => {
+      if (isContinuousMode) {
+        pushHistory();
+        isPainting = true;
+        paintAtCoord(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    editorEl.addEventListener('touchmove', (e) => {
+      if (isContinuousMode && isPainting) {
+        paintAtCoord(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    editorEl.addEventListener('mousedown', (e) => {
+      if (isContinuousMode) {
+        pushHistory();
+        isPainting = true;
+        paintAtCoord(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    editorEl.addEventListener('mousemove', (e) => {
+      if (isContinuousMode && isPainting) {
+        paintAtCoord(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+  }
+
+  window.addEventListener('mouseup', () => { isPainting = false; lastPaintedKey = ''; });
+  window.addEventListener('touchend', () => { isPainting = false; lastPaintedKey = ''; });
+
+  function selectColor(color, el) {
+    activeColor = color;
+    document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+    if (el) el.classList.add('selected');
+
+    if (!isContinuousMode) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        pushHistory();
+        document.execCommand('foreColor', false, color);
+        saveAllPagesState();
+      }
+    }
+  }
+
+  function toggleContinuousMode() {
+    isContinuousMode = !isContinuousMode;
+    const btn = document.getElementById('btn-continuous');
+    if (isContinuousMode) {
+      btn.classList.add('active');
+      document.body.classList.add('paint-mode');
+      showToast('🎨 연속 채색 모드 (글자를 터치하세요)');
+    } else {
+      btn.classList.remove('active');
+      document.body.classList.remove('paint-mode');
+      showToast('⌨️ 일반 텍스트 입력 모드');
+    }
+  }
+
+  function changeFontSize(delta) {
+    currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
+    updateFontSize();
+    seamlessContinuousReflow();
+  }
+
+  function updateFontSize() {
+    document.getElementById('size-display').innerText = currentFontSize;
+    document.querySelectorAll('.page-editor').forEach(ed => {
+      ed.style.fontSize = `${currentFontSize}px`;
+    });
+  }
+
+  function addNewPage() {
+    pushHistory();
+    saveAllPagesState();
+    pagesData.push({ title: '', html: '', isPlaceholder: false });
+    renderPages();
+    pushHistory();
+
+    setTimeout(() => {
+      if (viewMode === 'page') {
+        const wrappers = document.querySelectorAll('.page-wrapper');
+        const lastWrapper = wrappers[wrappers.length - 1];
+        if (lastWrapper) {
+          lastWrapper.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+          const ed = lastWrapper.querySelector('.page-editor');
+          if (ed) ed.focus();
+        }
+      } else {
+        const lastCard = document.querySelector('.note-page-card:last-child');
+        if (lastCard) {
+          lastCard.scrollIntoView({ behavior: 'smooth' });
+          const ed = lastCard.querySelector('.page-editor');
+          if (ed) ed.focus();
+        }
+      }
+    }, 50);
+
+    showToast('📄 새 페이지가 추가되었습니다');
+  }
+
+  function updatePageInfo() {
+    document.getElementById('page-info').innerText = `${pagesData.length} 페이지`;
+  }
+
+  function saveAllPagesState() {
+    document.querySelectorAll('.note-page-card').forEach((card, idx) => {
+      const editor = card.querySelector('.page-editor');
+      const titleInput = card.querySelector('.page-title-input');
+      if (editor && pagesData[idx]) {
+        if (!editor.classList.contains('is-placeholder')) {
+          pagesData[idx].html = editor.innerHTML;
+          pagesData[idx].isPlaceholder = false;
+        }
+        if (titleInput) {
+          pagesData[idx].title = titleInput.value;
+        }
+      }
+    });
+    saveToLocalStorageSilent();
+  }
+
+  function saveToLocalStorageSilent() {
+    try {
+      localStorage.setItem('yslide_note_pages_v44', JSON.stringify(pagesData));
+    } catch(e) {}
+  }
+
+  async function saveNoteData() {
+    saveAllPagesState();
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const filename = `Yslide_${dateStr}.json`;
+
+    const blob = new Blob([JSON.stringify(pagesData, null, 2)], { type: "application/json" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    showToast('💾 파일로 저장되었습니다');
+  }
+
+  function handleFileImport(files) {
+    if (!files || files.length === 0) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = e.target.result;
+      pushHistory();
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
+          pagesData = parsed;
+          renderPages();
+          pushHistory();
+          saveToLocalStorageSilent();
+          showToast('📂 파일을 성공적으로 불러왔습니다');
+          return;
+        }
+      } catch (err) {}
+
+      pagesData = [{ title: '', html: raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>'), isPlaceholder: false }];
+      seamlessContinuousReflow();
+    };
+    reader.readAsText(files[0]);
+  }
+
+  async function shareNoteContent() {
+    saveAllPagesState();
+    let shareText = '';
+    const sel = window.getSelection();
+
+    if (sel && !sel.isCollapsed && sel.toString().trim() !== '') {
+      shareText = sel.toString().trim();
+    } else {
+      shareText = pagesData.map((p, idx) => {
+        const titleStr = p.title ? `[${p.title}]\n` : '';
+        const bodyStr = p.isPlaceholder ? '' : p.html.replace(/<br\s*[\/]?>/gi, '\n').replace(/<[^>]+>/g, '');
+        return `[PAGE ${idx + 1}] ${titleStr}${bodyStr}`;
+      }).join('\n\n');
+    }
+
+    if (!shareText) {
+      showToast('⚠️ 공유할 내용이 없습니다');
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Yslide 원고 공유', text: shareText });
+        showToast('📤 공유 완료');
+      } catch (e) {
+        if (e.name !== 'AbortError') copyToClipboardFallback(shareText);
+      }
+    } else {
+      copyToClipboardFallback(shareText);
+    }
+  }
+
+  function copyToClipboardFallback(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 텍스트가 클립보드에 복사되었습니다');
+      });
+    }
+  }
+
+  function printNoteDocument() {
+    saveAllPagesState();
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = '';
+
+    pagesData.forEach((page, idx) => {
+      const sheet = document.createElement('div');
+      sheet.className = 'print-page-sheet';
+      sheet.innerHTML = `
+        <div class="print-page-header">
+          <span>[ PAGE ${idx + 1} / ${pagesData.length} ]</span>
+          <span>${page.title || ''}</span>
+        </div>
+        <div>${page.isPlaceholder ? '' : (page.html || '')}</div>
+      `;
+      printArea.appendChild(sheet);
+    });
+
+    window.print();
+  }
+
+  function previewCurrentViewPage() {
+    if (viewMode === 'page') {
+      const wrappers = document.querySelectorAll('.page-wrapper');
+      const scrollLeft = viewport.scrollLeft + (viewport.clientWidth / 2);
+      let targetIndex = 0;
+      wrappers.forEach((wrap, idx) => {
+        if (wrap.offsetLeft <= scrollLeft) targetIndex = idx;
+      });
+      startFullPresentation(targetIndex);
+    } else {
+      const cards = document.querySelectorAll('.note-page-card');
+      const viewportCenter = viewport.scrollTop + (viewport.clientHeight / 2);
+      let targetIndex = 0;
+      cards.forEach((card, idx) => {
+        if (card.offsetTop <= viewportCenter) targetIndex = idx;
+      });
+      startFullPresentation(targetIndex);
+    }
+  }
+
+  function startFullPresentation(startIndex = 0) {
+    saveAllPagesState();
+    readerViewport.innerHTML = '';
+
+    pagesData.forEach((page, idx) => {
+      const sheet = document.createElement('div');
+      sheet.className = `slide-sheet ${idx === startIndex ? 'active' : ''}`;
+      sheet.style.fontSize = `${currentFontSize}px`;
+      const titleHtml = page.title ? `<div class="slide-title-header">${page.title}</div>` : '';
+      sheet.innerHTML = `${titleHtml}${page.isPlaceholder ? '' : (page.html || '')}`;
+      readerViewport.appendChild(sheet);
+    });
+
+    currentReaderIndex = Math.min(startIndex, pagesData.length - 1);
+    document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
+    document.getElementById('reader-total').innerText = pagesData.length;
+
+    document.getElementById('reader-container').style.display = 'block';
+    isReaderOpen = true;
+
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
+
+  function nextSlide() {
+    const slides = document.querySelectorAll('.slide-sheet');
+    if (currentReaderIndex < slides.length - 1) {
+      slides[currentReaderIndex].classList.remove('active');
+      currentReaderIndex++;
+      slides[currentReaderIndex].classList.add('active');
+      document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
+    }
+  }
+
+  function prevSlide() {
+    const slides = document.querySelectorAll('.slide-sheet');
+    if (currentReaderIndex > 0) {
+      slides[currentReaderIndex].classList.remove('active');
+      currentReaderIndex--;
+      slides[currentReaderIndex].classList.add('active');
+      document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
+    }
+  }
+
+  function exitReaderMode() {
+    document.getElementById('reader-container').style.display = 'none';
+    isReaderOpen = false;
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (isReaderOpen) {
+      if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) {
+        e.preventDefault();
+        nextSlide();
+      } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'Escape') {
+        exitReaderMode();
+      }
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else {
+        e.preventDefault();
+        undo();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
+    }
+  });
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1500);
+  }
+
+  init();
+</script>
+</body>
+</html>
