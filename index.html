@@ -31,7 +31,7 @@
     --accent: #38bdf8;
     --toolbar-height: 96px;
     --page-width: min(820px, 92vw);
-    --page-card-height: 80vh; /* 화면 높이의 80% */
+    --page-card-height: 80vh;
     --header-height: 42px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
     --ui-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
@@ -205,7 +205,7 @@
 
   #file-input { display: none; }
 
-  /* 메인 뷰포트 (기본: 세로 스크롤 모드) */
+  /* 메인 뷰포트 (세로 스크롤 모드) */
   #main-viewport {
     position: fixed;
     top: var(--toolbar-height);
@@ -253,31 +253,35 @@
     padding: 12px;
   }
 
-  /* 플로팅 반투명 커스텀 스크롤바 */
+  /* 드래그 가능한 인터랙티브 플로팅 스크롤바 트랙 */
   #floating-scrollbar-track {
     position: fixed;
     top: calc(var(--toolbar-height) + 12px);
     bottom: 80px;
     right: 6px;
-    width: 5px;
+    width: 10px;
     background: transparent;
-    pointer-events: none;
     z-index: 2000;
+    cursor: pointer;
   }
 
   #floating-scrollbar-thumb {
-    width: 100%;
-    min-height: 28px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    min-height: 32px;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.45);
     box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
     opacity: 0;
-    transition: opacity 0.4s ease, transform 0.08s linear;
-    transform: translateY(0);
+    transition: opacity 0.4s ease, background 0.2s;
+    touch-action: none;
   }
   #floating-scrollbar-thumb.visible { opacity: 0.85; }
+  #floating-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.8); }
 
-  /* 반응형 80vh 개별 페이지 카드 */
+  /* 개별 페이지 카드 */
   .note-page-card {
     width: var(--page-width);
     max-width: 820px;
@@ -307,6 +311,7 @@
     color: #888888;
     flex-shrink: 0;
     box-sizing: border-box;
+    z-index: 5;
   }
 
   .page-badge {
@@ -597,7 +602,7 @@
 
       <div class="divider"></div>
 
-      <!-- 페이지 모드 전환 버튼 (스크롤 / 가로 페이지) -->
+      <!-- 페이지 모드 전환 버튼 -->
       <button id="btn-view-mode" class="btn-icon" onclick="toggleViewMode()" title="스크롤 / 페이지 모드 전환">
         <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -656,7 +661,7 @@
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
       </button>
 
@@ -712,7 +717,7 @@
 <!-- 메인 에디터 뷰포트 -->
 <div id="main-viewport" class="view-scroll"></div>
 
-<!-- 플로팅 반투명 커스텀 스크롤바 -->
+<!-- 드래그 가능한 인터랙티브 플로팅 스크롤바 -->
 <div id="floating-scrollbar-track">
   <div id="floating-scrollbar-thumb"></div>
 </div>
@@ -805,7 +810,7 @@
   let globalIsBold = false;
   let globalIsItalic = false;
 
-  let viewMode = 'scroll'; // 'scroll' 또는 'page'
+  let viewMode = 'scroll';
   let pagesData = [];
   let undoStack = [];
   let redoStack = [];
@@ -824,7 +829,7 @@
 
   let scrollFadeTimer = null;
 
-  /* 플로팅 스크롤바 제어 */
+  /* ================= 인터랙티브 드래그 가능한 플로팅 스크롤바 제어 ================= */
   function updateFloatingScrollbar() {
     if (!viewport || !scrollbarThumb || !scrollbarTrack || viewMode !== 'scroll') {
       if (scrollbarThumb) scrollbarThumb.classList.remove('visible');
@@ -860,6 +865,69 @@
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
+  // 마우스/터치 드래그로 스크롤바 움직이기
+  let isDraggingThumb = false;
+  let dragStartY = 0;
+  let startScrollTop = 0;
+
+  scrollbarThumb.addEventListener('mousedown', (e) => {
+    isDraggingThumb = true;
+    dragStartY = e.clientY;
+    startScrollTop = viewport.scrollTop;
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDraggingThumb) return;
+    const trackHeight = scrollbarTrack.clientHeight;
+    const thumbHeight = scrollbarThumb.clientHeight;
+    const maxThumbTop = trackHeight - thumbHeight;
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+
+    const deltaY = e.clientY - dragStartY;
+    const scrollDelta = (deltaY / maxThumbTop) * maxScrollTop;
+    viewport.scrollTop = startScrollTop + scrollDelta;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDraggingThumb) {
+      isDraggingThumb = false;
+      document.body.style.userSelect = '';
+    }
+  });
+
+  scrollbarThumb.addEventListener('touchstart', (e) => {
+    isDraggingThumb = true;
+    dragStartY = e.touches[0].clientY;
+    startScrollTop = viewport.scrollTop;
+    e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!isDraggingThumb) return;
+    const trackHeight = scrollbarTrack.clientHeight;
+    const thumbHeight = scrollbarThumb.clientHeight;
+    const maxThumbTop = trackHeight - thumbHeight;
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+
+    const deltaY = e.touches[0].clientY - dragStartY;
+    const scrollDelta = (deltaY / maxThumbTop) * maxScrollTop;
+    viewport.scrollTop = startScrollTop + scrollDelta;
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => { isDraggingThumb = false; });
+
+  // 트랙 클릭 시 해당 위치로 점프 스크롤
+  scrollbarTrack.addEventListener('click', (e) => {
+    if (e.target === scrollbarThumb) return;
+    const trackRect = scrollbarTrack.getBoundingClientRect();
+    const clickY = e.clientY - trackRect.top;
+    const trackHeight = trackRect.height;
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+    viewport.scrollTop = (clickY / trackHeight) * maxScrollTop;
+  });
+
   function toggleViewMode() {
     viewMode = viewMode === 'scroll' ? 'page' : 'scroll';
     localStorage.setItem('yslide_note_view_mode', viewMode);
@@ -879,6 +947,7 @@
         btnViewMode.title = "현재: 가로 페이지 넘김 모드";
       }
     }
+    updateFloatingScrollbar();
   }
 
   function getDynamicAvailableHeight() {
