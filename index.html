@@ -31,7 +31,7 @@
     --accent: #38bdf8;
     --toolbar-height: 96px;
     --page-width: min(820px, 92vw);
-    --page-card-height: 80vh; /* 각 페이지 카드 높이 */
+    --page-card-height: 80vh;
     --header-height: 42px;
     --page-gap: 28px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
@@ -337,7 +337,7 @@
   .page-title-input::placeholder { color: #555555; }
   .page-title-input:focus { color: #38bdf8; }
 
-  /* 페이지별 삭제 버튼 (일반 툴바 아이콘과 색상 통일) */
+  /* 페이지별 삭제 버튼 */
   .btn-page-delete {
     width: 28px;
     height: 28px;
@@ -355,7 +355,7 @@
   }
   .btn-page-delete:hover {
     background-color: #333333;
-    color: #ef4444; /* 마우스 올릴 때만 은은한 경고 레드 색상 */
+    color: #ef4444;
   }
 
   /* 텍스트 편집 영역 */
@@ -612,6 +612,15 @@
         </svg>
       </button>
 
+      <!-- 텍스트 정렬 순환 버튼 (이탤릭 우측 배치) -->
+      <button id="btn-align-cycle" class="btn-icon" onmousedown="event.preventDefault()" onclick="cycleTextAlign()" title="정렬 변경 (좌측/가운데/우측)">
+        <svg id="icon-align" class="icon-svg" viewBox="0 0 24 24">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="15" y2="12"></line>
+          <line x1="3" y1="18" x2="18" y2="18"></line>
+        </svg>
+      </button>
+
       <!-- 일괄 적용 토글 버튼 -->
       <button id="btn-batch-mode" class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBatchMode()" title="모든 페이지 일괄 서식 적용 모드">
         <svg class="icon-svg" viewBox="0 0 24 24">
@@ -682,7 +691,7 @@
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
       </button>
 
@@ -726,7 +735,7 @@
         </svg>
       </button>
 
-      <!-- 전체보기 버튼 (다른 툴바 아이콘과 색상 통일) -->
+      <!-- 전체보기 버튼 -->
       <button class="btn-icon" onclick="startFullPresentation(0)" title="1페이지부터 전체보기">
         <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -831,6 +840,9 @@
   let globalLineHeight = 1.55;
   let globalIsBold = false;
   let globalIsItalic = false;
+  let currentTextAlignIndex = 0; // 0: 좌측, 1: 가운데, 2: 우측
+  const ALIGN_MODES = ['left', 'center', 'right'];
+  const ALIGN_NAMES = ['좌측 정렬', '가운데 정렬', '우측 정렬'];
 
   let viewMode = 'scroll'; // 'scroll' 또는 'page'
   let pagesData = [];
@@ -846,6 +858,7 @@
   const btnBatchMode = document.getElementById('btn-batch-mode');
   const btnViewMode = document.getElementById('btn-view-mode');
   const iconViewMode = document.getElementById('icon-view-mode');
+  const iconAlign = document.getElementById('icon-align');
   const scrollbarThumb = document.getElementById('floating-scrollbar-thumb');
   const scrollbarTrack = document.getElementById('floating-scrollbar-track');
 
@@ -886,6 +899,38 @@
   }
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
+
+  /* 텍스트 정렬 순환 토글 함수 */
+  function cycleTextAlign() {
+    pushHistory();
+    currentTextAlignIndex = (currentTextAlignIndex + 1) % ALIGN_MODES.length;
+    const mode = ALIGN_MODES[currentTextAlignIndex];
+    const name = ALIGN_NAMES[currentTextAlignIndex];
+
+    // 아이콘 모양 동적 변경
+    if (mode === 'left') {
+      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line>';
+    } else if (mode === 'center') {
+      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line>';
+    } else {
+      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
+    }
+
+    if (isBatchMode) {
+      document.querySelectorAll('.page-editor').forEach(ed => {
+        ed.style.textAlign = mode;
+      });
+      showToast(`전체 ${name}`);
+    } else {
+      const idx = getCurrentPageIndex();
+      const editor = document.querySelectorAll('.page-editor')[idx];
+      if (editor) {
+        editor.style.textAlign = mode;
+        showToast(`페이지 ${idx + 1}: ${name}`);
+      }
+    }
+    saveAllPagesState();
+  }
 
   /* 뷰모드(스크롤 / 페이지) 전환 */
   function toggleViewMode() {
@@ -959,19 +1004,19 @@
       if (savedMode) viewMode = savedMode;
       applyViewModeUI();
 
-      const saved = localStorage.getItem('yslide_note_pages_v50');
+      const saved = localStorage.getItem('yslide_note_pages_v51');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
           pagesData = parsed;
         } else {
-          pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true }];
+          pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true, align: 'left' }];
         }
       } else {
-        pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true }];
+        pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true, align: 'left' }];
       }
     } catch (e) {
-      pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true }];
+      pagesData = [{ title: '', html: PLACEHOLDER_TEXT, isPlaceholder: true, align: 'left' }];
     }
 
     pushHistory();
@@ -1219,6 +1264,7 @@
       editor.contentEditable = 'true';
       editor.spellcheck = false;
       editor.style.fontSize = `${currentFontSize}px`;
+      editor.style.textAlign = page.align || 'left';
       
       if (page.isPlaceholder || (!page.html && page.html !== '')) {
         editor.classList.add('is-placeholder');
@@ -1430,10 +1476,12 @@
       newPagesHtml.some((html, idx) => pagesData[idx] && pagesData[idx].html !== html);
 
     if (hasChanged) {
+      const oldAligns = pagesData.map(p => p.align || 'left');
       pagesData = newPagesHtml.map((h, idx) => ({
         title: (pagesData[idx] && pagesData[idx].title) ? pagesData[idx].title : '',
         html: h,
-        isPlaceholder: false
+        isPlaceholder: false,
+        align: oldAligns[idx] || 'left'
       }));
 
       renderPages();
@@ -1783,7 +1831,7 @@ ${originalHtml}`;
   function addNewPage() {
     pushHistory();
     saveAllPagesState();
-    pagesData.push({ title: '', html: '', isPlaceholder: false });
+    pagesData.push({ title: '', html: '', isPlaceholder: false, align: 'left' });
     renderPages();
     pushHistory();
 
@@ -1822,6 +1870,7 @@ ${originalHtml}`;
           pagesData[idx].html = editor.innerHTML;
           pagesData[idx].isPlaceholder = false;
         }
+        pagesData[idx].align = editor.style.textAlign || 'left';
         if (titleInput) {
           pagesData[idx].title = titleInput.value;
         }
@@ -1832,7 +1881,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v50', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v51', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
@@ -1870,7 +1919,7 @@ ${originalHtml}`;
         }
       } catch (err) {}
 
-      pagesData = [{ title: '', html: raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>'), isPlaceholder: false }];
+      pagesData = [{ title: '', html: raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>'), isPlaceholder: false, align: 'left' }];
       seamlessContinuousReflow();
     };
     reader.readAsText(files[0]);
