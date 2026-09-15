@@ -320,17 +320,23 @@
   .page-title-input:focus { color: #38bdf8; }
 
   /* 
-    진정한 단 하나의 통짜 캔버스 에디터 
-    - 각 페이지 헤더 공간(42px)과 여백을 자동으로 피할 수 있도록 박스 모델 패딩 설정
+    삼성노트/HWP식 진정한 단일 통짜 다단 컬럼 캔버스
+    - 핵심: column-width를 페이지 폭으로 잡고, column-gap을 정확히 카드 간격(28px) + 헤더 높이(42px) 만큼 주어 
+      텍스트가 각 페이지의 본문 영역 안으로만 쏙쏙 나누어져 들어가게 함
   */
   #true-single-canvas {
     position: relative;
     width: 100%;
-    min-height: var(--page-card-height);
+    
+    /* CSS 다단을 통한 페이지 자동 분할 렌더링 */
+    column-width: var(--page-width);
+    column-gap: calc(var(--page-gap) + var(--header-height) + 20px);
+    height: calc(var(--page-card-height) - var(--header-height));
+    
     padding-left: 36px;
     padding-right: 36px;
-    padding-bottom: 40px;
-    padding-top: calc(var(--header-height) + 24px);
+    padding-top: 24px;
+    padding-bottom: 24px;
     
     color: #ffffff;
     font-size: 26px;
@@ -696,7 +702,7 @@
   <div id="document-wrapper">
     <!-- 배경 시각적 페이지 카드 가이드 레이어 -->
     <div id="visual-sheets-container"></div>
-    <!-- 진짜 단 하나의 통짜 캔버스 에디터 (Ctrl+A 전체 선택 가능 + 페이지 회피형 마스크 패딩) -->
+    <!-- 단일 통짜 다단 캔버스 에디터 (각 페이지 본문 안으로 텍스트가 정확히 안착됨) -->
     <div id="true-single-canvas" contenteditable="true" spellcheck="false"></div>
   </div>
 </div>
@@ -843,34 +849,23 @@
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
-  /* ================== 핵심 수정: 페이지 카드 높이 및 헤더 공간을 고려한 동적 패딩 스트림 매핑 ================== */
-  function updateCanvasMaskPadding() {
+  /* ================== 삼성노트식 다단 분할 엔진 (각 페이지 본문 격리 안착) ================== */
+  function updateVisualPageSheets() {
     const pageCardHeight = window.innerHeight * 0.8;
     const pageGap = 28;
     const headerH = 42;
-    const topPad = 24;
 
     const canvasHeight = Math.max(pageCardHeight, singleCanvas.scrollHeight);
     const calculatedPages = Math.max(1, Math.ceil(canvasHeight / (pageCardHeight + pageGap)));
     totalPageCount = calculatedPages;
 
-    // 핵심: 각 페이지의 헤더 높이만큼 텍스트가 위로 올라오지 못하도록 수직 마스크 패딩 스트링 생성
-    // 브라우저가 각 페이지 영역마다 정확히 헤더 높이(42px) + 여백(24px)만큼 위쪽을 비워주도록 계산
-    let paddingStops = [];
-    for (let i = 0; i < calculatedPages; i++) {
-      let pageTop = i * (pageCardHeight + pageGap);
-      let textStart = pageTop + headerH + topPad;
-      let pageBottom = pageTop + pageCardHeight;
-      let nextHeaderStart = pageBottom + pageGap;
-      
-      paddingStops.push(`${pageTop}px`);
-      paddingStops.push(`${textStart}px`);
-    }
+    // 핵심: 단일 캔버스의 높이(80vh - 헤더42px)에 맞추어 텍스트가 컬럼 단위로 다음 페이지 본문으로 정확히 떨어지도록 설정
+    const bodyHeight = pageCardHeight - headerH;
+    singleCanvas.style.height = `${bodyHeight}px`;
+    // 다단 간격에 카드 간격(28px)과 헤더 높이(42px)를 정확히 반영하여 텍스트가 헤더 밑에만 배치되도록 함
+    singleCanvas.style.columnGap = `${pageGap + headerH + 24px}`;
 
-    // 캔버스 기본 상단 패딩 설정
-    singleCanvas.style.paddingTop = `${headerH + topPad}px`;
-
-    // 백그라운드 페이지 시트 틀 생성
+    // 배경 페이지 시트 틀 생성
     visualSheetsContainer.innerHTML = '';
     for (let i = 0; i < calculatedPages; i++) {
       const sheet = document.createElement('div');
@@ -919,8 +914,8 @@
       }
       applyCurrentFont();
 
-      const savedDoc = localStorage.getItem('yslide_true_single_doc_v11');
-      const savedTitles = localStorage.getItem('yslide_true_doc_titles_v11');
+      const savedDoc = localStorage.getItem('yslide_true_single_doc_v12');
+      const savedTitles = localStorage.getItem('yslide_true_doc_titles_v12');
 
       if (savedDoc && savedDoc.trim() !== '' && savedDoc.trim() !== PLACEHOLDER_TEXT) {
         singleCanvas.innerHTML = cleanPageMarkers(savedDoc);
@@ -939,13 +934,13 @@
     }
 
     pushHistory();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
     updateFontSize();
     setTimeout(updateFloatingScrollbar, 200);
   }
 
   window.addEventListener('resize', () => {
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
     updateFloatingScrollbar();
   });
 
@@ -970,7 +965,7 @@
       singleCanvas.innerHTML = prev.html;
       pageTitles = prev.titles || {};
       saveToStorageSilent();
-      updateCanvasMaskPadding();
+      updateVisualPageSheets();
       showToast('↶ 되돌리기');
     } else {
       showToast('⚠️ 더 이상 되돌릴 작업이 없습니다');
@@ -985,7 +980,7 @@
       singleCanvas.innerHTML = next.html;
       pageTitles = next.titles || {};
       saveToStorageSilent();
-      updateCanvasMaskPadding();
+      updateVisualPageSheets();
       showToast('↷ 다시 실행');
     } else {
       showToast('⚠️ 다시 실행할 작업이 없습니다');
@@ -1022,7 +1017,7 @@
       singleCanvas.innerHTML = '';
       singleCanvas.classList.remove('is-placeholder');
       saveToStorageSilent();
-      updateCanvasMaskPadding();
+      updateVisualPageSheets();
     }
   });
 
@@ -1031,7 +1026,7 @@
       singleCanvas.classList.remove('is-placeholder');
     }
     saveToStorageSilent();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
     updateFloatingScrollbar();
   });
 
@@ -1042,7 +1037,7 @@
     }
     setTimeout(() => {
       saveToStorageSilent();
-      updateCanvasMaskPadding();
+      updateVisualPageSheets();
       updateFloatingScrollbar();
       pushHistory();
     }, 10);
@@ -1050,12 +1045,12 @@
 
   function saveToStorageSilent() {
     try {
-      localStorage.setItem('yslide_true_single_doc_v11', singleCanvas.innerHTML);
-      localStorage.setItem('yslide_true_doc_titles_v11', JSON.stringify(pageTitles));
+      localStorage.setItem('yslide_true_single_doc_v12', singleCanvas.innerHTML);
+      localStorage.setItem('yslide_true_doc_titles_v12', JSON.stringify(pageTitles));
     } catch(e) {}
   }
 
-  /* 서식 조절 (키가 안 먹히던 이슈 수정 완료: 일괄 및 단일 서식 완벽 대응) */
+  /* 서식 조절 */
   function toggleBold() {
     pushHistory();
     const sel = window.getSelection();
@@ -1067,7 +1062,7 @@
       showToast(cur ? '전체 볼드체 해제' : '전체 볼드체 적용');
     }
     saveToStorageSilent();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
   }
 
   function toggleItalic() {
@@ -1081,7 +1076,7 @@
       showToast(cur ? '전체 이탤릭체 해제' : '전체 이탤릭체 적용');
     }
     saveToStorageSilent();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
   }
 
   function adjustLetterSpacing(delta) {
@@ -1100,7 +1095,7 @@
       showToast(`전체 자간: ${globalLetterSpacing}px`);
     }
     saveToStorageSilent();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
   }
 
   function adjustLineHeight(delta) {
@@ -1109,7 +1104,7 @@
     singleCanvas.style.lineHeight = `${globalLineHeight}`;
     showToast(`전체 줄간격: ${globalLineHeight}`);
     saveToStorageSilent();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
   }
 
   /* Gemini 영문 번역 */
@@ -1181,7 +1176,7 @@ ${originalHtml}`;
         range.insertNode(frag);
 
         saveToStorageSilent();
-        updateCanvasMaskPadding();
+        updateVisualPageSheets();
         showToast('✨ 영어 번역이 완료되었습니다');
       }
     } catch (err) {
@@ -1318,7 +1313,7 @@ ${originalHtml}`;
   function changeFontSize(delta) {
     currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
     updateFontSize();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
   }
 
   function updateFontSize() {
@@ -1339,7 +1334,7 @@ ${originalHtml}`;
     singleCanvas.innerHTML += brs;
 
     saveToStorageSilent();
-    updateCanvasMaskPadding();
+    updateVisualPageSheets();
     showToast('📄 새 페이지 영역이 추가되었습니다');
   }
 
@@ -1376,7 +1371,7 @@ ${originalHtml}`;
           pageTitles = parsed.titles || {};
           singleCanvas.classList.remove('is-placeholder');
           saveToStorageSilent();
-          updateCanvasMaskPadding();
+          updateVisualPageSheets();
           showToast('📂 파일을 불러왔습니다');
           return;
         }
@@ -1385,7 +1380,7 @@ ${originalHtml}`;
       singleCanvas.innerHTML = cleanPageMarkers(raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>'));
       singleCanvas.classList.remove('is-placeholder');
       saveToStorageSilent();
-      updateCanvasMaskPadding();
+      updateVisualPageSheets();
       showToast('📂 텍스트 파일을 불러왔습니다');
     };
     reader.readAsText(files[0]);
