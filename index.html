@@ -337,14 +337,14 @@
   .page-title-input::placeholder { color: #555555; }
   .page-title-input:focus { color: #38bdf8; }
 
-  /* 페이지별 삭제 버튼 (휴지통 아이콘 네모 버튼) */
+  /* 페이지별 삭제 버튼 (일반 툴바 아이콘과 색상 통일) */
   .btn-page-delete {
     width: 28px;
     height: 28px;
     background-color: #262626;
     border: 1px solid #484848;
     border-radius: 6px;
-    color: #ef4444;
+    color: #e5e5e5;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -354,8 +354,8 @@
     justify-self: end;
   }
   .btn-page-delete:hover {
-    background-color: #3f1d1d;
-    border-color: #ef4444;
+    background-color: #333333;
+    color: #ef4444; /* 마우스 올릴 때만 은은한 경고 레드 색상 */
   }
 
   /* 텍스트 편집 영역 */
@@ -682,7 +682,7 @@
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
       </button>
 
@@ -726,7 +726,8 @@
         </svg>
       </button>
 
-      <button class="btn-icon" onclick="startFullPresentation(0)" style="background-color:#0284c7; border-color:#38bdf8; color:#fff;" title="1페이지부터 전체보기">
+      <!-- 전체보기 버튼 (다른 툴바 아이콘과 색상 통일) -->
+      <button class="btn-icon" onclick="startFullPresentation(0)" title="1페이지부터 전체보기">
         <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
@@ -958,7 +959,7 @@
       if (savedMode) viewMode = savedMode;
       applyViewModeUI();
 
-      const saved = localStorage.getItem('yslide_note_pages_v49');
+      const saved = localStorage.getItem('yslide_note_pages_v50');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
@@ -1155,14 +1156,12 @@
     return pre.toString().length === 0;
   }
 
-  /* 특정 페이지 삭제 함수 */
   function deletePage(index) {
     if (pagesData.length <= 1) {
       showToast('⚠️ 마지막 남은 페이지는 삭제할 수 없습니다');
       return;
     }
     pushHistory();
-    // 삭제할 페이지의 텍스트를 이전 페이지나 다음 페이지에 합쳐줌
     if (index > 0) {
       pagesData[index - 1].html = (pagesData[index - 1].html || '') + (pagesData[index].html || '');
       pagesData.splice(index, 1);
@@ -1200,7 +1199,6 @@
         saveToLocalStorageSilent();
       });
 
-      // 휴지통 아이콘 네모 삭제 버튼 생성
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'btn-page-delete';
       deleteBtn.title = '이 페이지 삭제';
@@ -1834,7 +1832,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v49', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v50', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
