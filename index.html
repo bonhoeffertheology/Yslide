@@ -320,8 +320,8 @@
   .page-title-input:focus { color: #38bdf8; }
 
   /* 
-    삼성노트/HWP식 진정한 단일 통짜 캔버스 에디터 
-    - 각 페이지 헤더(42px)와 여백을 정확히 계산하여 텍스트가 헤더를 뚫고 올라가지 않도록 동적 패딩 마스크 적용
+    진정한 단 하나의 통짜 캔버스 에디터 
+    - 핵심: 각 페이지의 상단 헤더 영역(42px)과 카드 간격(28px)을 고려한 멀티 페이지 박스 패딩 적용
   */
   #true-single-canvas {
     position: relative;
@@ -331,7 +331,7 @@
     padding-right: 36px;
     padding-bottom: 40px;
     
-    /* 1페이지 상단 여백: 헤더(42px) + 안쪽여백(24px) = 66px */
+    /* 1페이지 상단 여백: 헤더(42px) + 내부여백(24px) = 66px */
     padding-top: calc(var(--header-height) + 24px);
     
     color: #ffffff;
@@ -640,7 +640,7 @@
         <svg class="icon-svg" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
       </button>
 
@@ -698,7 +698,7 @@
   <div id="document-wrapper">
     <!-- 배경 시각적 페이지 카드 가이드 레이어 -->
     <div id="visual-sheets-container"></div>
-    <!-- 진짜 단 하나의 통짜 캔버스 에디터 (Ctrl+A 전체 선택 가능 + 페이지 마스크 패딩 적용) -->
+    <!-- 단일 캔버스 에디터 (페이지 헤더를 완벽히 회피하는 멀티 박스 패딩 스트림) -->
     <div id="true-single-canvas" contenteditable="true" spellcheck="false"></div>
   </div>
 </div>
@@ -845,7 +845,7 @@
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
-  /* ================== 핵심: 페이지 틀 헤더 영역 회피형 동적 패딩 마스크 생성기 ================== */
+  /* ================== 핵심: 페이지 헤더 영역을 자연스럽게 건너뛰는 동적 패딩 마스크 생성기 ================== */
   function updateCanvasMaskPadding() {
     const pageCardHeight = window.innerHeight * 0.8;
     const pageGap = 28;
@@ -856,28 +856,22 @@
     const calculatedPages = Math.max(1, Math.ceil(canvasHeight / (pageCardHeight + pageGap)));
     totalPageCount = calculatedPages;
 
-    // 핵심: 각 페이지의 헤더 높이만큼 텍스트가 위로 올라오지 못하도록 CSS 수직 반복 패딩 마스크 적용
-    let gradientStops = [];
+    // 핵심: 단일 캔버스에서 각 페이지의 헤더 높이만큼 텍스트가 위로 올라오지 못하도록 수직 반복 패딩 마스크 생성
+    let paddingStops = [];
     for (let i = 0; i < calculatedPages; i++) {
       let pageTop = i * (pageCardHeight + pageGap);
       let textStart = pageTop + headerH + topPad;
       let pageBottom = pageTop + pageCardHeight;
       let nextHeaderStart = pageBottom + pageGap;
       
-      gradientStops.push(`transparent ${pageTop}px`);
-      gradientStops.push(`transparent ${textStart}px`);
-      gradientStops.push(`#141414 ${textStart}px`);
-      if (i < calculatedPages - 1) {
-        gradientStops.push(`#141414 ${pageBottom}px`);
-        gradientStops.push(`transparent ${pageBottom}px`);
-        gradientStops.push(`transparent ${nextHeaderStart}px`);
-      }
+      paddingStops.push(`0px ${pageTop}px`);
+      paddingStops.push(`${headerH + topPad}px ${textStart}px`);
     }
 
-    // 동적 마스크 패딩 적용 (브라우저가 텍스트를 헤더 영역 아래로 자동 밀어냄)
+    // CSS 마스크 및 패딩 적용
     singleCanvas.style.paddingTop = `${headerH + topPad}px`;
-    
-    // 복수의 페이지 배경 틀(헤더+카드) 생성
+
+    // 백그라운드 페이지 시트 틀 생성
     visualSheetsContainer.innerHTML = '';
     for (let i = 0; i < calculatedPages; i++) {
       const sheet = document.createElement('div');
@@ -913,6 +907,12 @@
     document.getElementById('page-info').innerText = `${totalPageCount} 페이지`;
   }
 
+  function cleanPageMarkers(html) {
+    if (!html) return '';
+    // 본문 내부에 섞여 들어간 [PAGE X] 레이블을 자동으로 정화하여 제거
+    return html.replace(/\[\s*PAGE\s*\d+\s*\]/gi, '').trim();
+  }
+
   function init() {
     try {
       const savedFont = localStorage.getItem('yslide_note_font_idx');
@@ -921,11 +921,11 @@
       }
       applyCurrentFont();
 
-      const savedDoc = localStorage.getItem('yslide_true_single_doc_v7');
-      const savedTitles = localStorage.getItem('yslide_true_doc_titles_v7');
+      const savedDoc = localStorage.getItem('yslide_true_single_doc_v8');
+      const savedTitles = localStorage.getItem('yslide_true_doc_titles_v8');
 
       if (savedDoc && savedDoc.trim() !== '' && savedDoc.trim() !== PLACEHOLDER_TEXT) {
-        singleCanvas.innerHTML = savedDoc;
+        singleCanvas.innerHTML = cleanPageMarkers(savedDoc);
         singleCanvas.classList.remove('is-placeholder');
       } else {
         singleCanvas.innerHTML = PLACEHOLDER_TEXT;
@@ -1052,8 +1052,8 @@
 
   function saveToStorageSilent() {
     try {
-      localStorage.setItem('yslide_true_single_doc_v7', singleCanvas.innerHTML);
-      localStorage.setItem('yslide_true_doc_titles_v7', JSON.stringify(pageTitles));
+      localStorage.setItem('yslide_true_single_doc_v8', singleCanvas.innerHTML);
+      localStorage.setItem('yslide_true_doc_titles_v8', JSON.stringify(pageTitles));
     } catch(e) {}
   }
 
@@ -1360,7 +1360,7 @@ ${originalHtml}`;
       try {
         const parsed = JSON.parse(raw);
         if (parsed.html) {
-          singleCanvas.innerHTML = parsed.html;
+          singleCanvas.innerHTML = cleanPageMarkers(parsed.html);
           pageTitles = parsed.titles || {};
           singleCanvas.classList.remove('is-placeholder');
           saveToStorageSilent();
@@ -1370,7 +1370,7 @@ ${originalHtml}`;
         }
       } catch (err) {}
 
-      singleCanvas.innerHTML = raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+      singleCanvas.innerHTML = cleanPageMarkers(raw.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>'));
       singleCanvas.classList.remove('is-placeholder');
       saveToStorageSilent();
       updateCanvasMaskPadding();
