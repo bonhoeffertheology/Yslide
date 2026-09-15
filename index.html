@@ -31,7 +31,7 @@
     --accent: #38bdf8;
     --toolbar-height: 96px;
     --page-width: min(820px, 92vw);
-    --page-card-height: 80vh; /* 각 페이지 카드 높이 */
+    --page-card-height: 80vh;
     --header-height: 42px;
     --page-gap: 28px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
@@ -206,7 +206,7 @@
 
   #file-input { display: none; }
 
-  /* 메인 스크롤 뷰포트 */
+  /* 메인 뷰포트 */
   #main-viewport {
     position: fixed;
     top: var(--toolbar-height);
@@ -219,7 +219,6 @@
     z-index: 10;
   }
 
-  /* 📜 세로 스크롤 모드 */
   #main-viewport.view-scroll {
     overflow-y: auto !important;
     overflow-x: hidden;
@@ -230,7 +229,6 @@
   }
   #main-viewport.view-scroll::-webkit-scrollbar { display: none; }
 
-  /* 📄 가로 페이지 넘김 모드 */
   #main-viewport.view-page {
     overflow-x: auto !important;
     overflow-y: hidden;
@@ -255,31 +253,33 @@
     padding: 12px;
   }
 
-  /* 플로팅 반투명 커스텀 스크롤바 */
+  /* 💡 인터랙티브 드래그/터치 가능한 플로팅 스크롤바 */
   #floating-scrollbar-track {
     position: fixed;
     top: calc(var(--toolbar-height) + 12px);
     bottom: 80px;
     right: 6px;
-    width: 5px;
+    width: 12px;
     background: transparent;
-    pointer-events: none;
     z-index: 2000;
+    cursor: pointer;
   }
 
   #floating-scrollbar-thumb {
-    width: 100%;
-    min-height: 28px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    min-height: 32px;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.45);
     box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
     opacity: 0;
-    transition: opacity 0.4s ease, transform 0.08s linear;
-    transform: translateY(0);
+    transition: opacity 0.4s ease, background 0.2s;
+    touch-action: none;
   }
-  #floating-scrollbar-thumb.visible {
-    opacity: 0.85;
-  }
+  #floating-scrollbar-thumb.visible { opacity: 0.85; }
+  #floating-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.85); }
 
   /* 각 페이지 카드 틀 */
   .note-page-card {
@@ -298,7 +298,6 @@
     overflow: hidden;
   }
 
-  /* 페이지 상단 헤더 */
   .page-header {
     height: var(--header-height);
     background-color: #1a1a1a;
@@ -321,7 +320,6 @@
     cursor: default;
   }
 
-  /* 페이지 제목 입력 칸 */
   .page-title-input {
     width: 100%;
     background: transparent;
@@ -337,7 +335,6 @@
   .page-title-input::placeholder { color: #555555; }
   .page-title-input:focus { color: #38bdf8; }
 
-  /* 페이지별 삭제 버튼 */
   .btn-page-delete {
     width: 28px;
     height: 28px;
@@ -358,7 +355,6 @@
     color: #ef4444;
   }
 
-  /* 텍스트 편집 영역 */
   .page-editor {
     flex: 1;
     width: 100%;
@@ -484,7 +480,6 @@
     z-index: 6000;
   }
 
-  /* 인쇄 영역 */
   #print-area { display: none; }
 
   @media print {
@@ -612,7 +607,7 @@
         </svg>
       </button>
 
-      <!-- 텍스트 정렬 순환 버튼 (이탤릭 우측) -->
+      <!-- 텍스트 정렬 순환 버튼 -->
       <button id="btn-align-cycle" class="btn-icon" onmousedown="event.preventDefault()" onclick="cycleTextAlign()" title="정렬 변경 (좌측/가운데/우측)">
         <svg id="icon-align" class="icon-svg" viewBox="0 0 24 24">
           <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -735,7 +730,6 @@
         </svg>
       </button>
 
-      <!-- 전체보기 버튼 -->
       <button class="btn-icon" onclick="startFullPresentation(0)" title="1페이지부터 전체보기">
         <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -748,7 +742,7 @@
 <!-- 메인 에디터 뷰포트 -->
 <div id="main-viewport" class="view-scroll"></div>
 
-<!-- 플로팅 반투명 커스텀 스크롤바 -->
+<!-- 💡 드래그 및 터치 조절 가능한 인터랙티브 플로팅 스크롤바 -->
 <div id="floating-scrollbar-track">
   <div id="floating-scrollbar-thumb"></div>
 </div>
@@ -840,11 +834,11 @@
   let globalLineHeight = 1.55;
   let globalIsBold = false;
   let globalIsItalic = false;
-  let currentTextAlignIndex = 0; // 0: 좌측, 1: 가운데, 2: 우측
+  let currentTextAlignIndex = 0;
   const ALIGN_MODES = ['left', 'center', 'right'];
   const ALIGN_NAMES = ['좌측 정렬', '가운데 정렬', '우측 정렬'];
 
-  let viewMode = 'scroll'; // 'scroll' 또는 'page'
+  let viewMode = 'scroll';
   let pagesData = [];
   let undoStack = [];
   let redoStack = [];
@@ -864,7 +858,7 @@
 
   let scrollFadeTimer = null;
 
-  /* 플로팅 스크롤바 제어 */
+  /* ================== 💡 인터랙티브 플로팅 스크롤바 제어 엔진 ================== */
   function updateFloatingScrollbar() {
     if (!viewport || !scrollbarThumb || !scrollbarTrack || viewMode !== 'scroll') {
       if (scrollbarThumb) scrollbarThumb.classList.remove('visible');
@@ -895,48 +889,71 @@
     if (scrollFadeTimer) clearTimeout(scrollFadeTimer);
     scrollFadeTimer = setTimeout(() => {
       scrollbarThumb.classList.remove('visible');
-    }, 1000);
+    }, 1200);
   }
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
-  /* 텍스트 정렬 순환 토글 함수 (선택한 텍스트 또는 일괄/단일 적용) */
-  function cycleTextAlign() {
-    pushHistory();
-    currentTextAlignIndex = (currentTextAlignIndex + 1) % ALIGN_MODES.length;
-    const mode = ALIGN_MODES[currentTextAlignIndex];
-    const name = ALIGN_NAMES[currentTextAlignIndex];
+  let isDraggingThumb = false;
+  let dragStartY = 0;
+  let startScrollTop = 0;
 
-    // 아이콘 모양 동적 변경
-    if (mode === 'left') {
-      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line>';
-    } else if (mode === 'center') {
-      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line>';
-    } else {
-      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
-    }
+  scrollbarThumb.addEventListener('mousedown', (e) => {
+    isDraggingThumb = true;
+    dragStartY = e.clientY;
+    startScrollTop = viewport.scrollTop;
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
 
-    const sel = window.getSelection();
-    if (sel && !sel.isCollapsed && !isBatchMode) {
-      // 드래그하여 선택한 특정 텍스트 구간만 정렬 적용
-      document.execCommand('justify' + (mode === 'left' ? 'Left' : mode === 'center' ? 'Center' : 'Right'), false, null);
-      showToast(`선택 영역 ${name}`);
-    } else if (isBatchMode) {
-      document.querySelectorAll('.page-editor').forEach(ed => {
-        ed.style.textAlign = mode;
-      });
-      showToast(`전체 ${name}`);
-    } else {
-      const idx = getCurrentPageIndex();
-      const editor = document.querySelectorAll('.page-editor')[idx];
-      if (editor) {
-        editor.style.textAlign = mode;
-        showToast(`페이지 ${idx + 1}: ${name}`);
-      }
+  window.addEventListener('mousemove', (e) => {
+    if (!isDraggingThumb) return;
+    const trackHeight = scrollbarTrack.clientHeight;
+    const thumbHeight = scrollbarThumb.clientHeight;
+    const maxThumbTop = trackHeight - thumbHeight;
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+
+    const deltaY = e.clientY - dragStartY;
+    const scrollDelta = (deltaY / maxThumbTop) * maxScrollTop;
+    viewport.scrollTop = startScrollTop + scrollDelta;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDraggingThumb) {
+      isDraggingThumb = false;
+      document.body.style.userSelect = '';
     }
-    saveAllPagesState();
-    seamlessContinuousReflow();
-  }
+  });
+
+  scrollbarThumb.addEventListener('touchstart', (e) => {
+    isDraggingThumb = true;
+    dragStartY = e.touches[0].clientY;
+    startScrollTop = viewport.scrollTop;
+    e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!isDraggingThumb) return;
+    const trackHeight = scrollbarTrack.clientHeight;
+    const thumbHeight = scrollbarThumb.clientHeight;
+    const maxThumbTop = trackHeight - thumbHeight;
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+
+    const deltaY = e.touches[0].clientY - dragStartY;
+    const scrollDelta = (deltaY / maxThumbTop) * maxScrollTop;
+    viewport.scrollTop = startScrollTop + scrollDelta;
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => { isDraggingThumb = false; });
+
+  scrollbarTrack.addEventListener('click', (e) => {
+    if (e.target === scrollbarThumb) return;
+    const trackRect = scrollbarTrack.getBoundingClientRect();
+    const clickY = e.clientY - trackRect.top;
+    const trackHeight = trackRect.height;
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+    viewport.scrollTop = (clickY / trackHeight) * maxScrollTop;
+  });
 
   /* 뷰모드(스크롤 / 페이지) 전환 */
   function toggleViewMode() {
@@ -1010,7 +1027,7 @@
       if (savedMode) viewMode = savedMode;
       applyViewModeUI();
 
-      const saved = localStorage.getItem('yslide_note_pages_v52');
+      const saved = localStorage.getItem('yslide_note_pages_v53');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
@@ -1096,6 +1113,41 @@
     const current = FONT_LIST[currentFontIndex];
     document.documentElement.style.setProperty('--active-font', current.family);
     if (btnFontCycle) btnFontCycle.innerText = current.name;
+  }
+
+  function cycleTextAlign() {
+    pushHistory();
+    currentTextAlignIndex = (currentTextAlignIndex + 1) % ALIGN_MODES.length;
+    const mode = ALIGN_MODES[currentTextAlignIndex];
+    const name = ALIGN_NAMES[currentTextAlignIndex];
+
+    if (mode === 'left') {
+      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line>';
+    } else if (mode === 'center') {
+      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line>';
+    } else {
+      iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
+    }
+
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && !isBatchMode) {
+      document.execCommand('justify' + (mode === 'left' ? 'Left' : mode === 'center' ? 'Center' : 'Right'), false, null);
+      showToast(`선택 영역 ${name}`);
+    } else if (isBatchMode) {
+      document.querySelectorAll('.page-editor').forEach(ed => {
+        ed.style.textAlign = mode;
+      });
+      showToast(`전체 ${name}`);
+    } else {
+      const idx = getCurrentPageIndex();
+      const editor = document.querySelectorAll('.page-editor')[idx];
+      if (editor) {
+        editor.style.textAlign = mode;
+        showToast(`페이지 ${idx + 1}: ${name}`);
+      }
+    }
+    saveAllPagesState();
+    seamlessContinuousReflow();
   }
 
   function getCaretGlobalOffset(focusedEditor) {
@@ -1695,7 +1747,7 @@ ${originalHtml}`;
     }
   }
 
-  /* 연속 터치 채색 및 드래그 텍스트 색상 변경 가시성 확보 */
+  /* 연속 터치 채색 및 드래그 색상 변경 가시성 확보 */
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
       if (editorEl.classList.contains('is-placeholder')) return;
@@ -1801,7 +1853,6 @@ ${originalHtml}`;
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
         pushHistory();
-        // 드래그한 텍스트에 색상이 즉시 반영되도록 포커스 유지 후 foreColor 실행
         document.execCommand('styleWithCSS', false, true);
         document.execCommand('foreColor', false, color);
         saveAllPagesState();
@@ -1889,7 +1940,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v52', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v53', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
