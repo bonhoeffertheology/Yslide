@@ -31,7 +31,7 @@
     --accent: #38bdf8;
     --toolbar-height: 96px;
     --page-width: min(820px, 92vw);
-    --page-card-height: 80vh;
+    --page-card-height: 80vh; /* 각 페이지 카드 높이 */
     --header-height: 42px;
     --page-gap: 28px;
     --active-font: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
@@ -612,7 +612,7 @@
         </svg>
       </button>
 
-      <!-- 텍스트 정렬 순환 버튼 (이탤릭 우측 배치) -->
+      <!-- 텍스트 정렬 순환 버튼 (이탤릭 우측) -->
       <button id="btn-align-cycle" class="btn-icon" onmousedown="event.preventDefault()" onclick="cycleTextAlign()" title="정렬 변경 (좌측/가운데/우측)">
         <svg id="icon-align" class="icon-svg" viewBox="0 0 24 24">
           <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -900,7 +900,7 @@
 
   viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
-  /* 텍스트 정렬 순환 토글 함수 */
+  /* 텍스트 정렬 순환 토글 함수 (선택한 텍스트 또는 일괄/단일 적용) */
   function cycleTextAlign() {
     pushHistory();
     currentTextAlignIndex = (currentTextAlignIndex + 1) % ALIGN_MODES.length;
@@ -916,7 +916,12 @@
       iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
     }
 
-    if (isBatchMode) {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && !isBatchMode) {
+      // 드래그하여 선택한 특정 텍스트 구간만 정렬 적용
+      document.execCommand('justify' + (mode === 'left' ? 'Left' : mode === 'center' ? 'Center' : 'Right'), false, null);
+      showToast(`선택 영역 ${name}`);
+    } else if (isBatchMode) {
       document.querySelectorAll('.page-editor').forEach(ed => {
         ed.style.textAlign = mode;
       });
@@ -930,6 +935,7 @@
       }
     }
     saveAllPagesState();
+    seamlessContinuousReflow();
   }
 
   /* 뷰모드(스크롤 / 페이지) 전환 */
@@ -1004,7 +1010,7 @@
       if (savedMode) viewMode = savedMode;
       applyViewModeUI();
 
-      const saved = localStorage.getItem('yslide_note_pages_v51');
+      const saved = localStorage.getItem('yslide_note_pages_v52');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 200) {
@@ -1689,7 +1695,7 @@ ${originalHtml}`;
     }
   }
 
-  /* 연속 터치 채색 */
+  /* 연속 터치 채색 및 드래그 텍스트 색상 변경 가시성 확보 */
   function attachContinuousEvents(editorEl, pageIdx) {
     function paintAtCoord(clientX, clientY) {
       if (editorEl.classList.contains('is-placeholder')) return;
@@ -1795,6 +1801,8 @@ ${originalHtml}`;
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
         pushHistory();
+        // 드래그한 텍스트에 색상이 즉시 반영되도록 포커스 유지 후 foreColor 실행
+        document.execCommand('styleWithCSS', false, true);
         document.execCommand('foreColor', false, color);
         saveAllPagesState();
       }
@@ -1881,7 +1889,7 @@ ${originalHtml}`;
 
   function saveToLocalStorageSilent() {
     try {
-      localStorage.setItem('yslide_note_pages_v51', JSON.stringify(pagesData));
+      localStorage.setItem('yslide_note_pages_v52', JSON.stringify(pagesData));
     } catch(e) {}
   }
 
