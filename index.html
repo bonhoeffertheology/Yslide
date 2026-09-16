@@ -1103,6 +1103,7 @@ function serializeAllContent() {
   return fullHtml;
 }
 
+/* 💡 핵심: 전역 단일 문서 모델 기준 백스페이스 및 개행 제어 */
 function bindRootEvents(root) {
   root.addEventListener('input', (e) => {
     if (isReflowing || e.target.closest('.page-title-input')) return;
@@ -1149,7 +1150,7 @@ function bindRootEvents(root) {
       return;
     }
 
-    // 💡 백스페이스 처리: 이전 페이지의 마지막 단어가 밀려오지 않고 현재 글이 이전 페이지 끝으로 이어붙도록 최적화
+    // 💡 페이지 첫머리 백스페이스: 전체 문서 기준에서 앞 글자/개행만 안전하게 제거
     if (e.key === 'Backspace' && sel && sel.rangeCount && sel.isCollapsed) {
       const activeCard = sel.anchorNode?.parentElement?.closest('.note-page-card');
       const pageIndex = activeCard ? parseInt(activeCard.dataset.index, 10) : 0;
@@ -1162,37 +1163,39 @@ function bindRootEvents(root) {
         const isAtPageStart = probeRange.toString().length === 0;
 
         if (isAtPageStart) {
-          e.preventDefault();
+          e.preventDefault(); // 헤더 삭제 동작 원천 차단
 
           if (pageIndex > 0) {
             pushHistory();
-            const prevCard = root.querySelectorAll('.note-page-card')[pageIndex - 1];
-            const prevContent = prevCard ? prevCard.querySelector('.page-content') : null;
+            const currentGlobalOffset = captureGlobalCaret() || 0;
 
-            if (prevContent) {
-              // 1페이지 끝의 불필요한 개행을 정리하고 바로 텍스트를 이어붙여 역방향 밀림 방지
-              let prevHtml = prevContent.innerHTML || '';
-              prevHtml = prevHtml.replace(/(<br\s*[\/]?>\s*)+$/gi, ''); 
-              const currHtml = currentContent.innerHTML || '';
+            if (currentGlobalOffset > 0) {
+              // 1. 전체 문서 HTML에서 현재 위치 직전의 경계(<br> 또는 공백)만 정밀하게 1개 삭제
+              let html = serializeAllContent();
+              
+              // 1페이지 끝과 2페이지 시작 사이의 줄바꿈 또는 공백 제거
+              const beforeCaretHtml = html.slice(0, currentGlobalOffset);
+              const afterCaretHtml = html.slice(currentGlobalOffset);
 
-              // 합치기 전 1페이지의 실제 텍스트 길이 계산 (정확한 캐럿 복원용)
-              const tempDiv = document.createElement('div');
-              tempDiv.innerHTML = prevHtml;
-              const caretTargetOffset = (tempDiv.textContent || '').length;
+              if (/<br\s*[\/]?>$/i.test(beforeCaretHtml)) {
+                html = beforeCaretHtml.replace(/<br\s*[\/]?>$/i, '') + afterCaretHtml;
+              } else if (/\s$/i.test(beforeCaretHtml)) {
+                html = beforeCaretHtml.slice(0, -1) + afterCaretHtml;
+              } else {
+                html = beforeCaretHtml.slice(0, -1) + afterCaretHtml;
+              }
 
-              prevContent.innerHTML = prevHtml + currHtml;
-              currentContent.innerHTML = '';
-
-              documentHTML = serializeAllContent();
+              documentHTML = html;
               saveModel();
 
-              // 1페이지의 텍스트가 있던 끝 지점으로 커서 정확히 안착
-              renderPages(caretTargetOffset);
+              // 2. 커서는 1페이지의 마지막 글자 바로 뒤 위치(currentGlobalOffset - 1)에 정확히 복구
+              const newCaretPos = Math.max(0, currentGlobalOffset - 1);
+              renderPages(newCaretPos);
 
-              // 1페이지 카드로 시선 스크롤 정렬
-              const targetCard = root.querySelectorAll('.note-page-card')[pageIndex - 1];
-              if (targetCard) {
-                targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              // 3. 화면이 튀지 않고 1페이지 끝을 유지하도록 부드럽게 스크롤
+              const prevCard = root.querySelectorAll('.note-page-card')[pageIndex - 1];
+              if (prevCard) {
+                prevCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               }
             }
           }
