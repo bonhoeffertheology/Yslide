@@ -1049,10 +1049,34 @@ function restoreGlobalCaret(targetOffset) {
   }
 }
 
-function renderPages(savedCaret = null) {
+function getCaretViewportAnchor() {
+  const sel = window.getSelection();
+  const root = document.getElementById('document-editor');
+  if (!sel || !sel.rangeCount || !root || !root.contains(sel.anchorNode)) return null;
+
+  const caret = captureGlobalCaret();
+  if (caret == null) return null;
+
+  const range = document.createRange();
+  range.setStart(sel.anchorNode, sel.anchorOffset);
+  range.collapse(true);
+  const rects = range.getClientRects();
+  const rect = rects.length ? rects[0] : null;
+
+  return {
+    offset: caret,
+    top: rect ? rect.top : null,
+    left: rect ? rect.left : null,
+    scrollTop: viewport.scrollTop,
+    scrollLeft: viewport.scrollLeft
+  };
+}
+
+function renderPages(savedCaret = null, options = {}) {
   if (isReflowing) return;
   isReflowing = true;
 
+  const anchor = options.anchor || getCaretViewportAnchor();
   const oldScrollTop = viewport.scrollTop;
   const oldScrollLeft = viewport.scrollLeft;
   const pages = paginateDocument();
@@ -1060,26 +1084,26 @@ function renderPages(savedCaret = null) {
   while (pageMeta.length < pages.length) pageMeta.push({ title: '', align: 'left' });
   if (pageMeta.length > pages.length) pageMeta = pageMeta.slice(0, pages.length);
 
-  // 핵심: 편집의 기준이 되는 #document-editor 자체는 절대로 교체하지 않습니다.
-  // 페이지를 다시 배치할 때도 동일한 contenteditable root를 유지하므로
-  // Android/태블릿 IME(가상 키보드)의 포커스가 끊기지 않습니다.
+  // IMPORTANT:
+  // #document-editor is the single editing surface and is NEVER replaced.
+  // Only its visual page containers are rebuilt. IME/composition state therefore
+  // belongs to the same contenteditable root for the lifetime of the document.
   let root = document.getElementById('document-editor');
   if (!root) {
     root = document.createElement('div');
     root.id = 'document-editor';
     root.contentEditable = 'true';
     root.spellcheck = false;
+    root.dataset.composing = '0';
     root.setAttribute('role', 'textbox');
     root.setAttribute('aria-multiline', 'true');
     viewport.appendChild(root);
     bindRootEvents(root);
   }
 
-  // root는 유지하고 그 안의 '페이지 표시 구조'만 새로 구성합니다.
-  // 페이지 자체는 문서 데이터가 아니라 시각적 레이아웃입니다.
   const fragment = document.createDocumentFragment();
 
-  pages.forEach((html, index) => {
+  pages.forEach((pageHtml, index) => {
     const card = document.createElement('div');
     card.className = 'note-page-card';
     card.dataset.index = index;
@@ -1097,24 +1121,35 @@ function renderPages(savedCaret = null) {
     title.type = 'text';
     title.placeholder = '제목을 입력하세요';
     title.value = pageMeta[index]?.title || '';
-    title.addEventListener('input', e => { pageMeta[index].title = e.target.value; saveModel(); });
+    title.addEventListener('input', e => {
+      pageMeta[index].title = e.target.value;
+      saveModel();
+    });
 
     const del = document.createElement('button');
+    del.type = 'button';
     del.className = 'btn-page-delete';
     del.title = '이 페이지 삭제';
-    // 기존 SVG 아이콘을 그대로 유지합니다.
+    del.setAttribute('contenteditable', 'false');
     del.innerHTML = `
       <svg class="icon-svg" viewBox="0 0 24 24" style="width:15px;height:15px">
         <polyline points="3 6 5 6 21 6"></polyline>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
       </svg>`;
-    del.onclick = e => { e.preventDefault(); deletePage(index); };
+    del.addEventListener('mousedown', e => e.preventDefault());
+    del.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      deletePage(index);
+    });
+
     header.append(badge, title, del);
     card.appendChild(header);
 
     const content = document.createElement('div');
     content.className = 'page-content';
-    content.innerHTML = html || '';
+    content.setAttribute('contenteditable', 'inherit');
+    content.innerHTML = pageHtml || '';
     content.style.textAlign = pageMeta[index]?.align || 'left';
     content.style.fontSize = currentFontSize + 'px';
     content.style.letterSpacing = globalLetterSpacing + 'px';
@@ -1135,16 +1170,40 @@ function renderPages(savedCaret = null) {
     }
   });
 
-  // root 자체는 살아 있는 채로 자식 페이지만 교체합니다.
   root.replaceChildren(fragment);
 
   updatePageInfo();
   isReflowing = false;
+
+  // Restore the old scroll position first. Then, if there was a caret anchor,
+  // compensate for the changed page heights so the editing line does not jump.
   viewport.scrollTop = oldScrollTop;
   viewport.scrollLeft = oldScrollLeft;
   updateFloatingScrollbar();
 
-  if (savedCaret != null) requestAnimationFrame(() => restoreGlobalCaret(savedCaret));
+  const targetCaret = savedCaret != null ? savedCaret : (anchor ? anchor.offset : null);
+  if (targetCaret != null) {
+    requestAnimationFrame(() => {
+      restoreGlobalCaret(targetCaret);
+
+      if (anchor && anchor.top != null) {
+        requestAnimationFrame(() => {
+          const sel = window.getSelection();
+          if (!sel || !sel.rangeCount) return;
+          const r = sel.getRangeAt(0).cloneRange();
+          r.collapse(true);
+          const rects = r.getClientRects();
+          if (!rects.length) return;
+
+          const deltaY = rects[0].top - anchor.top;
+          const deltaX = rects[0].left - (anchor.left ?? rects[0].left);
+          if (Math.abs(deltaY) > 1) viewport.scrollTop += deltaY;
+          if (Math.abs(deltaX) > 1) viewport.scrollLeft += deltaX;
+          updateFloatingScrollbar();
+        });
+      }
+    });
+  }
 }
 
 function serializeAllContent() {
@@ -1160,61 +1219,124 @@ function serializeAllContent() {
 }
 
 function scheduleDocumentReflow(options = {}) {
-  const { preserveFocus = false, delay = 35 } = options;
+  const {
+    preserveFocus = false,
+    delay = 45,
+    caret = null,
+    anchor = null
+  } = options;
+
   if (reflowTimer) clearTimeout(reflowTimer);
+
   reflowTimer = setTimeout(() => {
     const root = document.getElementById('document-editor');
-    const keepEditorFocused = preserveFocus && root && root.contains(document.activeElement);
-    const caret = captureGlobalCaret();
+    if (!root || root.dataset.composing === '1') return;
+
+    const keepEditorFocused =
+      preserveFocus &&
+      root.contains(document.activeElement);
+
+    const currentCaret = caret != null ? caret : captureGlobalCaret();
+    const currentAnchor = anchor || getCaretViewportAnchor();
+
     documentHTML = serializeAllContent();
     saveModel();
-    renderPages(caret);
+    renderPages(currentCaret, { anchor: currentAnchor });
 
-    // #document-editor는 동일한 DOM 노드이므로 포커스/IME를 건드리지 않습니다.
-    // 페이지 내용만 재배치한 뒤 전역 커서 위치만 복원합니다.
-    if (keepEditorFocused && caret != null) {
-      requestAnimationFrame(() => restoreGlobalCaret(caret));
+    // Do NOT focus() here. Calling focus() during/after IME input is one of the
+    // common causes of Samsung/Android keyboards losing their composition state.
+    if (keepEditorFocused) {
+      requestAnimationFrame(() => {
+        const newRoot = document.getElementById('document-editor');
+        if (newRoot && document.activeElement !== newRoot) {
+          // Usually unnecessary because the same root remains focused.
+          // Only restore selection; never force focus.
+          restoreGlobalCaret(currentCaret);
+        }
+      });
     }
   }, delay);
 }
 
 function bindRootEvents(root) {
-  // 하나의 contenteditable root만 편집 표면으로 사용합니다.
-  // 페이지는 시각적 컨테이너일 뿐이며, 입력 후에는 동일한 문서 데이터에서 다시 배치됩니다.
+  // Android/Samsung IME support:
+  // Never re-render the page structure while Korean/Japanese/Chinese composition
+  // is active. The browser must be allowed to own the composing text until
+  // compositionend, otherwise characters can duplicate (e.g. ㅎ하나하나니...).
+  root.addEventListener('compositionstart', () => {
+    root.dataset.composing = '1';
+    root.dataset.lastCompositionCaret = String(captureGlobalCaret() ?? 0);
+    if (reflowTimer) clearTimeout(reflowTimer);
+  });
+
+  root.addEventListener('compositionupdate', () => {
+    root.dataset.composing = '1';
+  });
+
   root.addEventListener('beforeinput', (e) => {
-    // 모바일/태블릿 IME에서 Backspace/Delete는 keydown보다 beforeinput이
-    // 정확합니다. 삭제 입력이 들어오는 동안 키보드가 닫히지 않도록 상태를 기록합니다.
     root.dataset.lastInputType = e.inputType || '';
     root.dataset.isDeleting = /^delete/.test(e.inputType || '') ? '1' : '0';
   });
 
   root.addEventListener('input', (e) => {
     if (isReflowing || e.target.closest('.page-title-input')) return;
+
     documentHTML = serializeAllContent();
     saveModel();
 
-    // 이제 renderPages()가 #document-editor 자체를 교체하지 않으므로
-    // 삭제 직후에도 즉시 전체 페이지를 재배치할 수 있습니다.
-    // 커서의 전역 좌표만 복원하여 편집 흐름과 태블릿 키보드를 함께 유지합니다.
-    scheduleDocumentReflow({ preserveFocus: document.activeElement === root });
+    // During IME composition, absolutely no DOM/page rebuild.
+    if (root.dataset.composing === '1' || e.isComposing) return;
+
+    const caret = captureGlobalCaret();
+    const anchor = getCaretViewportAnchor();
+
+    // Reflow after the browser has completed its native edit operation.
+    // This keeps Backspace/Delete/Enter atomic and prevents visual jumping.
+    scheduleDocumentReflow({
+      preserveFocus: true,
+      delay: 55,
+      caret,
+      anchor
+    });
+  });
+
+  root.addEventListener('compositionend', () => {
+    root.dataset.composing = '0';
+
+    // The final committed Korean syllable is now in the DOM. Capture its actual
+    // caret position, then reflow once. Never focus() the editor.
+    requestAnimationFrame(() => {
+      documentHTML = serializeAllContent();
+      saveModel();
+
+      const caret = captureGlobalCaret();
+      const anchor = getCaretViewportAnchor();
+      scheduleDocumentReflow({
+        preserveFocus: true,
+        delay: 20,
+        caret,
+        anchor
+      });
+    });
   });
 
   root.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-      e.preventDefault(); selectAllPages(); return;
+      e.preventDefault();
+      selectAllPages();
+      return;
     }
 
     if (e.key === 'Enter') {
-      // 브라우저의 기본 Enter를 그대로 허용합니다. 현재 위치의 BR은
-      // 전역 문서 좌표에 포함되므로 페이지 끝에서도 다음 페이지로 자연스럽게 이동합니다.
+      // Let the browser perform exactly one native Enter operation.
+      // Do not schedule a competing reflow from keydown; input will do it once.
       pushHistory();
-      requestAnimationFrame(() => scheduleDocumentReflow({ preserveFocus: true }));
       return;
     }
 
     if (e.key === 'Backspace' || e.key === 'Delete') {
-      // 여기서 renderPages()를 직접 호출하지 않습니다. 실제 삭제는 input/beforeinput에서
-      // 처리하고, DOM을 즉시 교체하지 않아 태블릿의 가상 키보드 포커스를 보존합니다.
+      // Native deletion must finish first. The input event will perform one
+      // reflow using the resulting caret position.
       pushHistory();
       return;
     }
@@ -1224,30 +1346,39 @@ function bindRootEvents(root) {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     if (!text) return;
+
     pushHistory();
 
-    const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+    const formatted = text
+      .replace(/\r\n/g, '<br>')
+      .replace(/\n/g, '<br>');
+
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return;
-    const caret = captureGlobalCaret() || 0;
+
     const range = sel.getRangeAt(0);
     range.deleteContents();
+
     const temp = document.createElement('div');
     temp.innerHTML = formatted;
+
     const frag = document.createDocumentFragment();
     while (temp.firstChild) frag.appendChild(temp.firstChild);
     range.insertNode(frag);
 
     documentHTML = serializeAllContent();
     saveModel();
-    renderPages(caret + text.length);
-    requestAnimationFrame(() => {
-      const newRoot = document.getElementById('document-editor');
-      if (newRoot) {
-        try { newRoot.focus({ preventScroll: true }); } catch (_) { newRoot.focus(); }
-        restoreGlobalCaret(caret + text.length);
-      }
+
+    const caret = captureGlobalCaret();
+    const anchor = getCaretViewportAnchor();
+
+    scheduleDocumentReflow({
+      preserveFocus: true,
+      delay: 20,
+      caret,
+      anchor
     });
+
     showToast('📋 붙여넣기가 완료되었습니다');
   });
 }
@@ -1290,21 +1421,38 @@ document.addEventListener('copy', (e) => {
 });
 
 function deletePage(index) {
-  const contents = document.querySelectorAll('.page-content');
+  const root = document.getElementById('document-editor');
+  const contents = root
+    ? root.querySelectorAll('.page-content')
+    : document.querySelectorAll('.page-content');
+
   if (contents.length <= 1) {
     showToast('⚠️ 마지막 남은 페이지는 삭제할 수 없습니다');
     return;
   }
+  if (index < 0 || index >= contents.length) return;
+
   pushHistory();
+
+  const caretBefore = captureGlobalCaret();
+  const anchorBefore = getCaretViewportAnchor();
+
+  const pageHtml = contents[index].innerHTML;
+  const previousHtml = index > 0 ? contents[index - 1].innerHTML : '';
+
   if (index > 0) {
-    contents[index - 1].innerHTML += contents[index].innerHTML;
+    contents[index - 1].innerHTML = previousHtml + pageHtml;
   } else {
-    contents[1].innerHTML = contents[0].innerHTML + contents[1].innerHTML;
+    contents[1].innerHTML = pageHtml + contents[1].innerHTML;
   }
+
   pageMeta.splice(index, 1);
   documentHTML = serializeAllContent();
-  renderPages();
   saveModel();
+
+  // Rebuild only the visual pages; the editor root remains the same.
+  renderPages(caretBefore, { anchor: anchorBefore });
+
   showToast('🗑️ 페이지가 삭제되었습니다');
 }
 
@@ -1326,36 +1474,164 @@ function addNewPage() {
   showToast('📄 새 페이지가 추가되었습니다');
 }
 
-function toggleBold() {
-  pushHistory();
+
+// ---- Selection-safe formatting controls ----
+let formatSelectionRange = null;
+let colorPreview = null;
+
+function rememberFormatSelection() {
+  const root = document.getElementById('document-editor');
   const sel = window.getSelection();
-  if (sel && !sel.isCollapsed && !isBatchMode) {
-    document.execCommand('bold', false, null);
+  if (!root || !sel || !sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  if (root.contains(r.commonAncestorContainer) && !r.collapsed) {
+    formatSelectionRange = r.cloneRange();
+  }
+}
+
+function restoreFormatSelection() {
+  const root = document.getElementById('document-editor');
+  if (!root || !formatSelectionRange ||
+      !root.contains(formatSelectionRange.commonAncestorContainer)) return false;
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(formatSelectionRange.cloneRange());
+  return true;
+}
+
+function applySelectionCommand(command, value = null) {
+  if (!restoreFormatSelection()) return false;
+  const ok = document.execCommand(command, false, value);
+  rememberFormatSelection();
+  documentHTML = serializeAllContent();
+  saveModel();
+  return ok;
+}
+
+// Save the selection before the toolbar takes focus.
+document.addEventListener('selectionchange', () => {
+  const root = document.getElementById('document-editor');
+  const sel = window.getSelection();
+  if (!root || !sel || !sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  if (root.contains(r.commonAncestorContainer) && !r.collapsed) {
+    formatSelectionRange = r.cloneRange();
+  }
+});
+
+// Color preview: while the pointer is held over a color button, show the
+// candidate color without committing it. Releasing commits the chosen color.
+// The original selection range remains stored throughout.
+function removeColorPreview() {
+  if (colorPreview) {
+    colorPreview.remove();
+    colorPreview = null;
+  }
+}
+
+function showColorPreview(color) {
+  if (!formatSelectionRange) return;
+  removeColorPreview();
+
+  const rects = Array.from(formatSelectionRange.getClientRects())
+    .filter(r => r.width > 0 && r.height > 0);
+  if (!rects.length) return;
+
+  const host = document.createElement('div');
+  host.style.cssText =
+    'position:fixed;inset:0;pointer-events:none;z-index:2147483646;';
+  rects.forEach(r => {
+    const el = document.createElement('div');
+    el.style.cssText =
+      `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;` +
+      `height:${r.height}px;background:${color};opacity:.48;` +
+      `mix-blend-mode:multiply;border-radius:1px;`;
+    host.appendChild(el);
+  });
+  document.body.appendChild(host);
+  colorPreview = host;
+}
+
+function installColorPreview() {
+  const toolbar = document.getElementById('toolbar');
+  if (!toolbar || toolbar.dataset.colorPreview === '1') return;
+  toolbar.dataset.colorPreview = '1';
+
+  toolbar.addEventListener('pointerdown', e => {
+    const btn = e.target.closest('.color-btn');
+    if (!btn) return;
+    const color = btn.dataset.color || btn.style.color || btn.value;
+    if (!color) return;
+
+    rememberFormatSelection();
+    if (!formatSelectionRange) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    showColorPreview(color);
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+  }, true);
+
+  toolbar.addEventListener('pointerenter', e => {
+    if (!e.buttons) return;
+    const btn = e.target.closest('.color-btn');
+    if (!btn || !formatSelectionRange) return;
+    const color = btn.dataset.color || btn.style.color || btn.value;
+    if (color) showColorPreview(color);
+  }, true);
+
+  toolbar.addEventListener('pointerup', e => {
+    const btn = e.target.closest('.color-btn');
+    if (!btn || !formatSelectionRange) return;
+    const color = btn.dataset.color || btn.style.color || btn.value;
+    if (!color) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    removeColorPreview();
+    applySelectionCommand('foreColor', color);
+    restoreFormatSelection();
+  }, true);
+
+  window.addEventListener('pointerup', () => {
+    if (colorPreview) removeColorPreview();
+  }, true);
+}
+
+function toggleBold() {
+  rememberFormatSelection();
+  pushHistory();
+  if (formatSelectionRange && !formatSelectionRange.collapsed && !isBatchMode) {
+    applySelectionCommand('bold');
+    restoreFormatSelection();
   } else {
     globalIsBold = !globalIsBold;
     document.querySelectorAll('.page-content').forEach(c => {
-      c.style.fontWeight = globalIsBold ? 'bold' : 'normal';
+      c.style.fontWeight =
+        globalIsBold ? "bold" : "normal";
     });
-    showToast(globalIsBold ? '전체 볼드체 적용' : '전체 볼드체 해제');
+    showToast(globalIsBold ? "전체 볼드체 적용" : "전체 볼드체 해제");
+    documentHTML = serializeAllContent();
+    saveModel();
   }
-  documentHTML = serializeAllContent();
-  saveModel();
 }
 
 function toggleItalic() {
+  rememberFormatSelection();
   pushHistory();
-  const sel = window.getSelection();
-  if (sel && !sel.isCollapsed && !isBatchMode) {
-    document.execCommand('italic', false, null);
+  if (formatSelectionRange && !formatSelectionRange.collapsed && !isBatchMode) {
+    applySelectionCommand('italic');
+    restoreFormatSelection();
   } else {
     globalIsItalic = !globalIsItalic;
     document.querySelectorAll('.page-content').forEach(c => {
-      c.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
+      c.style.fontStyle =
+        globalIsItalic ? "italic" : "normal";
     });
-    showToast(globalIsItalic ? '전체 이탤릭체 적용' : '전체 이탤릭체 해제');
+    showToast(globalIsItalic ? "전체 이탤릭체 적용" : "전체 이탤릭체 해제");
+    documentHTML = serializeAllContent();
+    saveModel();
   }
-  documentHTML = serializeAllContent();
-  saveModel();
 }
 
 function adjustLetterSpacing(delta) {
@@ -1434,12 +1710,11 @@ function selectColor(color, el) {
   document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
   el?.classList.add('selected');
 
-  const sel = window.getSelection();
-  if (sel && !sel.isCollapsed && !isContinuousMode) {
+  rememberFormatSelection();
+  if (formatSelectionRange && !formatSelectionRange.collapsed && !isContinuousMode) {
     pushHistory();
-    document.execCommand('foreColor', false, color);
-    documentHTML = serializeAllContent();
-    saveModel();
+    applySelectionCommand('foreColor', color);
+    restoreFormatSelection();
   }
 }
 
@@ -1985,6 +2260,8 @@ function init() {
 }
 
 init();
+
+installColorPreview();
 </script>
 </body>
 </html>
