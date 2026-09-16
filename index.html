@@ -212,76 +212,40 @@ button:active { transform: scale(0.97); }
   background: var(--bg-main);
   z-index: 10;
   -webkit-overflow-scrolling: touch;
-}
-#main-viewport.view-scroll {
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px 16px 140px;
-}
-#main-viewport.view-scroll::-webkit-scrollbar { display: none; }
-
-#main-viewport.view-page {
-  overflow-x: auto;
-  overflow-y: hidden;
-  display: flex;
-  align-items: center;
-  padding: 0;
-  scroll-snap-type: x mandatory;
-}
-#main-viewport.view-page::-webkit-scrollbar { display: none; }
-
-#document-editor {
-  width: 100%;
-  min-height: 100%;
-  outline: none;
-  caret-color: #ffffff;
-  position: relative;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.view-scroll #document-editor {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--page-gap);
-  padding-bottom: 40px;
-}
-.view-page #document-editor {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0;
-  min-width: max-content;
-  height: 100%;
-}
-
-.page-lens-wrapper {
-  flex: 0 0 100vw;
-  width: 100vw;
-  height: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
-  scroll-snap-align: center;
-  scroll-snap-stop: always;
-  padding: 12px;
+  padding: 24px 16px 140px;
 }
+#main-viewport::-webkit-scrollbar { display: none; }
 
-.note-page-card {
+/* 💡 삼성노트 방식의 통합 아키텍처: 단일 캔버스 컨테이너 */
+#document-workspace {
+  position: relative;
   width: var(--page-width);
   max-width: 820px;
-  height: var(--page-card-height);
-  min-height: 460px;
+}
+
+/* 배경 페이지 카드 레이어 */
+#page-cards-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.page-sheet-card {
+  position: absolute;
+  width: 100%;
   background: var(--page-bg);
   border: 2px solid var(--page-border);
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  overflow: hidden;
-  user-select: text;
+  box-sizing: border-box;
+  pointer-events: auto;
 }
 
 .page-header {
@@ -294,16 +258,8 @@ button:active { transform: scale(0.97); }
   padding: 0 12px 0 16px;
   font-size: 13px;
   color: #888888;
-  flex-shrink: 0;
   box-sizing: border-box;
-  z-index: 20;
   user-select: none !important;
-  -webkit-user-select: none !important;
-}
-
-.page-header::selection, .page-header *::selection {
-  background: transparent !important;
-  color: inherit !important;
 }
 
 .page-badge {
@@ -323,7 +279,6 @@ button:active { transform: scale(0.97); }
   text-align: center;
   font-family: var(--ui-font);
   padding: 4px 8px;
-  user-select: text;
 }
 .page-title-input::placeholder { color: #555555; }
 .page-title-input:focus { color: #38bdf8; }
@@ -341,39 +296,38 @@ button:active { transform: scale(0.97); }
   cursor: pointer;
   padding: 0;
   justify-self: end;
-  transition: all 0.15s ease;
 }
 .btn-page-delete:hover {
   background: #333333;
   color: #ef4444;
 }
 
-.page-content {
-  flex: 1;
+/* 💡 단 하나의 연속된 에디터 본체 (커서 튐 / 줄바꿈 / 백스페이스 완벽 보장) */
+#single-stream-editor {
+  position: relative;
+  z-index: 5;
   width: 100%;
-  height: calc(100% - var(--header-height));
-  padding: 24px 36px;
+  min-height: 100%;
+  outline: none;
   color: #ffffff;
   font-size: 26px;
   line-height: 1.55;
-  outline: none;
+  font-family: var(--active-font);
   white-space: pre-wrap;
   word-break: break-word;
-  overflow: hidden;
-  cursor: text;
-  font-family: var(--active-font);
-  box-sizing: border-box;
   overflow-wrap: anywhere;
+  cursor: text;
   caret-color: #ffffff;
+  box-sizing: border-box;
 }
 
-.page-content:empty:before, .page-content.is-empty:before {
+#single-stream-editor:empty:before {
   content: "여기를 클릭하여 글을 작성하거나 긴 글을 붙여넣으세요.";
   color: #666666;
   pointer-events: none;
 }
 
-body.paint-mode .page-content {
+body.paint-mode #single-stream-editor {
   cursor: crosshair !important;
   user-select: none;
 }
@@ -574,39 +528,19 @@ body.paint-mode .page-content {
   <div class="toolbar-row toolbar-row-top">
     <div class="tool-group">
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(-0.5)" title="자간 좁게">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <line x1="4" y1="12" x2="10" y2="12"></line>
-          <polyline points="7 9 10 12 7 15"></polyline>
-          <line x1="20" y1="12" x2="14" y2="12"></line>
-          <polyline points="17 9 14 12 17 15"></polyline>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="4" y1="12" x2="10" y2="12"></line><polyline points="7 9 10 12 7 15"></polyline><line x1="20" y1="12" x2="14" y2="12"></line><polyline points="17 9 14 12 17 15"></polyline></svg>
       </button>
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLetterSpacing(0.5)" title="자간 넓게">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <line x1="10" y1="12" x2="4" y2="12"></line>
-          <polyline points="7 9 4 12 7 15"></polyline>
-          <line x1="14" y1="12" x2="20" y2="12"></line>
-          <polyline points="17 9 20 12 17 15"></polyline>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="10" y1="12" x2="4" y2="12"></line><polyline points="7 9 4 12 7 15"></polyline><line x1="14" y1="12" x2="20" y2="12"></line><polyline points="17 9 20 12 17 15"></polyline></svg>
       </button>
 
       <div class="divider"></div>
 
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(-0.1)" title="줄간격 좁게">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <polyline points="9 6 12 9 15 6"></polyline>
-          <line x1="12" y1="2" x2="12" y2="9"></line>
-          <polyline points="9 18 12 15 15 18"></polyline>
-          <line x1="12" y1="22" x2="12" y2="15"></line>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="9 6 12 9 15 6"></polyline><line x1="12" y1="2" x2="12" y2="9"></line><polyline points="9 18 12 15 15 18"></polyline><line x1="12" y1="22" x2="12" y2="15"></line></svg>
       </button>
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="adjustLineHeight(0.1)" title="줄간격 넓게">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <polyline points="8 6 12 2 16 6"></polyline>
-          <line x1="12" y1="2" x2="12" y2="10"></line>
-          <polyline points="8 18 12 22 16 18"></polyline>
-          <line x1="12" y1="22" x2="12" y2="14"></line>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="8 6 12 2 16 6"></polyline><line x1="12" y1="2" x2="12" y2="10"></line><polyline points="8 18 12 22 16 18"></polyline><line x1="12" y1="22" x2="12" y2="14"></line></svg>
       </button>
 
       <div class="divider"></div>
@@ -614,53 +548,32 @@ body.paint-mode .page-content {
       <button id="btn-font-cycle" class="btn-font" onclick="cycleFontFamily()" title="글꼴 변경">기본</button>
 
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBold()" title="볼드체">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-          <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg>
       </button>
 
       <button class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleItalic()" title="이탤릭체">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <line x1="19" y1="4" x2="10" y2="4"></line>
-          <line x1="14" y1="20" x2="5" y2="20"></line>
-          <line x1="15" y1="4" x2="9" y2="20"></line>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg>
       </button>
 
       <button id="btn-align-cycle" class="btn-icon" onmousedown="event.preventDefault()" onclick="cycleTextAlign()" title="정렬 변경">
-        <svg id="icon-align" class="icon-svg" viewBox="0 0 24 24">
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="12" x2="15" y2="12"></line>
-          <line x1="3" y1="18" x2="18" y2="18"></line>
-        </svg>
+        <svg id="icon-align" class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg>
       </button>
 
       <button id="btn-batch-mode" class="btn-icon" onmousedown="event.preventDefault()" onclick="toggleBatchMode()" title="모든 페이지 일괄 서식 적용 모드">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-          <polyline points="2 17 12 22 22 17"></polyline>
-          <polyline points="2 12 12 17 22 12"></polyline>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
       </button>
 
       <div class="divider"></div>
 
       <button id="btn-view-mode" class="btn-icon" onclick="toggleViewMode()" title="스크롤 / 페이지 모드 전환">
-        <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-        </svg>
+        <svg id="icon-view-mode" class="icon-svg" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
       </button>
 
       <div class="divider"></div>
 
+      <!-- 앱 설치 버튼 -->
       <button id="btn-install-app" class="btn-icon" onclick="promptInstallApp()" style="display:none; background:#0284c7; border-color:#38bdf8;" title="앱 설치">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="7 10 12 15 17 10"></polyline>
-          <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
       </button>
     </div>
   </div>
@@ -668,58 +581,32 @@ body.paint-mode .page-content {
   <div class="toolbar-row">
     <div class="tool-group">
       <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
 
       <button class="btn-icon" onclick="saveNoteData()" title="저장">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-          <polyline points="17 21 17 13 7 13 7 21"></polyline>
-          <polyline points="7 3 7 8 15 8"></polyline>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       </button>
 
       <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
       </button>
 
       <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <polyline points="6 9 6 2 18 2 18 9"></polyline>
-          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-          <rect x="6" y="14" width="12" height="8"></rect>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
       </button>
 
       <button class="btn-icon" onclick="translateSelectedTextWithGemini()" title="영어 번역 (Gemini AI)">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
       </button>
 
       <button class="btn-icon" onclick="undo()" title="실행 취소 / 되돌리기">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M3 7v6h6"></path>
-          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
       </button>
 
       <button class="btn-icon" onclick="redo()" title="다시 실행">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M21 7v6h-6"></path>
-          <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
       </button>
 
       <div class="divider"></div>
@@ -742,23 +629,25 @@ body.paint-mode .page-content {
 
     <div class="tool-group">
       <button class="btn-icon" onclick="previewCurrentViewPage()" title="현재 화면 페이지 미리보기">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-          <circle cx="12" cy="12" r="3"></circle>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
       </button>
-
       <button class="btn-icon" onclick="startFullPresentation(0)" title="1페이지부터 전체보기">
-        <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;">
-          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-        </svg>
+        <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
       </button>
     </div>
   </div>
 </div>
 
 <!-- 메인 에디터 뷰포트 -->
-<div id="main-viewport" class="view-scroll"></div>
+<div id="main-viewport">
+  <div id="document-workspace">
+    <!-- 배경 페이지 카드 레이어 (자동 증감) -->
+    <div id="page-cards-layer"></div>
+
+    <!-- 💡 단 하나의 끊김 없는 에디터 본체 (커서 튐 / 줄바꿈 증폭 완전 해결) -->
+    <div id="single-stream-editor" contenteditable="true" spellcheck="false"></div>
+  </div>
+</div>
 
 <!-- 10px 플로팅 스크롤바 -->
 <div id="floating-scrollbar-track">
@@ -768,7 +657,7 @@ body.paint-mode .page-content {
 <!-- 하단 고정 독 -->
 <div id="bottom-dock">
   <span id="page-info">1 페이지</span>
-  <button onclick="addNewPage()">➕ 새 페이지</button>
+  <button onclick="addNewPageBreak()">➕ 새 페이지</button>
 </div>
 
 <!-- 전체화면 슬라이드 뷰포트 -->
@@ -784,7 +673,6 @@ body.paint-mode .page-content {
 <div id="toast"></div>
 
 <script>
-const PLACEHOLDER_TEXT = '여기를 클릭하여 글을 작성하거나 긴 글을 붙여넣으세요.';
 const FONT_LIST = [
   { name: '기본', family: "-apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', sans-serif" },
   { name: 'KoPub 돋움', family: "'KoPubWorld Dotum', sans-serif" },
@@ -795,18 +683,18 @@ const ALIGN_NAMES = ['좌측 정렬', '가운데 정렬', '우측 정렬'];
 
 let currentFontIndex = 0, activeColor = '#ef4444', isContinuousMode = false, isBatchMode = false, isPainting = false, lastPaintedKey = '';
 let currentFontSize = 26, globalLetterSpacing = 0, globalLineHeight = 1.55, globalIsBold = false, globalIsItalic = false, currentTextAlignIndex = 0;
-let viewMode = 'scroll', pageMeta = [], documentHTML = '', undoStack = [], redoStack = [], MAX_HISTORY = 40;
-let isReflowing = false, reflowTimer = null, currentReaderIndex = 0, isReaderOpen = false, toastTimer = null;
-
-let lastWindowWidth = window.innerWidth;
+let viewMode = 'scroll', pageTitles = [], undoStack = [], redoStack = [], MAX_HISTORY = 40;
 
 const viewport = document.getElementById('main-viewport');
+const workspace = document.getElementById('document-workspace');
+const cardsLayer = document.getElementById('page-cards-layer');
+const editor = document.getElementById('single-stream-editor');
 const readerViewport = document.getElementById('reader-viewport');
-const btnFontCycle = document.getElementById('btn-font-cycle'), btnBatchMode = document.getElementById('btn-batch-mode'), btnViewMode = document.getElementById('btn-view-mode');
-const iconViewMode = document.getElementById('icon-view-mode'), iconAlign = document.getElementById('icon-align');
+const btnFontCycle = document.getElementById('btn-font-cycle'), btnBatchMode = document.getElementById('btn-batch-mode');
+const iconAlign = document.getElementById('icon-align');
 const scrollbarThumb = document.getElementById('floating-scrollbar-thumb'), scrollbarTrack = document.getElementById('floating-scrollbar-track');
 
-/* 서비스 워커 및 PWA 설치 등록 */
+/* PWA 서비스 워커 등록 */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -834,649 +722,213 @@ function promptInstallApp() {
   }
 }
 
-function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
-function getDynamicAvailableHeight() { return Math.max(300, window.innerHeight * 0.8 - 42 - 48); }
-function getDynamicCardWidth() { return Math.min(820, window.innerWidth * 0.92); }
-
-function getMeasureBox() {
-  let b = document.getElementById('yslide-measure-box');
-  if (!b) {
-    b = document.createElement('div');
-    b.id = 'yslide-measure-box';
-    b.style.cssText = 'position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;box-sizing:border-box;';
-    document.body.appendChild(b);
-  }
-  b.style.width = (getDynamicCardWidth() - 72) + 'px';
-  b.style.fontSize = currentFontSize + 'px';
-  b.style.fontFamily = FONT_LIST[currentFontIndex].family;
-  b.style.letterSpacing = globalLetterSpacing + 'px';
-  b.style.lineHeight = globalLineHeight;
-  b.style.textAlign = ALIGN_MODES[currentTextAlignIndex];
-  return b;
+function getCardHeight() {
+  return Math.max(460, window.innerHeight * 0.8);
 }
 
-function paginateDocument() {
-  if (!documentHTML || !documentHTML.trim()) return [''];
-
-  const measureBox = getMeasureBox();
-  const maxHeight = getDynamicAvailableHeight();
-  const rawParts = documentHTML.split(/<br\s*[\/]?>/gi);
-  const pages = [];
-  let currentLines = [];
-
-  for (let i = 0; i < rawParts.length; i++) {
-    let part = rawParts[i];
-
-    if (part === '') {
-      const test = [...currentLines, ''].join('<br>');
-      measureBox.innerHTML = test || '<br>';
-      if (measureBox.offsetHeight <= maxHeight) {
-        currentLines.push('');
-      } else {
-        pages.push(currentLines.join('<br>'));
-        currentLines = [''];
-      }
-      continue;
-    }
-
-    while (part.length > 0) {
-      const candidate = [...currentLines, part].join('<br>');
-      measureBox.innerHTML = candidate;
-
-      if (measureBox.offsetHeight <= maxHeight) {
-        currentLines.push(part);
-        break;
-      } else {
-        const words = part.split(' ');
-        let lo = 0, hi = words.length, best = 0;
-
-        while (lo <= hi) {
-          const mid = Math.floor((lo + hi) / 2);
-          const chunk = words.slice(0, mid).join(' ');
-          const testCandidate = [...currentLines, chunk].join('<br>');
-          measureBox.innerHTML = testCandidate;
-
-          if (measureBox.offsetHeight <= maxHeight) {
-            best = mid;
-            lo = mid + 1;
-          } else {
-            hi = mid - 1;
-          }
-        }
-
-        if (best > 0) {
-          const fitChunk = words.slice(0, best).join(' ');
-          currentLines.push(fitChunk);
-          pages.push(currentLines.join('<br>'));
-          currentLines = [];
-          part = words.slice(best).join(' ').trim();
-        } else {
-          if (currentLines.length > 0) {
-            pages.push(currentLines.join('<br>'));
-            currentLines = [];
-          } else {
-            const charCount = Math.max(10, Math.floor(part.length / 2));
-            currentLines.push(part.slice(0, charCount));
-            pages.push(currentLines.join('<br>'));
-            currentLines = [];
-            part = part.slice(charCount).trim();
-          }
-        }
-      }
-    }
-  }
-
-  if (currentLines.length) pages.push(currentLines.join('<br>'));
-  return pages.length ? pages : [''];
+function getContentHeight() {
+  return getCardHeight() - 42 - 48; // 카드 높이 - 헤더(42) - 상하 패딩(48)
 }
 
-function captureGlobalCaret() {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return null;
-  const range = sel.getRangeAt(0);
-  const root = document.getElementById('document-editor');
-  if (!root || !root.contains(range.startContainer)) return null;
+/* 💡 에디터 높이에 맞춰 시각적 배경 카드를 완벽 동기화하는 레이아웃 엔진 */
+function syncLayout() {
+  const cardHeight = getCardHeight();
+  const contentHeight = getContentHeight();
+  const pageGap = 28;
 
-  let offset = 0;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node.parentElement && node.parentElement.closest('.page-header')) continue;
-    if (node === range.startContainer) {
-      return offset + range.startOffset;
-    }
-    offset += node.textContent.length;
-  }
-  return offset;
-}
+  // 전체 본문 높이 기준 페이지 수 계산
+  const currentHeight = editor.offsetHeight;
+  const pageCount = Math.max(1, Math.ceil(currentHeight / contentHeight));
 
-function restoreGlobalCaret(targetOffset) {
-  if (targetOffset === null) return;
-  const root = document.getElementById('document-editor');
-  if (!root) return;
+  while (pageTitles.length < pageCount) pageTitles.push('');
+  if (pageTitles.length > pageCount) pageTitles = pageTitles.slice(0, pageCount);
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  let node, accumulated = 0;
-
-  while ((node = walker.nextNode())) {
-    if (node.parentElement && node.parentElement.closest('.page-header')) continue;
-    const len = node.textContent.length;
-    if (accumulated + len >= targetOffset) {
-      const range = document.createRange();
-      range.setStart(node, Math.min(targetOffset - accumulated, len));
-      range.collapse(true);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      return;
-    }
-    accumulated += len;
-  }
-
-  const allContents = root.querySelectorAll('.page-content');
-  const last = allContents[allContents.length - 1];
-  if (last) {
-    const range = document.createRange();
-    range.selectNodeContents(last);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-}
-
-function renderPages(savedCaret = null) {
-  if (isReflowing) return;
-  isReflowing = true;
-
-  const oldScrollTop = viewport.scrollTop;
-  const oldScrollLeft = viewport.scrollLeft;
-  const pages = paginateDocument();
-
-  while (pageMeta.length < pages.length) pageMeta.push({ title: '', align: 'left' });
-  if (pageMeta.length > pages.length) pageMeta = pageMeta.slice(0, pages.length);
-
-  let root = document.getElementById('document-editor');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = 'document-editor';
-    root.contentEditable = 'true';
-    root.spellcheck = false;
-    viewport.appendChild(root);
-    bindRootEvents(root);
-  }
-
-  const fragment = document.createDocumentFragment();
-
-  pages.forEach((html, index) => {
+  cardsLayer.innerHTML = '';
+  for (let i = 0; i < pageCount; i++) {
     const card = document.createElement('div');
-    card.className = 'note-page-card';
-    card.dataset.index = index;
+    card.className = 'page-sheet-card';
+    card.style.height = `${cardHeight}px`;
+    card.style.top = `${i * (cardHeight + pageGap)}px`;
 
     const header = document.createElement('div');
     header.className = 'page-header';
-    header.contentEditable = 'false';
 
     const badge = document.createElement('span');
     badge.className = 'page-badge';
-    badge.textContent = `[ PAGE ${index + 1} ]`;
+    badge.textContent = `[ PAGE ${i + 1} ]`;
 
     const title = document.createElement('input');
     title.className = 'page-title-input';
     title.type = 'text';
     title.placeholder = '제목을 입력하세요';
-    title.value = pageMeta[index]?.title || '';
+    title.value = pageTitles[i] || '';
     title.addEventListener('input', e => {
-      pageMeta[index].title = e.target.value;
+      pageTitles[i] = e.target.value;
       saveModel();
     });
 
     const del = document.createElement('button');
-    del.type = 'button';
     del.className = 'btn-page-delete';
     del.title = '이 페이지 삭제';
-    del.setAttribute('contenteditable', 'false');
     del.innerHTML = `
       <svg class="icon-svg" viewBox="0 0 24 24" style="width:15px;height:15px">
         <polyline points="3 6 5 6 21 6"></polyline>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
       </svg>
     `;
-    del.addEventListener('mousedown', e => e.preventDefault());
-    del.addEventListener('click', e => {
-      e.preventDefault();
+    del.onclick = (e) => {
       e.stopPropagation();
-      deletePage(index);
-    });
+      deletePageAt(i);
+    };
 
     header.append(badge, title, del);
     card.appendChild(header);
-
-    const content = document.createElement('div');
-    content.className = 'page-content';
-    content.innerHTML = html || '';
-    content.style.textAlign = pageMeta[index]?.align || 'left';
-    content.style.fontSize = currentFontSize + 'px';
-    content.style.letterSpacing = globalLetterSpacing + 'px';
-    content.style.lineHeight = globalLineHeight;
-    content.style.fontWeight = globalIsBold ? 'bold' : 'normal';
-    content.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
-
-    attachContinuousEvents(content, index);
-
-    card.appendChild(content);
-
-    if (viewMode === 'page') {
-      const wrap = document.createElement('div');
-      wrap.className = 'page-lens-wrapper';
-      wrap.appendChild(card);
-      fragment.appendChild(wrap);
-    } else {
-      fragment.appendChild(card);
-    }
-  });
-
-  root.replaceChildren(fragment);
-  updatePageInfo();
-  isReflowing = false;
-
-  viewport.scrollTop = oldScrollTop;
-  viewport.scrollLeft = oldScrollLeft;
-  updateFloatingScrollbar();
-
-  if (savedCaret !== null) {
-    requestAnimationFrame(() => restoreGlobalCaret(savedCaret));
+    cardsLayer.appendChild(card);
   }
+
+  // 에디터 패딩 및 전체 워크스페이스 높이 일치화
+  editor.style.paddingTop = '66px'; // 헤더(42) + 본문 상단 여백(24)
+  editor.style.paddingBottom = '32px';
+  editor.style.paddingLeft = '36px';
+  editor.style.paddingRight = '36px';
+
+  const totalWorkspaceHeight = pageCount * cardHeight + (pageCount - 1) * pageGap;
+  workspace.style.minHeight = `${totalWorkspaceHeight}px`;
+
+  document.getElementById('page-info').textContent = `${pageCount} 페이지`;
+  updateFloatingScrollbar();
 }
 
-function serializeAllContent() {
-  const root = document.getElementById('document-editor');
-  if (!root) return documentHTML || '';
-  const contents = root.querySelectorAll('.page-content');
-  let fullHtml = '';
-  contents.forEach((c, idx) => {
-    if (idx > 0 && fullHtml && !fullHtml.endsWith('<br>') && !c.innerHTML.startsWith('<br>')) {
-      fullHtml += '<br>';
-    }
-    fullHtml += c.innerHTML;
-  });
-  return fullHtml;
-}
+/* 💡 브라우저 네이티브 입력 보존 (커서 튐 / 개행 증폭 원천 방지) */
+editor.addEventListener('input', () => {
+  saveModel();
+  syncLayout();
+});
 
-/* 💡 핵심: 전역 단일 문서 모델 기준 백스페이스 및 개행 제어 */
-function bindRootEvents(root) {
-  root.addEventListener('input', (e) => {
-    if (isReflowing || e.target.closest('.page-title-input')) return;
-
-    documentHTML = serializeAllContent();
-    saveModel();
-
-    if (e.isComposing) return;
-
-    const targetContent = window.getSelection()?.anchorNode?.parentElement?.closest('.page-content');
-    if (targetContent && (targetContent.scrollHeight > targetContent.clientHeight + 4)) {
-      if (reflowTimer) clearTimeout(reflowTimer);
-      reflowTimer = setTimeout(() => {
-        const caret = captureGlobalCaret();
-        renderPages(caret);
-      }, 100);
-    }
-  });
-
-  root.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-      e.preventDefault();
-      selectAllPages();
-      return;
-    }
-
-    const sel = window.getSelection();
-
-    // 1줄 개행
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      pushHistory();
-      document.execCommand('insertLineBreak');
-      documentHTML = serializeAllContent();
-      saveModel();
-
-      const targetContent = sel?.anchorNode?.parentElement?.closest('.page-content');
-      if (targetContent && (targetContent.scrollHeight > targetContent.clientHeight + 4)) {
-        if (reflowTimer) clearTimeout(reflowTimer);
-        reflowTimer = setTimeout(() => {
-          renderPages(captureGlobalCaret());
-        }, 60);
-      }
-      return;
-    }
-
-    // 💡 페이지 첫머리 백스페이스: 전체 문서 기준에서 앞 글자/개행만 안전하게 제거
-    if (e.key === 'Backspace' && sel && sel.rangeCount && sel.isCollapsed) {
-      const activeCard = sel.anchorNode?.parentElement?.closest('.note-page-card');
-      const pageIndex = activeCard ? parseInt(activeCard.dataset.index, 10) : 0;
-      const currentContent = activeCard ? activeCard.querySelector('.page-content') : null;
-
-      if (currentContent) {
-        const probeRange = document.createRange();
-        probeRange.selectNodeContents(currentContent);
-        probeRange.setEnd(sel.anchorNode, sel.anchorOffset);
-        const isAtPageStart = probeRange.toString().length === 0;
-
-        if (isAtPageStart) {
-          e.preventDefault(); // 헤더 삭제 동작 원천 차단
-
-          if (pageIndex > 0) {
-            pushHistory();
-            const currentGlobalOffset = captureGlobalCaret() || 0;
-
-            if (currentGlobalOffset > 0) {
-              // 1. 전체 문서 HTML에서 현재 위치 직전의 경계(<br> 또는 공백)만 정밀하게 1개 삭제
-              let html = serializeAllContent();
-              
-              // 1페이지 끝과 2페이지 시작 사이의 줄바꿈 또는 공백 제거
-              const beforeCaretHtml = html.slice(0, currentGlobalOffset);
-              const afterCaretHtml = html.slice(currentGlobalOffset);
-
-              if (/<br\s*[\/]?>$/i.test(beforeCaretHtml)) {
-                html = beforeCaretHtml.replace(/<br\s*[\/]?>$/i, '') + afterCaretHtml;
-              } else if (/\s$/i.test(beforeCaretHtml)) {
-                html = beforeCaretHtml.slice(0, -1) + afterCaretHtml;
-              } else {
-                html = beforeCaretHtml.slice(0, -1) + afterCaretHtml;
-              }
-
-              documentHTML = html;
-              saveModel();
-
-              // 2. 커서는 1페이지의 마지막 글자 바로 뒤 위치(currentGlobalOffset - 1)에 정확히 복구
-              const newCaretPos = Math.max(0, currentGlobalOffset - 1);
-              renderPages(newCaretPos);
-
-              // 3. 화면이 튀지 않고 1페이지 끝을 유지하도록 부드럽게 스크롤
-              const prevCard = root.querySelectorAll('.note-page-card')[pageIndex - 1];
-              if (prevCard) {
-                prevCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
-            }
-          }
-          return;
-        }
-      }
-      pushHistory();
-      return;
-    }
-
-    if (e.key === 'Delete') {
-      pushHistory();
-      return;
-    }
-  });
-
-  root.addEventListener('paste', (e) => {
-    e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-    if (!text) return;
-
+editor.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
     pushHistory();
-    const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-
-    const sel = window.getSelection();
-    const startCaret = captureGlobalCaret() || 0;
-
-    const allContents = root.querySelectorAll('.page-content');
-    if (allContents.length > 0 && sel && sel.toString().length > 30 && sel.toString().trim() === root.innerText.trim()) {
-      documentHTML = formatted;
-      renderPages(formatted.length);
+    // 브라우저의 자연스러운 1줄 개행 허용
+    setTimeout(() => {
+      syncLayout();
       saveModel();
-      showToast('📋 전체 원고가 교체되었습니다');
-      return;
-    }
-
-    if (sel && sel.rangeCount) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      const tempNode = document.createElement('div');
-      tempNode.innerHTML = formatted;
-      const frag = document.createDocumentFragment();
-      while (tempNode.firstChild) frag.appendChild(tempNode.firstChild);
-      range.insertNode(frag);
-    } else {
-      documentHTML = (documentHTML ? documentHTML + '<br>' : '') + formatted;
-    }
-
-    documentHTML = serializeAllContent();
-    saveModel();
-    renderPages(startCaret + text.length);
-    showToast('📋 붙여넣기가 완료되었습니다');
-  });
-}
-
-function selectAllPages() {
-  const root = document.getElementById('document-editor');
-  if (!root) return;
-  const contents = root.querySelectorAll('.page-content');
-  if (!contents.length) return;
-
-  const first = contents[0];
-  const last = contents[contents.length - 1];
-
-  const range = document.createRange();
-  range.setStart(first, 0);
-  range.setEnd(last, last.childNodes.length);
-
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-document.addEventListener('copy', (e) => {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-
-  const range = sel.getRangeAt(0);
-  const clone = range.cloneContents();
-  clone.querySelectorAll('.page-header').forEach(h => h.remove());
-
-  const temp = document.createElement('div');
-  temp.appendChild(clone);
-
-  const plainText = temp.innerText.trim();
-  if (plainText) {
-    e.clipboardData.setData('text/plain', plainText);
-    e.clipboardData.setData('text/html', temp.innerHTML);
-    e.preventDefault();
+    }, 10);
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    pushHistory();
+    setTimeout(() => {
+      syncLayout();
+      saveModel();
+    }, 10);
   }
 });
 
-function deletePage(index) {
-  const root = document.getElementById('document-editor');
-  const contents = root ? root.querySelectorAll('.page-content') : document.querySelectorAll('.page-content');
+editor.addEventListener('paste', (e) => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  if (!text) return;
+  pushHistory();
+  const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+  document.execCommand('insertHTML', false, formatted);
+  saveModel();
+  syncLayout();
+  showToast('📋 붙여넣기가 완료되었습니다');
+});
 
-  if (contents.length <= 1) {
+function deletePageAt(pageIdx) {
+  if (pageTitles.length <= 1) {
     showToast('⚠️ 마지막 남은 페이지는 삭제할 수 없습니다');
     return;
   }
-  if (index < 0 || index >= contents.length) return;
-
   pushHistory();
-  const caretBefore = captureGlobalCaret();
+  const contentHeight = getContentHeight();
+  const startLineRatio = pageIdx / pageTitles.length;
+  const endLineRatio = (pageIdx + 1) / pageTitles.length;
 
-  const pageHtml = contents[index].innerHTML;
-  const previousHtml = index > 0 ? contents[index - 1].innerHTML : '';
+  const lines = editor.innerHTML.split(/<br\s*[\/]?>/gi);
+  const startIdx = Math.floor(lines.length * startLineRatio);
+  const endIdx = Math.floor(lines.length * endLineRatio);
 
-  if (index > 0) {
-    contents[index - 1].innerHTML = previousHtml + pageHtml;
-  } else {
-    contents[1].innerHTML = pageHtml + contents[1].innerHTML;
-  }
+  lines.splice(startIdx, Math.max(1, endIdx - startIdx));
+  editor.innerHTML = lines.join('<br>');
+  pageTitles.splice(pageIdx, 1);
 
-  pageMeta.splice(index, 1);
-  documentHTML = serializeAllContent();
   saveModel();
-
-  renderPages(caretBefore);
+  syncLayout();
   showToast('🗑️ 페이지가 삭제되었습니다');
 }
 
-function addNewPage() {
+function addNewPageBreak() {
   pushHistory();
-  documentHTML = serializeAllContent() + '<br><br>';
-  pageMeta.push({ title: '', align: 'left' });
-  renderPages();
+  editor.focus();
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  document.execCommand('insertHTML', false, '<br><br><br>');
   saveModel();
-  setTimeout(() => {
-    const cards = document.querySelectorAll('.note-page-card');
-    const lastCard = cards[cards.length - 1];
-    if (lastCard) {
-      lastCard.scrollIntoView({ behavior: 'smooth' });
-      const ed = lastCard.querySelector('.page-content');
-      if (ed) ed.focus();
-    }
-  }, 50);
-  showToast('📄 새 페이지가 추가되었습니다');
+  syncLayout();
+  showToast('📄 새 페이지 영역이 추가되었습니다');
 }
 
-/* 서식 및 툴바 상태 유지 */
+/* 서식 및 툴바 상태 제어 */
 let formatSelectionRange = null;
-let colorPreview = null;
 
 function rememberFormatSelection() {
-  const root = document.getElementById('document-editor');
   const sel = window.getSelection();
-  if (!root || !sel || !sel.rangeCount) return;
+  if (!sel || !sel.rangeCount) return;
   const r = sel.getRangeAt(0);
-  if (root.contains(r.commonAncestorContainer) && !r.collapsed) {
+  if (editor.contains(r.commonAncestorContainer) && !r.collapsed) {
     formatSelectionRange = r.cloneRange();
   }
 }
 
 function restoreFormatSelection() {
-  const root = document.getElementById('document-editor');
-  if (!root || !formatSelectionRange || !root.contains(formatSelectionRange.commonAncestorContainer)) return false;
+  if (!formatSelectionRange) return false;
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(formatSelectionRange.cloneRange());
   return true;
 }
 
-function applySelectionCommand(command, value = null) {
-  if (!restoreFormatSelection()) return false;
-  const ok = document.execCommand(command, false, value);
-  rememberFormatSelection();
-  documentHTML = serializeAllContent();
+function applyFormatCommand(cmd, val = null) {
+  restoreFormatSelection();
+  document.execCommand(cmd, false, val);
   saveModel();
-  return ok;
+  syncLayout();
 }
 
 document.addEventListener('selectionchange', () => {
-  const root = document.getElementById('document-editor');
   const sel = window.getSelection();
-  if (!root || !sel || !sel.rangeCount) return;
+  if (!sel || !sel.rangeCount) return;
   const r = sel.getRangeAt(0);
-  if (root.contains(r.commonAncestorContainer) && !r.collapsed) {
+  if (editor.contains(r.commonAncestorContainer) && !r.collapsed) {
     formatSelectionRange = r.cloneRange();
   }
 });
 
-document.addEventListener('mousedown', (e) => {
-  const root = document.getElementById('document-editor');
-  if (!root) return;
-  const t = e.target;
-  if (t && t.closest && (t.closest('#btn-align-cycle') || t.closest('.color-btn') || t.closest('#btn-bold') || t.closest('#btn-italic'))) {
-    rememberFormatSelection();
-  }
-}, true);
-
-function removeColorPreview() {
-  if (colorPreview) {
-    colorPreview.remove();
-    colorPreview = null;
-  }
-}
-
-function showColorPreview(color) {
-  if (!formatSelectionRange) return;
-  removeColorPreview();
-
-  const rects = Array.from(formatSelectionRange.getClientRects()).filter(r => r.width > 0 && r.height > 0);
-  if (!rects.length) return;
-
-  const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483646;';
-  rects.forEach(r => {
-    const el = document.createElement('div');
-    el.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;background:${color};opacity:.48;mix-blend-mode:multiply;border-radius:1px;`;
-    host.appendChild(el);
-  });
-  document.body.appendChild(host);
-  colorPreview = host;
-}
-
-function installColorPreview() {
-  const toolbar = document.getElementById('header-toolbar');
-  if (!toolbar || toolbar.dataset.colorPreview === '1') return;
-  toolbar.dataset.colorPreview = '1';
-
-  toolbar.addEventListener('pointerdown', e => {
-    const btn = e.target.closest('.color-btn');
-    if (!btn) return;
-    const color = activeColor;
-    if (!color) return;
-
-    rememberFormatSelection();
-    if (!formatSelectionRange) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    showColorPreview(color);
-    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
-  }, true);
-
-  toolbar.addEventListener('pointerup', e => {
-    const btn = e.target.closest('.color-btn');
-    if (!btn || !formatSelectionRange) return;
-    e.preventDefault();
-    e.stopPropagation();
-    removeColorPreview();
-    applySelectionCommand('foreColor', activeColor);
-    restoreFormatSelection();
-  }, true);
-
-  window.addEventListener('pointerup', () => {
-    if (colorPreview) removeColorPreview();
-  }, true);
-}
-
 function toggleBold() {
-  rememberFormatSelection();
   pushHistory();
-  if (formatSelectionRange && !formatSelectionRange.collapsed && !isBatchMode) {
-    applySelectionCommand('bold');
-    restoreFormatSelection();
+  if (formatSelectionRange && !formatSelectionRange.collapsed) {
+    applyFormatCommand('bold');
   } else {
     globalIsBold = !globalIsBold;
-    document.querySelectorAll('.page-content').forEach(c => {
-      c.style.fontWeight = globalIsBold ? "bold" : "normal";
-    });
-    showToast(globalIsBold ? "전체 볼드체 적용" : "전체 볼드체 해제");
-    documentHTML = serializeAllContent();
+    editor.style.fontWeight = globalIsBold ? 'bold' : 'normal';
+    showToast(globalIsBold ? '전체 볼드체 적용' : '전체 볼드체 해제');
     saveModel();
   }
 }
 
 function toggleItalic() {
-  rememberFormatSelection();
   pushHistory();
-  if (formatSelectionRange && !formatSelectionRange.collapsed && !isBatchMode) {
-    applySelectionCommand('italic');
-    restoreFormatSelection();
+  if (formatSelectionRange && !formatSelectionRange.collapsed) {
+    applyFormatCommand('italic');
   } else {
     globalIsItalic = !globalIsItalic;
-    document.querySelectorAll('.page-content').forEach(c => {
-      c.style.fontStyle = globalIsItalic ? "italic" : "normal";
-    });
-    showToast(globalIsItalic ? "전체 이탤릭체 적용" : "전체 이탤릭체 해제");
-    documentHTML = serializeAllContent();
+    editor.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
+    showToast(globalIsItalic ? '전체 이탤릭체 적용' : '전체 이탤릭체 해제');
     saveModel();
   }
 }
@@ -1484,23 +936,19 @@ function toggleItalic() {
 function adjustLetterSpacing(delta) {
   pushHistory();
   globalLetterSpacing = parseFloat((globalLetterSpacing + delta).toFixed(1));
-  document.querySelectorAll('.page-content').forEach(c => {
-    c.style.letterSpacing = globalLetterSpacing + 'px';
-  });
+  editor.style.letterSpacing = `${globalLetterSpacing}px`;
   showToast(`자간: ${globalLetterSpacing}px`);
-  documentHTML = serializeAllContent();
   saveModel();
+  syncLayout();
 }
 
 function adjustLineHeight(delta) {
   pushHistory();
   globalLineHeight = parseFloat(Math.max(0.8, globalLineHeight + delta).toFixed(2));
-  document.querySelectorAll('.page-content').forEach(c => {
-    c.style.lineHeight = globalLineHeight;
-  });
+  editor.style.lineHeight = `${globalLineHeight}`;
   showToast(`줄간격: ${globalLineHeight}`);
-  documentHTML = serializeAllContent();
   saveModel();
+  syncLayout();
 }
 
 function cycleFontFamily() {
@@ -1508,10 +956,9 @@ function cycleFontFamily() {
   localStorage.setItem('yslide_note_font_idx', currentFontIndex);
   document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
   btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
-  document.querySelectorAll('.page-content').forEach(c => {
-    c.style.fontFamily = FONT_LIST[currentFontIndex].family;
-  });
+  editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
   showToast(`글꼴: ${FONT_LIST[currentFontIndex].name}`);
+  syncLayout();
 }
 
 function cycleTextAlign() {
@@ -1526,40 +973,17 @@ function cycleTextAlign() {
     iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
   }
 
-  const hasSelection = formatSelectionRange && !formatSelectionRange.collapsed;
-  if (hasSelection) {
-    pushHistory();
-    const applied = applySelectionCommand('justify' + mode.charAt(0).toUpperCase() + mode.slice(1));
-    if (applied) {
-      showToast(`${ALIGN_NAMES[currentTextAlignIndex]} 적용`);
-      return;
-    }
-  }
-
   pushHistory();
-  if (isBatchMode) {
-    document.querySelectorAll('.page-content').forEach(c => c.style.textAlign = mode);
-    pageMeta.forEach(p => p.align = mode);
-    showToast(`전체 ${ALIGN_NAMES[currentTextAlignIndex]}`);
-  } else {
-    const idx = getCurrentPageIndex();
-    const cur = document.querySelectorAll('.page-content')[idx];
-    if (cur) {
-      cur.style.textAlign = mode;
-      if (pageMeta[idx]) pageMeta[idx].align = mode;
-      showToast(`페이지 ${idx + 1}: ${ALIGN_NAMES[currentTextAlignIndex]}`);
-    }
-  }
+  editor.style.textAlign = mode;
+  showToast(`${ALIGN_NAMES[currentTextAlignIndex]} 적용`);
   saveModel();
 }
 
 function changeFontSize(delta) {
   currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
   document.getElementById('size-display').innerText = currentFontSize;
-  document.querySelectorAll('.page-content').forEach(c => {
-    c.style.fontSize = currentFontSize + 'px';
-  });
-  renderPages(captureGlobalCaret());
+  editor.style.fontSize = `${currentFontSize}px`;
+  syncLayout();
 }
 
 function selectColor(color, el) {
@@ -1567,91 +991,78 @@ function selectColor(color, el) {
   document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
   el?.classList.add('selected');
 
-  rememberFormatSelection();
   if (formatSelectionRange && !formatSelectionRange.collapsed && !isContinuousMode) {
     pushHistory();
-    applySelectionCommand('foreColor', color);
-    restoreFormatSelection();
+    applyFormatCommand('foreColor', color);
   }
 }
 
-function attachContinuousEvents(contentEl, pageIdx) {
-  function paintAt(x, y) {
-    let r = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
-    if (!r) return;
-
-    let n = r.startContainer;
-    if (n.nodeType !== Node.TEXT_NODE) {
-      if (n.childNodes.length > 0 && r.startOffset < n.childNodes.length) {
-        n = n.childNodes[r.startOffset];
-        while (n && n.nodeType !== Node.TEXT_NODE && n.firstChild) n = n.firstChild;
-      }
-    }
-
-    if (n && n.nodeType === Node.TEXT_NODE) {
-      const txt = n.textContent;
-      const off = r.startOffset;
-      let a = Math.min(off, txt.length > 0 ? txt.length - 1 : 0);
-      while (a > 0 && !/\s/.test(txt[a - 1])) a--;
-      let b = off;
-      while (b < txt.length && !/\s/.test(txt[b])) b++;
-
-      if (a < b) {
-        const key = `${n.textContent}_${a}_${b}`;
-        if (key === lastPaintedKey) return;
-        lastPaintedKey = key;
-
-        const wr = document.createRange();
-        wr.setStart(n, a);
-        wr.setEnd(n, b);
-
-        const s = window.getSelection();
-        s.removeAllRanges();
-        s.addRange(wr);
-        document.execCommand('foreColor', false, activeColor);
-        s.removeAllRanges();
-
-        documentHTML = serializeAllContent();
-        saveModel();
-      }
-    }
+/* 연속 터치 채색 기능 */
+editor.addEventListener('touchstart', e => {
+  if (isContinuousMode) {
+    pushHistory();
+    isPainting = true;
+    paintAt(e.touches[0].clientX, e.touches[0].clientY);
+    e.preventDefault();
   }
+}, { passive: false });
 
-  contentEl.addEventListener('touchstart', e => {
-    if (isContinuousMode) {
-      pushHistory();
-      isPainting = true;
-      paintAt(e.touches[0].clientX, e.touches[0].clientY);
-      e.preventDefault();
-    }
-  }, { passive: false });
+editor.addEventListener('touchmove', e => {
+  if (isContinuousMode && isPainting) {
+    paintAt(e.touches[0].clientX, e.touches[0].clientY);
+    e.preventDefault();
+  }
+}, { passive: false });
 
-  contentEl.addEventListener('touchmove', e => {
-    if (isContinuousMode && isPainting) {
-      paintAt(e.touches[0].clientX, e.touches[0].clientY);
-      e.preventDefault();
-    }
-  }, { passive: false });
+editor.addEventListener('mousedown', e => {
+  if (isContinuousMode) {
+    pushHistory();
+    isPainting = true;
+    paintAt(e.clientX, e.clientY);
+    e.preventDefault();
+  }
+});
 
-  contentEl.addEventListener('mousedown', e => {
-    if (isContinuousMode) {
-      pushHistory();
-      isPainting = true;
-      paintAt(e.clientX, e.clientY);
-      e.preventDefault();
-    }
-  });
-
-  contentEl.addEventListener('mousemove', e => {
-    if (isContinuousMode && isPainting) {
-      paintAt(e.clientX, e.clientY);
-      e.preventDefault();
-    }
-  });
-}
+editor.addEventListener('mousemove', e => {
+  if (isContinuousMode && isPainting) {
+    paintAt(e.clientX, e.clientY);
+  }
+});
 
 window.addEventListener('mouseup', () => { isPainting = false; lastPaintedKey = ''; });
 window.addEventListener('touchend', () => { isPainting = false; lastPaintedKey = ''; });
+
+function paintAt(x, y) {
+  let r = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+  if (!r) return;
+  let n = r.startContainer;
+  if (n.nodeType !== Node.TEXT_NODE && n.childNodes.length > 0) {
+    n = n.childNodes[r.startOffset] || n.firstChild;
+    while (n && n.nodeType !== Node.TEXT_NODE && n.firstChild) n = n.firstChild;
+  }
+  if (n && n.nodeType === Node.TEXT_NODE) {
+    const txt = n.textContent;
+    const off = r.startOffset;
+    let a = Math.min(off, txt.length > 0 ? txt.length - 1 : 0);
+    while (a > 0 && !/\s/.test(txt[a - 1])) a--;
+    let b = off;
+    while (b < txt.length && !/\s/.test(txt[b])) b++;
+    if (a < b) {
+      const key = `${n.textContent}_${a}_${b}`;
+      if (key === lastPaintedKey) return;
+      lastPaintedKey = key;
+      const wr = document.createRange();
+      wr.setStart(n, a);
+      wr.setEnd(n, b);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(wr);
+      document.execCommand('foreColor', false, activeColor);
+      s.removeAllRanges();
+      saveModel();
+    }
+  }
+}
 
 function toggleContinuousMode() {
   isContinuousMode = !isContinuousMode;
@@ -1668,101 +1079,12 @@ function toggleBatchMode() {
 
 function toggleViewMode() {
   viewMode = viewMode === 'scroll' ? 'page' : 'scroll';
-  localStorage.setItem('yslide_note_view_mode', viewMode);
-  applyViewModeUI();
-  renderPages(captureGlobalCaret());
-  showToast(viewMode === 'scroll' ? '📜 세로 스크롤 모드' : '📄 페이지 넘김 모드');
+  showToast(viewMode === 'scroll' ? '📜 세로 스크롤 모드' : '📄 페이지 모드');
 }
 
-function applyViewModeUI() {
-  viewport.className = viewMode === 'scroll' ? 'view-scroll' : 'view-page';
-  if (iconViewMode) {
-    if (viewMode === 'scroll') {
-      iconViewMode.innerHTML = '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>';
-      btnViewMode.title = '현재: 세로 스크롤 모드';
-    } else {
-      iconViewMode.innerHTML = '<rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line>';
-      btnViewMode.title = '현재: 페이지 넘김 모드';
-    }
-  }
-  updateFloatingScrollbar();
-}
-
-function getCurrentPageIndex() {
-  const sel = window.getSelection();
-  if (sel && sel.rangeCount > 0) {
-    let node = sel.anchorNode;
-    while (node && node !== document.body) {
-      if (node.classList && node.classList.contains('note-page-card')) {
-        return parseInt(node.dataset.index, 10) || 0;
-      }
-      node = node.parentNode;
-    }
-  }
-  return 0;
-}
-
-function updatePageInfo() {
-  const el = document.getElementById('page-info');
-  const count = document.querySelectorAll('.note-page-card').length;
-  if (el) el.textContent = `${Math.max(1, count)} 페이지`;
-}
-
-function saveModel() {
-  try {
-    localStorage.setItem('yslide_note_document_v61', JSON.stringify({
-      version: 61,
-      html: documentHTML,
-      pageMeta,
-      viewMode
-    }));
-  } catch (e) {}
-}
-
-function pushHistory() {
-  const st = JSON.stringify({ html: documentHTML, pageMeta });
-  if (!undoStack.length || undoStack[undoStack.length - 1] !== st) {
-    undoStack.push(st);
-    if (undoStack.length > MAX_HISTORY) undoStack.shift();
-    redoStack = [];
-  }
-}
-
-function undo() {
-  if (undoStack.length <= 1) {
-    showToast('⚠️ 더 이상 되돌릴 작업이 없습니다');
-    return;
-  }
-  const cur = undoStack.pop();
-  redoStack.push(cur);
-  const prev = JSON.parse(undoStack[undoStack.length - 1]);
-  documentHTML = prev.html || '';
-  pageMeta = prev.pageMeta || [];
-  renderPages();
-  saveModel();
-  showToast('↶ 되돌리기');
-}
-
-function redo() {
-  if (!redoStack.length) {
-    showToast('⚠️ 다시 실행할 작업이 없습니다');
-    return;
-  }
-  const n = redoStack.pop();
-  undoStack.push(n);
-  const next = JSON.parse(n);
-  documentHTML = next.html || '';
-  pageMeta = next.pageMeta || [];
-  renderPages();
-  saveModel();
-  showToast('↷ 다시 실행');
-}
-
+/* 10px 플로팅 스크롤바 */
 function updateFloatingScrollbar() {
-  if (!scrollbarThumb || viewMode !== 'scroll') {
-    scrollbarThumb?.classList.remove('visible');
-    return;
-  }
+  if (!scrollbarThumb) return;
   const sh = viewport.scrollHeight, ch = viewport.clientHeight;
   if (sh <= ch + 10) {
     scrollbarThumb.classList.remove('visible');
@@ -1784,56 +1106,84 @@ function updateFloatingScrollbar() {
 viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
 let isDrag = false, startY = 0, startScroll = 0;
-
-function onDragStart(clientY) {
+scrollbarThumb.addEventListener('mousedown', e => {
   isDrag = true;
-  startY = clientY;
+  startY = e.clientY;
   startScroll = viewport.scrollTop;
   scrollbarThumb.classList.add('active', 'visible');
   document.body.style.userSelect = 'none';
-}
-
-function onDragMove(clientY) {
+  e.preventDefault();
+});
+window.addEventListener('mousemove', e => {
   if (!isDrag) return;
   const trackH = scrollbarTrack.clientHeight - scrollbarThumb.clientHeight;
   const scrollH = viewport.scrollHeight - viewport.clientHeight;
   if (trackH > 0) {
-    viewport.scrollTop = startScroll + ((clientY - startY) / trackH) * scrollH;
+    viewport.scrollTop = startScroll + ((e.clientY - startY) / trackH) * scrollH;
   }
-}
-
-function onDragEnd() {
+});
+window.addEventListener('mouseup', () => {
   if (isDrag) {
     isDrag = false;
     scrollbarThumb.classList.remove('active');
     document.body.style.userSelect = '';
-    clearTimeout(window._sf);
-    window._sf = setTimeout(() => scrollbarThumb.classList.remove('visible'), 1200);
+  }
+});
+
+/* 데이터 저장 및 관리 */
+function saveModel() {
+  try {
+    localStorage.setItem('yslide_note_v70', JSON.stringify({
+      html: editor.innerHTML,
+      titles: pageTitles
+    }));
+  } catch (e) {}
+}
+
+function pushHistory() {
+  const st = JSON.stringify({ html: editor.innerHTML, titles: pageTitles });
+  if (!undoStack.length || undoStack[undoStack.length - 1] !== st) {
+    undoStack.push(st);
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = [];
   }
 }
 
-scrollbarThumb.addEventListener('mousedown', e => {
-  onDragStart(e.clientY);
-  e.preventDefault();
-});
-window.addEventListener('mousemove', e => onDragMove(e.clientY));
-window.addEventListener('mouseup', onDragEnd);
+function undo() {
+  if (undoStack.length <= 1) {
+    showToast('⚠️ 더 이상 되돌릴 작업이 없습니다');
+    return;
+  }
+  const cur = undoStack.pop();
+  redoStack.push(cur);
+  const prev = JSON.parse(undoStack[undoStack.length - 1]);
+  editor.innerHTML = prev.html || '';
+  pageTitles = prev.titles || [];
+  syncLayout();
+  saveModel();
+  showToast('↶ 되돌리기');
+}
 
-scrollbarThumb.addEventListener('touchstart', e => {
-  onDragStart(e.touches[0].clientY);
-  e.stopPropagation();
-}, { passive: true });
-window.addEventListener('touchmove', e => {
-  if (isDrag) onDragMove(e.touches[0].clientY);
-}, { passive: true });
-window.addEventListener('touchend', onDragEnd);
+function redo() {
+  if (!redoStack.length) {
+    showToast('⚠️ 다시 실행할 작업이 없습니다');
+    return;
+  }
+  const n = redoStack.pop();
+  undoStack.push(n);
+  const next = JSON.parse(n);
+  editor.innerHTML = next.html || '';
+  pageTitles = next.titles || [];
+  syncLayout();
+  saveModel();
+  showToast('↷ 다시 실행');
+}
 
 function saveNoteData() {
-  documentHTML = serializeAllContent();
   saveModel();
   const now = new Date();
   const ds = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-  const blob = new Blob([JSON.stringify({ version: 61, html: documentHTML, pageMeta, viewMode }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ html: editor.innerHTML, titles: pageTitles }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `Yslide_${ds}.json`;
@@ -1846,22 +1196,21 @@ function handleFileImport(files) {
   if (!files?.length) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const raw = e.target.result;
     pushHistory();
     try {
-      const x = JSON.parse(raw);
-      if (Array.isArray(x)) {
-        documentHTML = x.map(p => p.isPlaceholder ? '' : (p.html || '')).filter(Boolean).join('<br><br>');
-        pageMeta = x.map(p => ({ title: p.title || '', align: p.align || 'left' }));
-      } else {
-        documentHTML = x.html || '';
-        pageMeta = x.pageMeta || [];
+      const x = JSON.parse(e.target.result);
+      if (x.html) {
+        editor.innerHTML = x.html;
+        pageTitles = x.titles || [];
+      } else if (Array.isArray(x)) {
+        editor.innerHTML = x.map(p => p.html || '').join('<br><br>');
+        pageTitles = x.map(p => p.title || '');
       }
     } catch {
-      documentHTML = String(raw).replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-      pageMeta = [];
+      editor.innerHTML = String(e.target.result).replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+      pageTitles = [];
     }
-    renderPages();
+    syncLayout();
     saveModel();
     showToast('📂 파일을 성공적으로 불러왔습니다');
   };
@@ -1869,13 +1218,8 @@ function handleFileImport(files) {
 }
 
 async function shareNoteContent() {
-  documentHTML = serializeAllContent();
-  const temp = document.createElement('div');
-  temp.innerHTML = documentHTML;
-  const text = temp.innerText.trim();
-
+  const text = editor.innerText.trim();
   if (!text) return showToast('⚠️ 공유할 내용이 없습니다');
-
   if (navigator.share) {
     try {
       await navigator.share({ title: 'Yslide 원고 공유', text });
@@ -1887,24 +1231,25 @@ async function shareNoteContent() {
 }
 
 function printNoteDocument() {
-  documentHTML = serializeAllContent();
   saveModel();
   const printArea = document.getElementById('print-area');
   printArea.innerHTML = '';
-  const pages = paginateDocument();
+  const lines = editor.innerHTML.split(/<br\s*[\/]?>/gi);
+  const chunkSize = Math.max(10, Math.ceil(lines.length / Math.max(1, pageTitles.length)));
 
-  pages.forEach((html, i) => {
+  for (let i = 0; i < pageTitles.length; i++) {
+    const chunk = lines.slice(i * chunkSize, (i + 1) * chunkSize).join('<br>');
     const sheet = document.createElement('div');
     sheet.className = 'print-page-sheet';
     sheet.innerHTML = `
       <div class="print-page-header">
-        <span>[ PAGE ${i + 1} / ${pages.length} ]</span>
-        <span>${esc(pageMeta[i]?.title || '')}</span>
+        <span>[ PAGE ${i + 1} / ${pageTitles.length} ]</span>
+        <span>${pageTitles[i] || ''}</span>
       </div>
-      <div>${html}</div>
+      <div>${chunk}</div>
     `;
     printArea.appendChild(sheet);
-  });
+  }
   window.print();
 }
 
@@ -1949,49 +1294,45 @@ async function translateSelectedTextWithGemini() {
     while (d.firstChild) f.appendChild(d.firstChild);
     range.insertNode(f);
 
-    documentHTML = serializeAllContent();
     saveModel();
-    renderPages(captureGlobalCaret());
+    syncLayout();
     showToast('✨ 영어 번역 완료');
   } catch (e) {
     showToast('⚠️ 번역 실패: API 키 또는 네트워크 상태를 확인하세요');
   }
 }
 
-function previewCurrentViewPage() {
-  const cards = document.querySelectorAll('.note-page-card');
-  const viewportCenter = viewport.scrollTop + (viewport.clientHeight / 2);
-  let targetIndex = 0;
-  cards.forEach((c, idx) => {
-    if (c.offsetTop <= viewportCenter) targetIndex = idx;
-  });
-  startFullPresentation(targetIndex);
-}
-
+/* 슬라이드 프레젠테이션 */
+let currentReaderIndex = 0;
 function startFullPresentation(startIndex = 0) {
-  documentHTML = serializeAllContent();
-  saveModel();
   readerViewport.innerHTML = '';
-  const pages = paginateDocument();
+  const lines = editor.innerHTML.split(/<br\s*[\/]?>/gi);
+  const chunkSize = Math.max(8, Math.ceil(lines.length / Math.max(1, pageTitles.length)));
 
-  pages.forEach((html, i) => {
+  for (let i = 0; i < Math.max(1, pageTitles.length); i++) {
+    const chunk = lines.slice(i * chunkSize, (i + 1) * chunkSize).join('<br>');
     const sheet = document.createElement('div');
     sheet.className = `slide-sheet ${i === startIndex ? 'active' : ''}`;
     sheet.style.fontSize = `${currentFontSize}px`;
-    const title = pageMeta[i]?.title ? `<div class="slide-title-header">${esc(pageMeta[i].title)}</div>` : '';
-    sheet.innerHTML = title + html;
+    const title = pageTitles[i] ? `<div class="slide-title-header">${pageTitles[i]}</div>` : '';
+    sheet.innerHTML = title + chunk;
     readerViewport.appendChild(sheet);
-  });
+  }
 
-  currentReaderIndex = Math.min(startIndex, pages.length - 1);
+  currentReaderIndex = startIndex;
   document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
-  document.getElementById('reader-total').innerText = pages.length;
+  document.getElementById('reader-total').innerText = Math.max(1, pageTitles.length);
   document.getElementById('reader-container').style.display = 'block';
-  isReaderOpen = true;
 
   if (document.documentElement.requestFullscreen) {
     document.documentElement.requestFullscreen().catch(() => {});
   }
+}
+
+function previewCurrentViewPage() {
+  const cardH = getCardHeight() + 28;
+  const pageIdx = Math.floor(viewport.scrollTop / cardH);
+  startFullPresentation(Math.min(pageTitles.length - 1, Math.max(0, pageIdx)));
 }
 
 function nextSlide() {
@@ -2014,52 +1355,20 @@ function prevSlide() {
 
 function exitReaderMode() {
   document.getElementById('reader-container').style.display = 'none';
-  isReaderOpen = false;
   if (document.fullscreenElement && document.exitFullscreen) {
     document.exitFullscreen().catch(() => {});
   }
 }
 
-window.addEventListener('keydown', e => {
-  if (isReaderOpen) {
-    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) {
-      e.preventDefault();
-      nextSlide();
-    } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) {
-      e.preventDefault();
-      prevSlide();
-    } else if (e.key === 'Escape') {
-      exitReaderMode();
-    }
-    return;
-  }
-
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-    e.preventDefault();
-    e.shiftKey ? redo() : undo();
-  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-    e.preventDefault();
-    redo();
-  }
-});
-
 window.addEventListener('resize', () => {
-  const currentWidth = window.innerWidth;
-  if (currentWidth !== lastWindowWidth) {
-    lastWindowWidth = currentWidth;
-    clearTimeout(reflowTimer);
-    reflowTimer = setTimeout(() => renderPages(), 200);
-  } else {
-    updateFloatingScrollbar();
-  }
+  syncLayout();
 });
 
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.innerText = msg;
   t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1500);
+  setTimeout(() => t.classList.remove('show'), 1500);
 }
 
 function init() {
@@ -2069,38 +1378,19 @@ function init() {
     document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
     btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
 
-    const vm = localStorage.getItem('yslide_note_view_mode');
-    if (vm) viewMode = vm;
-
-    const saved = localStorage.getItem('yslide_note_document_v61') || localStorage.getItem('yslide_note_document_v60');
+    const saved = localStorage.getItem('yslide_note_v70');
     if (saved) {
       const x = JSON.parse(saved);
-      documentHTML = x.html || '';
-      pageMeta = Array.isArray(x.pageMeta) ? x.pageMeta : [];
-      if (x.viewMode) viewMode = x.viewMode;
-    } else {
-      const old = localStorage.getItem('yslide_note_pages_v53');
-      if (old) {
-        const arr = JSON.parse(old);
-        if (Array.isArray(arr)) {
-          documentHTML = arr.map(p => p.isPlaceholder ? '' : (p.html || '')).filter(Boolean).join('<br><br>');
-          pageMeta = arr.map(p => ({ title: p.title || '', align: p.align || 'left' }));
-        }
-      }
+      editor.innerHTML = x.html || '';
+      pageTitles = x.titles || [];
     }
-  } catch (e) {
-    documentHTML = '';
-    pageMeta = [];
-  }
+  } catch (e) {}
 
-  applyViewModeUI();
-  renderPages();
   pushHistory();
-  updateFloatingScrollbar();
+  syncLayout();
 }
 
 init();
-installColorPreview();
 </script>
 </body>
 </html>
