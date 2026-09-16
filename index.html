@@ -228,7 +228,6 @@ button:active { transform: scale(0.97); }
 }
 #main-viewport.view-page::-webkit-scrollbar { display: none; }
 
-/* 단일 편집 문서 컨테이너 (전체 선택의 핵심) */
 #document-editor {
   width: 100%;
   min-height: 100%;
@@ -280,7 +279,6 @@ button:active { transform: scale(0.97); }
   overflow: hidden;
 }
 
-/* 💡 헤더는 전체 선택 시 시각적 하이라이트와 텍스트 복사에서 완전 배제 */
 .page-header {
   height: var(--header-height);
   background: #1a1a1a;
@@ -296,11 +294,6 @@ button:active { transform: scale(0.97); }
   z-index: 20;
   user-select: none !important;
   -webkit-user-select: none !important;
-}
-
-.page-header::selection, .page-header *::selection {
-  background: transparent !important;
-  color: inherit !important;
 }
 
 .page-badge {
@@ -374,7 +367,7 @@ body.paint-mode .page-content {
   user-select: none;
 }
 
-/* 💡 잡기 편하고 도톰해진 플로팅 스크롤바 */
+/* 10px 플로팅 스크롤바 */
 #floating-scrollbar-track {
   position: fixed;
   top: calc(var(--toolbar-height) + 12px);
@@ -756,7 +749,7 @@ body.paint-mode .page-content {
 <!-- 메인 에디터 뷰포트 -->
 <div id="main-viewport" class="view-scroll"></div>
 
-<!-- 도톰한 플로팅 스크롤바 -->
+<!-- 10px 플로팅 스크롤바 -->
 <div id="floating-scrollbar-track">
   <div id="floating-scrollbar-thumb"></div>
 </div>
@@ -823,7 +816,7 @@ function getMeasureBox() {
   return b;
 }
 
-/* 💡 HTML 태그 파괴 없이 문단과 줄바꿈을 온전히 보존하는 분할 엔진 */
+/* 💡 문단 및 긴 단일 문장까지 한계 높이에 맞춰 정확히 페이지를 쪼개는 핵심 엔진 */
 function paginateDocument() {
   if (!documentHTML || !documentHTML.trim()) return [''];
   
@@ -834,20 +827,40 @@ function paginateDocument() {
   let currentLines = [];
 
   for (let i = 0; i < rawParts.length; i++) {
-    const part = rawParts[i];
-    const candidate = [...currentLines, part].join('<br>');
-    measureBox.innerHTML = candidate;
+    let part = rawParts[i];
 
-    if (measureBox.offsetHeight <= maxHeight || currentLines.length === 0) {
-      currentLines.push(part);
-    } else {
-      const words = part.split(' ');
-      if (words.length > 1) {
+    // 빈 줄바꿈인 경우
+    if (part === '') {
+      const test = [...currentLines, ''].join('<br>');
+      measureBox.innerHTML = test || '<br>';
+      if (measureBox.offsetHeight <= maxHeight) {
+        currentLines.push('');
+      } else {
+        pages.push(currentLines.join('<br>'));
+        currentLines = [''];
+      }
+      continue;
+    }
+
+    // 일반 문단 처리 (문단이 카드 높이를 넘으면 쪼갬)
+    while (part.length > 0) {
+      const candidate = [...currentLines, part].join('<br>');
+      measureBox.innerHTML = candidate;
+
+      if (measureBox.offsetHeight <= maxHeight) {
+        currentLines.push(part);
+        break;
+      } else {
+        // 단어 단위 이진 탐색으로 현재 페이지에 들어갈 수 있는 최대 단어량 계산
+        const words = part.split(' ');
         let lo = 0, hi = words.length, best = 0;
+
         while (lo <= hi) {
           const mid = Math.floor((lo + hi) / 2);
           const chunk = words.slice(0, mid).join(' ');
-          measureBox.innerHTML = [...currentLines, chunk].join('<br>');
+          const testCandidate = [...currentLines, chunk].join('<br>');
+          measureBox.innerHTML = testCandidate;
+
           if (measureBox.offsetHeight <= maxHeight) {
             best = mid;
             lo = mid + 1;
@@ -855,15 +868,28 @@ function paginateDocument() {
             hi = mid - 1;
           }
         }
+
         if (best > 0) {
-          currentLines.push(words.slice(0, best).join(' '));
+          const fitChunk = words.slice(0, best).join(' ');
+          currentLines.push(fitChunk);
           pages.push(currentLines.join('<br>'));
-          currentLines = [words.slice(best).join(' ')];
-          continue;
+          currentLines = [];
+          part = words.slice(best).join(' ').trim();
+        } else {
+          // 한 단어도 못 들어갈 만큼 이미 꽉 찬 경우 현재 페이지 마감 후 새 페이지 시작
+          if (currentLines.length > 0) {
+            pages.push(currentLines.join('<br>'));
+            currentLines = [];
+          } else {
+            // 단어 하나가 전체 페이지보다 긴 극단적인 경우 강제 분할
+            const charCount = Math.max(10, Math.floor(part.length / 2));
+            currentLines.push(part.slice(0, charCount));
+            pages.push(currentLines.join('<br>'));
+            currentLines = [];
+            part = part.slice(charCount).trim();
+          }
         }
       }
-      pages.push(currentLines.join('<br>'));
-      currentLines = [part];
     }
   }
 
@@ -926,7 +952,6 @@ function restoreGlobalCaret(targetOffset) {
   }
 }
 
-/* 💡 핵심: #document-editor 전체를 단일 contenteditable로 구성하여 전체 선택 복원 */
 function renderPages(savedCaret = null) {
   if (isReflowing) return;
   isReflowing = true;
@@ -949,7 +974,6 @@ function renderPages(savedCaret = null) {
     card.className = 'note-page-card';
     card.dataset.index = index;
 
-    // 헤더는 contenteditable=false로 격리하여 텍스트 선택 및 타이핑에서 배제
     const header = document.createElement('div');
     header.className = 'page-header';
     header.contentEditable = 'false';
@@ -1039,7 +1063,6 @@ function bindRootEvents(root) {
     documentHTML = serializeAllContent();
     saveModel();
 
-    // 입력으로 인해 현재 카드의 높이가 넘칠 때만 자연스럽게 페이지 분할
     if (targetContent && (targetContent.scrollHeight > targetContent.clientHeight + 4)) {
       if (reflowTimer) clearTimeout(reflowTimer);
       reflowTimer = setTimeout(() => {
@@ -1050,14 +1073,12 @@ function bindRootEvents(root) {
   });
 
   root.addEventListener('keydown', (e) => {
-    // Ctrl+A 키보드 단축키 처리
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       selectAllPages();
       return;
     }
 
-    // 엔터 시 안정적인 줄바꿈 삽입
     if (e.key === 'Enter') {
       pushHistory();
       document.execCommand('insertLineBreak');
@@ -1079,20 +1100,51 @@ function bindRootEvents(root) {
     }
   });
 
+  /* 💡 붙여넣기 시 카드 구조 파괴를 원천 차단하고 분량에 맞게 즉시 페이지 확장 */
   root.addEventListener('paste', (e) => {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     if (!text) return;
+
     pushHistory();
     const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-    document.execCommand('insertHTML', false, formatted);
+
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+      documentHTML = formatted;
+      renderPages(0);
+      saveModel();
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const startCaret = captureGlobalCaret() || 0;
+
+    // 전체 선택 후 붙여넣는 경우
+    const allContents = root.querySelectorAll('.page-content');
+    if (allContents.length > 0 && sel.toString().length > 30 && sel.toString().trim() === root.innerText.trim()) {
+      documentHTML = formatted;
+      renderPages(formatted.length);
+      saveModel();
+      showToast('📋 전체 원고가 교체되었습니다');
+      return;
+    }
+
+    // 일반 위치에 붙여넣기
+    range.deleteContents();
+    const tempNode = document.createElement('div');
+    tempNode.innerHTML = formatted;
+    const frag = document.createDocumentFragment();
+    while (tempNode.firstChild) frag.appendChild(tempNode.firstChild);
+    range.insertNode(frag);
+
     documentHTML = serializeAllContent();
     saveModel();
-    renderPages(captureGlobalCaret());
+    renderPages(startCaret + text.length);
+    showToast('📋 붙여넣기가 완료되었습니다');
   });
 }
 
-/* 💡 모든 페이지 본문 일괄 선택 함수 */
 function selectAllPages() {
   const root = document.getElementById('document-editor');
   if (!root) return;
@@ -1111,7 +1163,6 @@ function selectAllPages() {
   sel.addRange(range);
 }
 
-/* 💡 복사 이벤트 인터셉트: 전체 선택 상태에서 복사하더라도 헤더 텍스트는 완전히 제외 */
 document.addEventListener('copy', (e) => {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
