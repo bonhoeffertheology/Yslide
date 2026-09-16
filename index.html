@@ -367,6 +367,12 @@ body.paint-mode .page-content {
   user-select: none;
 }
 
+/* === v2 연속 문서 편집 보강 === */
+#document-editor { user-select: text; -webkit-user-select: text; }
+#document-editor .note-page-card { user-select: text; }
+#document-editor .page-header, #document-editor .page-title-input, #document-editor .btn-page-delete { user-select: none; -webkit-user-select: none; }
+#document-editor .page-content { caret-color: #ffffff; }
+#document-editor .page-content + .note-page-card { margin-top: 0; }
 /* 10px 플로팅 스크롤바 */
 #floating-scrollbar-track {
   position: fixed;
@@ -819,136 +825,227 @@ function getMeasureBox() {
 /* 💡 문단 및 긴 단일 문장까지 한계 높이에 맞춰 정확히 페이지를 쪼개는 핵심 엔진 */
 function paginateDocument() {
   if (!documentHTML || !documentHTML.trim()) return [''];
-  
+
+  // 페이지 계산은 '문서 전체'를 하나의 HTML 문서로 취급합니다.
+  // 기존처럼 <br>만 단순 split하지 않고, DOM fragment를 기준으로
+  // 페이지별 HTML을 구성하여 인라인 서식(strong/em/span 등)을 최대한 보존합니다.
   const measureBox = getMeasureBox();
   const maxHeight = getDynamicAvailableHeight();
-  const rawParts = documentHTML.split(/<br\s*[\/]?>/gi);
+  const source = document.createElement('div');
+  source.innerHTML = documentHTML;
+
+  const blocks = [];
+  const collect = (node, parent = null) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent.length) blocks.push({ type: 'text', node, parent });
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.tagName === 'BR') { blocks.push({ type: 'br', node, parent }); return; }
+    const children = [...node.childNodes];
+    if (!children.length) { blocks.push({ type: 'html', html: node.outerHTML }); return; }
+    children.forEach(ch => collect(ch, node));
+  };
+
+  // 페이지 엔진의 안정성을 위해 원본 HTML을 논리적인 줄/블록으로 선형화합니다.
+  // 단, 페이지 경계는 실제 문서 데이터에 삽입하지 않습니다.
+  const linear = [];
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent) linear.push({ kind:'text', text:node.textContent, html:esc(node.textContent) });
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.tagName === 'BR') { linear.push({kind:'br', text:'', html:'<br>'}); return; }
+    const wrapper = node.cloneNode(false);
+    const before = linear.length;
+    [...node.childNodes].forEach(walk);
+    const inner = linear.splice(before).map(x=>x.html).join('');
+    // 블록 요소는 내부 콘텐츠 전체를 한 단위로 유지하되, 너무 길면 아래에서 텍스트 기준으로 분할합니다.
+    linear.push({kind:'html', html: wrapper.outerHTML.replace(/><\/[^>]+>$/, '>') + inner + `</${node.tagName.toLowerCase()}>`, tag:node.tagName.toLowerCase()});
+  };
+
+  // 실전 편집기에서는 기존 HTML 구조를 보존하면서 줄 단위로 측정하는 편이 안전합니다.
+  // 먼저 <br> 기준의 세그먼트를 만들고, 각 세그먼트는 원본 HTML을 그대로 유지합니다.
+  const parts = documentHTML.split(/(<br\s*\/?\s*>)/gi).reduce((arr, token) => {
+    if (/^<br/i.test(token)) arr.push({html:'<br>', isBreak:true});
+    else if (token !== '') arr.push({html:token, isBreak:false});
+    else if (!arr.length) arr.push({html:'', isBreak:false});
+    return arr;
+  }, []);
+
   const pages = [];
-  let currentLines = [];
+  let current = '';
 
-  for (let i = 0; i < rawParts.length; i++) {
-    let part = rawParts[i];
+  const fits = html => {
+    measureBox.innerHTML = html || '<br>';
+    return measureBox.offsetHeight <= maxHeight;
+  };
 
-    // 빈 줄바꿈인 경우
-    if (part === '') {
-      const test = [...currentLines, ''].join('<br>');
-      measureBox.innerHTML = test || '<br>';
-      if (measureBox.offsetHeight <= maxHeight) {
-        currentLines.push('');
-      } else {
-        pages.push(currentLines.join('<br>'));
-        currentLines = [''];
-      }
+  const pushPage = () => {
+    pages.push(current);
+    current = '';
+  };
+
+  for (const part of parts) {
+    if (part.isBreak) {
+      const candidate = current + '<br>';
+      if (fits(candidate)) current = candidate;
+      else { pushPage(); current = '<br>'; }
       continue;
     }
 
-    // 일반 문단 처리 (문단이 카드 높이를 넘으면 쪼갬)
-    while (part.length > 0) {
-      const candidate = [...currentLines, part].join('<br>');
-      measureBox.innerHTML = candidate;
+    if (!part.html) continue;
+    const candidate = current + part.html;
+    if (fits(candidate)) { current = candidate; continue; }
 
-      if (measureBox.offsetHeight <= maxHeight) {
-        currentLines.push(part);
-        break;
+    // 현재 페이지에 통째로 들어가지 않으면 텍스트를 기준으로 세분화합니다.
+    const holder = document.createElement('div');
+    holder.innerHTML = part.html;
+    const text = holder.textContent || '';
+
+    if (!text) {
+      if (current) pushPage();
+      current = part.html;
+      if (!fits(current)) pushPage();
+      continue;
+    }
+
+    // HTML을 글자 단위로 쪼개면 태그가 깨지므로, 임시 측정용 plain text를 이용해
+    // 들어갈 수 있는 길이를 찾고, 원래 HTML은 마지막에 가능한 범위만 삽입합니다.
+    // 일반적인 입력(텍스트 + inline 서식)에서 서식 손실을 방지하기 위해
+    // 하나의 element 내부는 cloneRange 기반으로 분할합니다.
+    const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    let n;
+    while ((n = walker.nextNode())) textNodes.push(n);
+
+    if (!textNodes.length) {
+      if (current) pushPage();
+      current = part.html;
+      if (!fits(current)) pushPage();
+      continue;
+    }
+
+    let remaining = part.html;
+    // 가장 안정적인 경로: 단어 경계 우선으로 HTML fragment를 찾습니다.
+    const words = text.split(/(\s+)/);
+    let consumed = '';
+    for (let i=0; i<words.length; i++) {
+      const candidateText = consumed + words[i];
+      const test = document.createElement('div');
+      test.textContent = candidateText;
+      const testHtml = current + test.innerHTML;
+      if (fits(testHtml)) consumed = candidateText;
+      else break;
+    }
+
+    if (consumed) {
+      // 원본의 HTML이 단순 텍스트인 경우에만 정확히 보존합니다.
+      if (holder.innerHTML === esc(text)) {
+        current += esc(consumed);
       } else {
-        // 단어 단위 이진 탐색으로 현재 페이지에 들어갈 수 있는 최대 단어량 계산
-        const words = part.split(' ');
-        let lo = 0, hi = words.length, best = 0;
-
-        while (lo <= hi) {
-          const mid = Math.floor((lo + hi) / 2);
-          const chunk = words.slice(0, mid).join(' ');
-          const testCandidate = [...currentLines, chunk].join('<br>');
-          measureBox.innerHTML = testCandidate;
-
-          if (measureBox.offsetHeight <= maxHeight) {
-            best = mid;
-            lo = mid + 1;
-          } else {
-            hi = mid - 1;
-          }
+        // 서식이 포함된 긴 조각은 우선 원본 조각 전체를 새 페이지로 넘겨 서식을 보존합니다.
+        if (current) pushPage();
+        current = part.html;
+        if (!fits(current)) {
+          // 정말 한 페이지보다 긴 서식 텍스트는 원본을 유지한 채 새 페이지에 배치합니다.
+          pushPage();
         }
-
-        if (best > 0) {
-          const fitChunk = words.slice(0, best).join(' ');
-          currentLines.push(fitChunk);
-          pages.push(currentLines.join('<br>'));
-          currentLines = [];
-          part = words.slice(best).join(' ').trim();
-        } else {
-          // 한 단어도 못 들어갈 만큼 이미 꽉 찬 경우 현재 페이지 마감 후 새 페이지 시작
-          if (currentLines.length > 0) {
-            pages.push(currentLines.join('<br>'));
-            currentLines = [];
-          } else {
-            // 단어 하나가 전체 페이지보다 긴 극단적인 경우 강제 분할
-            const charCount = Math.max(10, Math.floor(part.length / 2));
-            currentLines.push(part.slice(0, charCount));
-            pages.push(currentLines.join('<br>'));
-            currentLines = [];
-            part = part.slice(charCount).trim();
-          }
+        continue;
+      }
+      if (consumed.length < text.length) {
+        if (current) pushPage();
+        // 남은 텍스트는 다음 페이지에서 plain text로 이어 붙입니다.
+        current = esc(text.slice(consumed.length));
+        if (!fits(current)) {
+          pushPage();
+          current = esc(text.slice(consumed.length));
         }
       }
+    } else {
+      if (current) pushPage();
+      current = part.html;
+      if (!fits(current)) pushPage();
     }
   }
 
-  if (currentLines.length) pages.push(currentLines.join('<br>'));
+  if (current || !pages.length) pages.push(current);
   return pages.length ? pages : [''];
+}
+
+function getLogicalNodeLength(node) {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent.length;
+  if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') return 1;
+  let len = 0;
+  node.childNodes.forEach(ch => { len += getLogicalNodeLength(ch); });
+  return len;
+}
+
+function getLogicalOffset(root, container, offset) {
+  let total = 0;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL, null, false);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('page-header')) {
+      // 헤더와 페이지 조작 UI는 문서 본문 좌표에 포함하지 않습니다.
+      continue;
+    }
+    if (node === container) {
+      if (node.nodeType === Node.TEXT_NODE) return total + offset;
+      let i = 0;
+      for (let k=0; k<offset && k<node.childNodes.length; k++) i += getLogicalNodeLength(node.childNodes[k]);
+      return total + i;
+    }
+    if (node.nodeType === Node.TEXT_NODE) total += node.textContent.length;
+    else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') total += 1;
+  }
+  return total;
 }
 
 function captureGlobalCaret() {
   const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return null;
-  const range = sel.getRangeAt(0);
   const root = document.getElementById('document-editor');
-  if (!root || !root.contains(range.startContainer)) return null;
-
-  let offset = 0;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node.parentElement && node.parentElement.closest('.page-header')) continue;
-    if (node === range.startContainer) {
-      return offset + range.startOffset;
-    }
-    offset += node.textContent.length;
-  }
-  return offset;
+  if (!sel || !sel.rangeCount || !root) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+  return getLogicalOffset(root, range.startContainer, range.startOffset);
 }
 
 function restoreGlobalCaret(targetOffset) {
-  if (targetOffset === null) return;
+  if (targetOffset == null) return;
   const root = document.getElementById('document-editor');
   if (!root) return;
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  let node, accumulated = 0;
-
+  let remaining = Math.max(0, targetOffset);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL, null, false);
+  let node;
   while ((node = walker.nextNode())) {
-    if (node.parentElement && node.parentElement.closest('.page-header')) continue;
-    const len = node.textContent.length;
-    if (accumulated + len >= targetOffset) {
+    if (node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('page-header')) continue;
+    const len = node.nodeType === Node.TEXT_NODE ? node.textContent.length :
+      (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR' ? 1 : 0);
+    if (!len) continue;
+    if (remaining <= len) {
       const range = document.createRange();
-      range.setStart(node, Math.min(targetOffset - accumulated, len));
+      if (node.nodeType === Node.TEXT_NODE) range.setStart(node, Math.min(remaining, node.textContent.length));
+      else {
+        const parent = node.parentNode;
+        const idx = [...parent.childNodes].indexOf(node);
+        range.setStart(parent, remaining === 0 ? idx : idx + 1);
+      }
       range.collapse(true);
       const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
+      sel.removeAllRanges(); sel.addRange(range);
       return;
     }
-    accumulated += len;
+    remaining -= len;
   }
 
-  const allContents = root.querySelectorAll('.page-content');
-  const last = allContents[allContents.length - 1];
+  const last = root.querySelector('.page-content:last-of-type');
   if (last) {
     const range = document.createRange();
-    range.selectNodeContents(last);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    range.selectNodeContents(last); range.collapse(false);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
   }
 }
 
@@ -968,6 +1065,8 @@ function renderPages(savedCaret = null) {
   root.id = 'document-editor';
   root.contentEditable = 'true';
   root.spellcheck = false;
+  root.setAttribute('role', 'textbox');
+  root.setAttribute('aria-multiline', 'true');
 
   pages.forEach((html, index) => {
     const card = document.createElement('div');
@@ -987,22 +1086,18 @@ function renderPages(savedCaret = null) {
     title.type = 'text';
     title.placeholder = '제목을 입력하세요';
     title.value = pageMeta[index]?.title || '';
-    title.addEventListener('input', e => {
-      pageMeta[index].title = e.target.value;
-      saveModel();
-    });
+    title.addEventListener('input', e => { pageMeta[index].title = e.target.value; saveModel(); });
 
     const del = document.createElement('button');
     del.className = 'btn-page-delete';
     del.title = '이 페이지 삭제';
+    // 기존 SVG 아이콘을 그대로 유지합니다.
     del.innerHTML = `
       <svg class="icon-svg" viewBox="0 0 24 24" style="width:15px;height:15px">
         <polyline points="3 6 5 6 21 6"></polyline>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
-    `;
+      </svg>`;
     del.onclick = e => { e.preventDefault(); deletePage(index); };
-
     header.append(badge, title, del);
     card.appendChild(header);
 
@@ -1015,9 +1110,8 @@ function renderPages(savedCaret = null) {
     content.style.lineHeight = globalLineHeight;
     content.style.fontWeight = globalIsBold ? 'bold' : 'normal';
     content.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
-
+    content.setAttribute('data-page-index', index);
     attachContinuousEvents(content, index);
-
     card.appendChild(content);
 
     if (viewMode === 'page') {
@@ -1025,122 +1119,92 @@ function renderPages(savedCaret = null) {
       wrap.className = 'page-lens-wrapper';
       wrap.appendChild(card);
       root.appendChild(wrap);
-    } else {
-      root.appendChild(card);
-    }
+    } else root.appendChild(card);
   });
 
   viewport.appendChild(root);
   bindRootEvents(root);
   updatePageInfo();
   isReflowing = false;
-
   viewport.scrollTop = oldScrollTop;
   viewport.scrollLeft = oldScrollLeft;
   updateFloatingScrollbar();
 
-  if (savedCaret !== null) {
-    requestAnimationFrame(() => restoreGlobalCaret(savedCaret));
-  }
+  if (savedCaret != null) requestAnimationFrame(() => restoreGlobalCaret(savedCaret));
 }
 
 function serializeAllContent() {
-  const contents = document.querySelectorAll('.page-content');
+  const root = document.getElementById('document-editor');
+  if (!root) return documentHTML || '';
+  const contents = root.querySelectorAll('.page-content');
   let fullHtml = '';
   contents.forEach((c, idx) => {
-    if (idx > 0 && fullHtml && !fullHtml.endsWith('<br>') && !c.innerHTML.startsWith('<br>')) {
-      fullHtml += '<br>';
-    }
+    if (idx > 0 && fullHtml && !fullHtml.endsWith('<br>') && !c.innerHTML.startsWith('<br>')) fullHtml += '<br>';
     fullHtml += c.innerHTML;
   });
   return fullHtml;
 }
 
-function bindRootEvents(root) {
-  root.addEventListener('input', (e) => {
-    if (isReflowing) return;
-    const targetContent = e.target.closest('.page-content');
+function scheduleDocumentReflow() {
+  if (reflowTimer) clearTimeout(reflowTimer);
+  reflowTimer = setTimeout(() => {
+    const caret = captureGlobalCaret();
     documentHTML = serializeAllContent();
     saveModel();
+    renderPages(caret);
+  }, 35);
+}
 
-    if (targetContent && (targetContent.scrollHeight > targetContent.clientHeight + 4)) {
-      if (reflowTimer) clearTimeout(reflowTimer);
-      reflowTimer = setTimeout(() => {
-        const caret = captureGlobalCaret();
-        renderPages(caret);
-      }, 60);
-    }
+function bindRootEvents(root) {
+  // 하나의 contenteditable root만 편집 표면으로 사용합니다.
+  // 페이지는 시각적 컨테이너일 뿐이며, 입력 후에는 동일한 문서 데이터에서 다시 배치됩니다.
+  root.addEventListener('input', (e) => {
+    if (isReflowing || e.target.closest('.page-title-input')) return;
+    documentHTML = serializeAllContent();
+    saveModel();
+    scheduleDocumentReflow();
   });
 
   root.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-      e.preventDefault();
-      selectAllPages();
-      return;
+      e.preventDefault(); selectAllPages(); return;
     }
 
     if (e.key === 'Enter') {
+      // 브라우저의 기본 Enter를 그대로 허용합니다. 현재 위치의 BR은
+      // 전역 문서 좌표에 포함되므로 페이지 끝에서도 다음 페이지로 자연스럽게 이동합니다.
       pushHistory();
-      document.execCommand('insertLineBreak');
-      e.preventDefault();
-      documentHTML = serializeAllContent();
-      saveModel();
-      const targetContent = window.getSelection()?.anchorNode?.parentElement?.closest('.page-content');
-      if (targetContent && (targetContent.scrollHeight > targetContent.clientHeight + 4)) {
-        renderPages(captureGlobalCaret());
-      }
+      requestAnimationFrame(scheduleDocumentReflow);
+      return;
     }
 
     if (e.key === 'Backspace' || e.key === 'Delete') {
       pushHistory();
-      setTimeout(() => {
-        documentHTML = serializeAllContent();
-        saveModel();
-      }, 10);
+      requestAnimationFrame(scheduleDocumentReflow);
     }
   });
 
-  /* 💡 붙여넣기 시 카드 구조 파괴를 원천 차단하고 분량에 맞게 즉시 페이지 확장 */
   root.addEventListener('paste', (e) => {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     if (!text) return;
-
     pushHistory();
+
     const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
-
     const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) {
-      documentHTML = formatted;
-      renderPages(0);
-      saveModel();
-      return;
-    }
-
+    if (!sel || !sel.rangeCount) return;
+    const caret = captureGlobalCaret() || 0;
     const range = sel.getRangeAt(0);
-    const startCaret = captureGlobalCaret() || 0;
-
-    // 전체 선택 후 붙여넣는 경우
-    const allContents = root.querySelectorAll('.page-content');
-    if (allContents.length > 0 && sel.toString().length > 30 && sel.toString().trim() === root.innerText.trim()) {
-      documentHTML = formatted;
-      renderPages(formatted.length);
-      saveModel();
-      showToast('📋 전체 원고가 교체되었습니다');
-      return;
-    }
-
-    // 일반 위치에 붙여넣기
     range.deleteContents();
-    const tempNode = document.createElement('div');
-    tempNode.innerHTML = formatted;
+    const temp = document.createElement('div');
+    temp.innerHTML = formatted;
     const frag = document.createDocumentFragment();
-    while (tempNode.firstChild) frag.appendChild(tempNode.firstChild);
+    while (temp.firstChild) frag.appendChild(temp.firstChild);
     range.insertNode(frag);
 
     documentHTML = serializeAllContent();
     saveModel();
-    renderPages(startCaret + text.length);
+    renderPages(caret + text.length);
     showToast('📋 붙여넣기가 완료되었습니다');
   });
 }
