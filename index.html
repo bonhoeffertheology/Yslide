@@ -1060,13 +1060,24 @@ function renderPages(savedCaret = null) {
   while (pageMeta.length < pages.length) pageMeta.push({ title: '', align: 'left' });
   if (pageMeta.length > pages.length) pageMeta = pageMeta.slice(0, pages.length);
 
-  viewport.innerHTML = '';
-  const root = document.createElement('div');
-  root.id = 'document-editor';
-  root.contentEditable = 'true';
-  root.spellcheck = false;
-  root.setAttribute('role', 'textbox');
-  root.setAttribute('aria-multiline', 'true');
+  // 핵심: 편집의 기준이 되는 #document-editor 자체는 절대로 교체하지 않습니다.
+  // 페이지를 다시 배치할 때도 동일한 contenteditable root를 유지하므로
+  // Android/태블릿 IME(가상 키보드)의 포커스가 끊기지 않습니다.
+  let root = document.getElementById('document-editor');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'document-editor';
+    root.contentEditable = 'true';
+    root.spellcheck = false;
+    root.setAttribute('role', 'textbox');
+    root.setAttribute('aria-multiline', 'true');
+    viewport.appendChild(root);
+    bindRootEvents(root);
+  }
+
+  // root는 유지하고 그 안의 '페이지 표시 구조'만 새로 구성합니다.
+  // 페이지 자체는 문서 데이터가 아니라 시각적 레이아웃입니다.
+  const fragment = document.createDocumentFragment();
 
   pages.forEach((html, index) => {
     const card = document.createElement('div');
@@ -1118,12 +1129,15 @@ function renderPages(savedCaret = null) {
       const wrap = document.createElement('div');
       wrap.className = 'page-lens-wrapper';
       wrap.appendChild(card);
-      root.appendChild(wrap);
-    } else root.appendChild(card);
+      fragment.appendChild(wrap);
+    } else {
+      fragment.appendChild(card);
+    }
   });
 
-  viewport.appendChild(root);
-  bindRootEvents(root);
+  // root 자체는 살아 있는 채로 자식 페이지만 교체합니다.
+  root.replaceChildren(fragment);
+
   updatePageInfo();
   isReflowing = false;
   viewport.scrollTop = oldScrollTop;
@@ -1156,18 +1170,10 @@ function scheduleDocumentReflow(options = {}) {
     saveModel();
     renderPages(caret);
 
-    // 모바일/태블릿에서는 contenteditable DOM을 교체하는 순간 가상 키보드가
-    // 닫히는 브라우저가 있습니다. 삭제 입력 중에는 편집 표면의 포커스를
-    // 즉시 되돌려 키보드가 사라지지 않도록 합니다.
-    if (keepEditorFocused) {
-      requestAnimationFrame(() => {
-        const newRoot = document.getElementById('document-editor');
-        if (newRoot) {
-          try { newRoot.focus({ preventScroll: true }); }
-          catch (_) { newRoot.focus(); }
-          restoreGlobalCaret(caret);
-        }
-      });
+    // #document-editor는 동일한 DOM 노드이므로 포커스/IME를 건드리지 않습니다.
+    // 페이지 내용만 재배치한 뒤 전역 커서 위치만 복원합니다.
+    if (keepEditorFocused && caret != null) {
+      requestAnimationFrame(() => restoreGlobalCaret(caret));
     }
   }, delay);
 }
@@ -1187,20 +1193,10 @@ function bindRootEvents(root) {
     documentHTML = serializeAllContent();
     saveModel();
 
-    const isDeleting = root.dataset.isDeleting === '1' || /^delete/.test(e.inputType || '');
-    if (isDeleting) {
-      // 삭제할 때 매번 페이지 DOM을 통째로 다시 만들면 Android/갤럭시
-      // 태블릿의 가상 키보드가 닫힐 수 있습니다. 먼저 현재 편집 DOM을
-      // 그대로 유지하고 저장만 합니다. 포커스가 빠지면 blur에서 reflow합니다.
-      if (document.activeElement === root) return;
-    }
+    // 이제 renderPages()가 #document-editor 자체를 교체하지 않으므로
+    // 삭제 직후에도 즉시 전체 페이지를 재배치할 수 있습니다.
+    // 커서의 전역 좌표만 복원하여 편집 흐름과 태블릿 키보드를 함께 유지합니다.
     scheduleDocumentReflow({ preserveFocus: document.activeElement === root });
-  });
-
-  root.addEventListener('blur', () => {
-    // 키보드가 닫힌 뒤 페이지를 다시 계산하여 삭제 후 남은 공간으로
-    // 다음 페이지의 내용이 자연스럽게 당겨지도록 합니다.
-    if (!isReflowing) scheduleDocumentReflow({ delay: 20 });
   });
 
   root.addEventListener('keydown', (e) => {
