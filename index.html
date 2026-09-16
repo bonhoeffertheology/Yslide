@@ -118,12 +118,6 @@ button:active { transform: scale(0.97); }
 }
 #main-viewport::-webkit-scrollbar { display: none; }
 
-/* 💡 페이지 모드 스냅 활성화 */
-#main-viewport.page-mode {
-  scroll-snap-type: y mandatory !important;
-  scroll-padding-top: 24px;
-}
-
 #document-workspace { position: relative; width: var(--page-width); max-width: 820px; }
 
 /* 1) 배경 종이 레이어 */
@@ -132,15 +126,6 @@ button:active { transform: scale(0.97); }
   position: absolute; left: 0; width: 100%;
   background: var(--page-bg); border: 2px solid var(--page-border); border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05);
-}
-
-/* 💡 스냅 타깃 레이어 (페이지 단위 걸림목) */
-#page-snap-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
-.page-snap-anchor {
-  position: absolute; left: 0; width: 100%;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  visibility: hidden;
 }
 
 /* 2) 텍스트 캔버스 */
@@ -370,7 +355,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 
 <div id="main-viewport">
   <div id="document-workspace">
-    <div id="page-snap-layer"></div>
     <div id="page-cards-layer"></div>
     <div id="single-stream-editor" contenteditable="true" spellcheck="false"></div>
     <div id="page-headers-layer"></div>
@@ -423,7 +407,6 @@ let pageCount = 1, composing = false, reflowBusy = false, reflowQueued = false;
 const viewport = document.getElementById('main-viewport');
 const workspace = document.getElementById('document-workspace');
 const cardsLayer = document.getElementById('page-cards-layer');
-const snapLayer = document.getElementById('page-snap-layer');
 const headersLayer = document.getElementById('page-headers-layer');
 const editor = document.getElementById('single-stream-editor');
 const readerViewport = document.getElementById('reader-viewport');
@@ -548,7 +531,6 @@ function scheduleReflow() {
   requestAnimationFrame(() => { reflowQueued = false; reflow(); });
 }
 
-/* 💡 종이 카드, 머리글 및 스냅 앵커 동기화 */
 function renderPageChrome(n) {
   const cardH = cardHeight();
   while (pageTitles.length < n) pageTitles.push('');
@@ -556,26 +538,16 @@ function renderPageChrome(n) {
 
   cardsLayer.innerHTML = '';
   headersLayer.innerHTML = '';
-  snapLayer.innerHTML = '';
 
   for (let i = 0; i < n; i++) {
     const top = i * (cardH + PAGE_GAP);
 
-    // 1) 스냅 앵커 (페이지 스냅 걸림목)
-    const anchor = document.createElement('div');
-    anchor.className = 'page-snap-anchor';
-    anchor.style.top = top + 'px';
-    anchor.style.height = cardH + 'px';
-    snapLayer.appendChild(anchor);
-
-    // 2) 배경 카드
     const card = document.createElement('div');
     card.className = 'page-sheet-card';
     card.style.height = cardH + 'px';
     card.style.top = top + 'px';
     cardsLayer.appendChild(card);
 
-    // 3) 헤더
     const header = document.createElement('div');
     header.className = 'page-header';
     header.style.top = (top + 2) + 'px';
@@ -900,27 +872,86 @@ function toggleBatchMode() {
   showToast(isBatchMode ? '🌐 문서 전체 적용 모드 ON' : '📄 선택 영역 적용 모드 ON');
 }
 
-/* 💡 뷰 모드 전환 정상화 */
+/* 💡 100% 동작하는 정밀 페이지 단위 스냅 & 페이징 컨트롤러 */
+function getPageTop(idx) {
+  const cardH = cardHeight();
+  return idx * (cardH + PAGE_GAP);
+}
+
+function getCurrentPageIndexByScroll() {
+  const unit = cardHeight() + PAGE_GAP;
+  return Math.max(0, Math.min(pageCount - 1, Math.round(viewport.scrollTop / unit)));
+}
+
+function scrollToPageIndex(idx) {
+  const targetTop = getPageTop(Math.max(0, Math.min(pageCount - 1, idx)));
+  viewport.scrollTo({ top: targetTop, behavior: 'smooth' });
+}
+
 function toggleViewMode() {
   viewMode = viewMode === 'scroll' ? 'page' : 'scroll';
   try { localStorage.setItem('yslide_note_view_mode', viewMode); } catch (e) {}
   applyViewModeUI();
-  showToast(viewMode === 'scroll' ? '📜 세로 스크롤 모드' : '📄 페이지 넘김 모드');
+  if (viewMode === 'page') {
+    scrollToPageIndex(getCurrentPageIndexByScroll());
+    showToast('📄 페이지 넘김 모드 (1장씩 이동)');
+  } else {
+    showToast('📜 세로 스크롤 모드 (자유 이동)');
+  }
 }
 
 function applyViewModeUI() {
-  viewport.classList.toggle('page-mode', viewMode === 'page');
   btnViewMode.classList.toggle('active', viewMode === 'page');
   if (iconViewMode) {
     if (viewMode === 'page') {
       iconViewMode.innerHTML = '<rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="16" y2="18"></line>';
-      btnViewMode.title = '현재: 페이지 넘김 모드';
+      btnViewMode.title = '현재: 페이지 넘김 모드 (클릭 시 스크롤 모드)';
     } else {
       iconViewMode.innerHTML = '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>';
-      btnViewMode.title = '현재: 세로 스크롤 모드';
+      btnViewMode.title = '현재: 세로 스크롤 모드 (클릭 시 페이지 모드)';
     }
   }
 }
+
+/* 💡 페이지 모드일 때 터치/휠 인터셉트로 1페이지 단위 부드러운 스냅 보장 */
+let touchStartY = 0, isPagePaging = false;
+
+viewport.addEventListener('touchstart', e => {
+  if (viewMode !== 'page') return;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+viewport.addEventListener('touchend', e => {
+  if (viewMode !== 'page' || isPagePaging) return;
+  const touchEndY = e.changedTouches[0].clientY;
+  const deltaY = touchStartY - touchEndY;
+  if (Math.abs(deltaY) > 40) {
+    const curIdx = getCurrentPageIndexByScroll();
+    isPagePaging = true;
+    if (deltaY > 0) {
+      scrollToPageIndex(curIdx + 1);
+    } else {
+      scrollToPageIndex(curIdx - 1);
+    }
+    setTimeout(() => { isPagePaging = false; }, 400);
+  }
+}, { passive: true });
+
+let wheelTimer = null;
+viewport.addEventListener('wheel', e => {
+  if (viewMode !== 'page') return;
+  if (Math.abs(e.deltaY) < 15) return;
+  e.preventDefault();
+  if (wheelTimer) return;
+  wheelTimer = setTimeout(() => { wheelTimer = null; }, 300);
+
+  const curIdx = getCurrentPageIndexByScroll();
+  if (e.deltaY > 0) {
+    scrollToPageIndex(curIdx + 1);
+  } else {
+    scrollToPageIndex(curIdx - 1);
+  }
+}, { passive: false });
 
 /* 스크롤바 */
 function updateFloatingScrollbar() {
@@ -965,6 +996,9 @@ function endThumbDrag(e) {
   if (dragPointerId !== null) {
     try { scrollbarThumb.releasePointerCapture(dragPointerId); } catch (err) {}
     dragPointerId = null;
+  }
+  if (viewMode === 'page') {
+    scrollToPageIndex(getCurrentPageIndexByScroll());
   }
   updateFloatingScrollbar();
 }
