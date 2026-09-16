@@ -12,7 +12,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Yslide">
 
-<!-- 💡 저장소의 icon.png 및 manifest.json 정상 연결 -->
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -656,7 +655,6 @@ body.paint-mode .page-content {
 
       <div class="divider"></div>
 
-      <!-- 💡 앱 설치 버튼 -->
       <button id="btn-install-app" class="btn-icon" onclick="promptInstallApp()" style="display:none; background:#0284c7; border-color:#38bdf8;" title="앱 설치">
         <svg class="icon-svg" viewBox="0 0 24 24">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -808,7 +806,7 @@ const btnFontCycle = document.getElementById('btn-font-cycle'), btnBatchMode = d
 const iconViewMode = document.getElementById('icon-view-mode'), iconAlign = document.getElementById('icon-align');
 const scrollbarThumb = document.getElementById('floating-scrollbar-thumb'), scrollbarTrack = document.getElementById('floating-scrollbar-track');
 
-/* 💡 서비스 워커 및 PWA 설치 등록 */
+/* 서비스 워커 및 PWA 설치 등록 */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -1133,7 +1131,7 @@ function bindRootEvents(root) {
 
     const sel = window.getSelection();
 
-    // 1줄만 정확히 개행
+    // 1줄 개행
     if (e.key === 'Enter') {
       e.preventDefault();
       pushHistory();
@@ -1151,7 +1149,7 @@ function bindRootEvents(root) {
       return;
     }
 
-    // 페이지 첫머리 백스페이스 시 헤더 보호 및 이전 페이지 병합
+    // 💡 백스페이스 처리: 이전 페이지의 마지막 단어가 밀려오지 않고 현재 글이 이전 페이지 끝으로 이어붙도록 최적화
     if (e.key === 'Backspace' && sel && sel.rangeCount && sel.isCollapsed) {
       const activeCard = sel.anchorNode?.parentElement?.closest('.note-page-card');
       const pageIndex = activeCard ? parseInt(activeCard.dataset.index, 10) : 0;
@@ -1172,21 +1170,29 @@ function bindRootEvents(root) {
             const prevContent = prevCard ? prevCard.querySelector('.page-content') : null;
 
             if (prevContent) {
-              prevContent.innerHTML = (prevContent.innerHTML || '') + (currentContent.innerHTML || '');
+              // 1페이지 끝의 불필요한 개행을 정리하고 바로 텍스트를 이어붙여 역방향 밀림 방지
+              let prevHtml = prevContent.innerHTML || '';
+              prevHtml = prevHtml.replace(/(<br\s*[\/]?>\s*)+$/gi, ''); 
+              const currHtml = currentContent.innerHTML || '';
+
+              // 합치기 전 1페이지의 실제 텍스트 길이 계산 (정확한 캐럿 복원용)
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = prevHtml;
+              const caretTargetOffset = (tempDiv.textContent || '').length;
+
+              prevContent.innerHTML = prevHtml + currHtml;
               currentContent.innerHTML = '';
-              
+
               documentHTML = serializeAllContent();
               saveModel();
 
-              renderPages();
-              const targetCards = root.querySelectorAll('.note-page-card');
-              const targetEd = targetCards[pageIndex - 1]?.querySelector('.page-content');
-              if (targetEd) {
-                const range = document.createRange();
-                range.selectNodeContents(targetEd);
-                range.collapse(false);
-                sel.removeAllRanges();
-                sel.addRange(range);
+              // 1페이지의 텍스트가 있던 끝 지점으로 커서 정확히 안착
+              renderPages(caretTargetOffset);
+
+              // 1페이지 카드로 시선 스크롤 정렬
+              const targetCard = root.querySelectorAll('.note-page-card')[pageIndex - 1];
+              if (targetCard) {
+                targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               }
             }
           }
