@@ -1148,7 +1148,9 @@ function renderPages(savedCaret = null, options = {}) {
 
     const content = document.createElement('div');
     content.className = 'page-content';
-    content.setAttribute('contenteditable', 'inherit');
+    // IMPORTANT: do not make each page a separate editing host.
+    // #document-editor is the only contenteditable surface.
+    content.removeAttribute('contenteditable');
     content.innerHTML = pageHtml || '';
     content.style.textAlign = pageMeta[index]?.align || 'left';
     content.style.fontSize = currentFontSize + 'px';
@@ -1229,6 +1231,7 @@ function scheduleDocumentReflow(options = {}) {
   if (reflowTimer) clearTimeout(reflowTimer);
 
   reflowTimer = setTimeout(() => {
+    reflowTimer = null;
     const root = document.getElementById('document-editor');
     if (!root || root.dataset.composing === '1') return;
 
@@ -1327,20 +1330,117 @@ function bindRootEvents(root) {
       return;
     }
 
+    const sel = window.getSelection();
+    const active = document.activeElement;
+    const content = active && active.closest ? active.closest('.page-content') : null;
+
+    // A page boundary is visual only. At the first character of page N,
+    // Backspace must continue into the end of page N-1 instead of getting
+    // trapped by the non-editable page header.
+    if (e.key === 'Backspace' && !e.ctrlKey && !e.metaKey && !e.altKey &&
+        sel && sel.rangeCount && sel.isCollapsed && content) {
+      const r = sel.getRangeAt(0);
+      const atStart = (() => {
+        const probe = document.createRange();
+        probe.selectNodeContents(content);
+        probe.setEnd(r.startContainer, r.startOffset);
+        return probe.toString().length === 0;
+      })();
+
+      const contents = [...root.querySelectorAll('.page-content')];
+      const idx = contents.indexOf(content);
+
+      if (atStart && idx > 0) {
+        e.preventDefault();
+        pushHistory();
+
+        const prev = contents[idx - 1];
+        const oldPrevHtml = prev.innerHTML;
+        const currentHtml = content.innerHTML;
+
+        // Insert a logical line break only when both sides contain content.
+        // The pagination engine will decide the final visual page split.
+        if (oldPrevHtml && currentHtml) {
+          prev.innerHTML = oldPrevHtml + '<br>' + currentHtml;
+        } else {
+          prev.innerHTML = oldPrevHtml + currentHtml;
+        }
+        content.innerHTML = '';
+
+        documentHTML = serializeAllContent();
+        saveModel();
+
+        const caret = captureGlobalCaretFromElementEnd(prev);
+        const anchor = getCaretViewportAnchor();
+        scheduleDocumentReflow({ preserveFocus: true, delay: 0, caret, anchor });
+        return;
+      }
+    }
+
+    // Symmetric handling for Delete at the end of a page: remove the visual
+    // page boundary and let the next page's first content follow naturally.
+    if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey &&
+        sel && sel.rangeCount && sel.isCollapsed && content) {
+      const r = sel.getRangeAt(0);
+      const atEnd = (() => {
+        const probe = document.createRange();
+        probe.selectNodeContents(content);
+        probe.setStart(r.startContainer, r.startOffset);
+        return probe.toString().length === 0;
+      })();
+
+      const contents = [...root.querySelectorAll('.page-content')];
+      const idx = contents.indexOf(content);
+
+      if (atEnd && idx >= 0 && idx < contents.length - 1) {
+        e.preventDefault();
+        pushHistory();
+
+        const next = contents[idx + 1];
+        const currentHtml = content.innerHTML;
+        const nextHtml = next.innerHTML;
+
+        if (currentHtml && nextHtml) {
+          content.innerHTML = currentHtml + '<br>' + nextHtml;
+        } else {
+          content.innerHTML = currentHtml + nextHtml;
+        }
+        next.innerHTML = '';
+
+        documentHTML = serializeAllContent();
+        saveModel();
+
+        const caret = captureGlobalCaret();
+        const anchor = getCaretViewportAnchor();
+        scheduleDocumentReflow({ preserveFocus: true, delay: 0, caret, anchor });
+        return;
+      }
+    }
+
     if (e.key === 'Enter') {
-      // Let the browser perform exactly one native Enter operation.
-      // Do not schedule a competing reflow from keydown; input will do it once.
+      // Do not re-render from keydown. Let the browser complete one native
+      // insertion, then the input handler paginates once.
       pushHistory();
       return;
     }
 
     if (e.key === 'Backspace' || e.key === 'Delete') {
-      // Native deletion must finish first. The input event will perform one
-      // reflow using the resulting caret position.
       pushHistory();
       return;
     }
   });
+
+  // Return a logical caret offset at the end of a particular page-content node.
+  function captureGlobalCaretFromElementEnd(el) {
+    if (!el) return captureGlobalCaret();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return captureGlobalCaret();
+  }
 
   root.addEventListener('paste', (e) => {
     e.preventDefault();
@@ -1519,6 +1619,18 @@ document.addEventListener('selectionchange', () => {
   }
 });
 
+
+// Capture the current text selection immediately before a toolbar control takes focus.
+document.addEventListener('mousedown', (e) => {
+  const root = document.getElementById('document-editor');
+  if (!root) return;
+  const t = e.target;
+  if (t && t.closest && (t.closest('#btn-align-cycle') || t.closest('.color-btn') ||
+      t.closest('#btn-bold') || t.closest('#btn-italic'))) {
+    rememberFormatSelection();
+  }
+}, true);
+
 // Color preview: while the pointer is held over a color button, show the
 // candidate color without committing it. Releasing commits the chosen color.
 // The original selection range remains stored throughout.
@@ -1668,10 +1780,9 @@ function cycleFontFamily() {
 }
 
 function cycleTextAlign() {
-  pushHistory();
   currentTextAlignIndex = (currentTextAlignIndex + 1) % ALIGN_MODES.length;
   const mode = ALIGN_MODES[currentTextAlignIndex];
-  
+
   if (mode === 'left') {
     iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line>';
   } else if (mode === 'center') {
@@ -1680,6 +1791,21 @@ function cycleTextAlign() {
     iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
   }
 
+  // If text is selected, alignment belongs to the selected block(s), not
+  // the whole document/page. Restore the saved range because toolbar clicks
+  // move focus away from the editor.
+  const hasSelection = formatSelectionRange && !formatSelectionRange.collapsed;
+  if (hasSelection) {
+    pushHistory();
+    const applied = applySelectionCommand('justify' + mode.charAt(0).toUpperCase() + mode.slice(1));
+    if (applied) {
+      showToast(`${ALIGN_NAMES[currentTextAlignIndex]} 적용`);
+      return;
+    }
+  }
+
+  // No selection: retain the original page-level behavior.
+  pushHistory();
   if (isBatchMode) {
     document.querySelectorAll('.page-content').forEach(c => c.style.textAlign = mode);
     pageMeta.forEach(p => p.align = mode);
