@@ -519,6 +519,15 @@ body.paint-mode #single-stream-editor {
   z-index: 9000;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 페이지 카드 레이어가 키보드 입력의 스크롤 앵커가 되지 않도록 한다. */
+#page-cards-layer {
+  overflow-anchor: none;
+}
+#single-stream-editor {
+  overflow-anchor: auto;
+}
+
 </style>
 </head>
 <body>
@@ -793,44 +802,92 @@ function syncLayout() {
   editor.style.paddingRight = '36px';
 
   const totalWorkspaceHeight = pageCount * cardHeight + (pageCount - 1) * pageGap;
-  workspace.style.minHeight = `${totalWorkspaceHeight}px`;
+  // The editor is the real document. The workspace only provides enough room
+  // for the visual page cards; never resize the editor itself here.
+  workspace.style.minHeight = `${Math.max(totalWorkspaceHeight, editor.scrollHeight)}px`;
 
   document.getElementById('page-info').textContent = `${pageCount} 페이지`;
   updateFloatingScrollbar();
 }
 
-/* 💡 브라우저 네이티브 입력 보존 (커서 튐 / 개행 증폭 원천 방지) */
+/* =========================================================
+   단일 연속 문서 입력 엔진
+   ---------------------------------------------------------
+   핵심 원칙:
+   1) #single-stream-editor만 contenteditable이다.
+   2) Enter / Backspace / Delete 때 editor.innerHTML을 건드리지 않는다.
+   3) 키 입력 직후에는 브라우저의 native editing을 그대로 끝내게 한다.
+   4) 페이지 카드는 requestAnimationFrame 한 번으로만 재배치한다.
+   5) 페이지 경계에는 실제 DOM 경계가 없으므로 Backspace/Delete가
+      페이지를 넘어갈 때 별도 병합 코드를 실행하지 않는다.
+   ========================================================= */
+
+let layoutFrame = 0;
+let layoutAfterInput = false;
+
+function scheduleVisualLayout() {
+  if (layoutFrame) return;
+  layoutFrame = requestAnimationFrame(() => {
+    layoutFrame = 0;
+    syncLayout();
+    updateFloatingScrollbar();
+  });
+}
+
+function captureScrollState() {
+  return {
+    top: viewport.scrollTop,
+    left: viewport.scrollLeft
+  };
+}
+
+function restoreScrollState(state) {
+  if (!state) return;
+  // 브라우저의 native scroll anchoring을 방해하지 않도록 같은 frame 안에서
+  // 미세한 차이만 보정한다.
+  if (Math.abs(viewport.scrollTop - state.top) > 2) {
+    viewport.scrollTop = state.top;
+  }
+  if (Math.abs(viewport.scrollLeft - state.left) > 2) {
+    viewport.scrollLeft = state.left;
+  }
+}
+
+/* 입력 후에는 저장만 하고, 시각적 페이지 카드만 다음 animation frame에서
+   한 번 갱신한다. editor 자체의 DOM/selection/caret에는 손대지 않는다. */
 editor.addEventListener('input', () => {
   saveModel();
-  syncLayout();
+  layoutAfterInput = true;
+  scheduleVisualLayout();
 });
 
+/* Enter, Backspace, Delete에는 별도 조작을 하지 않는다.
+   이것이 페이지 경계에서 커서가 튀는 것을 막는 핵심이다. */
 editor.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    pushHistory();
-    // 브라우저의 자연스러운 1줄 개행 허용
-    setTimeout(() => {
-      syncLayout();
-      saveModel();
-    }, 10);
-  } else if (e.key === 'Backspace' || e.key === 'Delete') {
-    pushHistory();
-    setTimeout(() => {
-      syncLayout();
-      saveModel();
-    }, 10);
+  if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {
+    // native editing 그대로 통과
+    return;
   }
 });
 
+/* 붙여넣기도 editor의 native selection을 유지한 채 한 번만 삽입한다. */
 editor.addEventListener('paste', (e) => {
   e.preventDefault();
+
   const text = (e.clipboardData || window.clipboardData).getData('text/plain');
   if (!text) return;
+
   pushHistory();
-  const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+
+  const formatted = text
+    .replace(/\r\n/g, '<br>')
+    .replace(/\r/g, '<br>')
+    .replace(/\n/g, '<br>');
+
   document.execCommand('insertHTML', false, formatted);
+
   saveModel();
-  syncLayout();
+  scheduleVisualLayout();
   showToast('📋 붙여넣기가 완료되었습니다');
 });
 
@@ -973,12 +1030,44 @@ function cycleTextAlign() {
     iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
   }
 
+  const sel = window.getSelection();
+  const hasSelection = sel && sel.rangeCount && !sel.isCollapsed &&
+                       editor.contains(sel.getRangeAt(0).commonAncestorContainer);
+
+  if (hasSelection) {
+    pushHistory();
+
+    // Restore the live selection immediately before execCommand. Do not call
+    // syncLayout here: it can move the visual scroll position while the user
+    // is still holding the selection.
+    const range = sel.getRangeAt(0).cloneRange();
+    document.execCommand(
+      mode === 'left' ? 'justifyLeft' :
+      mode === 'center' ? 'justifyCenter' : 'justifyRight',
+      false,
+      null
+    );
+
+    // Selection is restored by the browser in most engines; explicitly restore
+    // the exact range when possible.
+    try {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (_) {}
+
+    saveModel();
+    scheduleVisualLayout();
+    showToast(`${ALIGN_NAMES[currentTextAlignIndex]} 적용`);
+    return;
+  }
+
+  // No selection: preserve the existing page/document behavior.
   pushHistory();
   editor.style.textAlign = mode;
-  showToast(`${ALIGN_NAMES[currentTextAlignIndex]} 적용`);
   saveModel();
+  scheduleVisualLayout();
+  showToast(`${ALIGN_NAMES[currentTextAlignIndex]} 적용`);
 }
-
 function changeFontSize(delta) {
   currentFontSize = Math.min(48, Math.max(16, currentFontSize + delta));
   document.getElementById('size-display').innerText = currentFontSize;
@@ -1361,7 +1450,7 @@ function exitReaderMode() {
 }
 
 window.addEventListener('resize', () => {
-  syncLayout();
+  scheduleVisualLayout();
 });
 
 function showToast(msg) {
