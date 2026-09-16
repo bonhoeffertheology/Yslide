@@ -234,6 +234,8 @@ button:active { transform: scale(0.97); }
   outline: none;
   caret-color: #ffffff;
   position: relative;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .view-scroll #document-editor {
   display: flex;
@@ -277,6 +279,7 @@ button:active { transform: scale(0.97); }
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  user-select: text;
 }
 
 .page-header {
@@ -294,6 +297,11 @@ button:active { transform: scale(0.97); }
   z-index: 20;
   user-select: none !important;
   -webkit-user-select: none !important;
+}
+
+.page-header::selection, .page-header *::selection {
+  background: transparent !important;
+  color: inherit !important;
 }
 
 .page-badge {
@@ -354,6 +362,7 @@ button:active { transform: scale(0.97); }
   font-family: var(--active-font);
   box-sizing: border-box;
   overflow-wrap: anywhere;
+  caret-color: #ffffff;
 }
 
 .page-content:empty:before, .page-content.is-empty:before {
@@ -367,12 +376,6 @@ body.paint-mode .page-content {
   user-select: none;
 }
 
-/* === v2 연속 문서 편집 보강 === */
-#document-editor { user-select: text; -webkit-user-select: text; }
-#document-editor .note-page-card { user-select: text; }
-#document-editor .page-header, #document-editor .page-title-input, #document-editor .btn-page-delete { user-select: none; -webkit-user-select: none; }
-#document-editor .page-content { caret-color: #ffffff; }
-#document-editor .page-content + .note-page-card { margin-top: 0; }
 /* 10px 플로팅 스크롤바 */
 #floating-scrollbar-track {
   position: fixed;
@@ -826,257 +829,138 @@ function getMeasureBox() {
 function paginateDocument() {
   if (!documentHTML || !documentHTML.trim()) return [''];
 
-  // 페이지 계산은 '문서 전체'를 하나의 HTML 문서로 취급합니다.
-  // 기존처럼 <br>만 단순 split하지 않고, DOM fragment를 기준으로
-  // 페이지별 HTML을 구성하여 인라인 서식(strong/em/span 등)을 최대한 보존합니다.
   const measureBox = getMeasureBox();
   const maxHeight = getDynamicAvailableHeight();
-  const source = document.createElement('div');
-  source.innerHTML = documentHTML;
-
-  const blocks = [];
-  const collect = (node, parent = null) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if (node.textContent.length) blocks.push({ type: 'text', node, parent });
-      return;
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
-    if (node.tagName === 'BR') { blocks.push({ type: 'br', node, parent }); return; }
-    const children = [...node.childNodes];
-    if (!children.length) { blocks.push({ type: 'html', html: node.outerHTML }); return; }
-    children.forEach(ch => collect(ch, node));
-  };
-
-  // 페이지 엔진의 안정성을 위해 원본 HTML을 논리적인 줄/블록으로 선형화합니다.
-  // 단, 페이지 경계는 실제 문서 데이터에 삽입하지 않습니다.
-  const linear = [];
-  const walk = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if (node.textContent) linear.push({ kind:'text', text:node.textContent, html:esc(node.textContent) });
-      return;
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
-    if (node.tagName === 'BR') { linear.push({kind:'br', text:'', html:'<br>'}); return; }
-    const wrapper = node.cloneNode(false);
-    const before = linear.length;
-    [...node.childNodes].forEach(walk);
-    const inner = linear.splice(before).map(x=>x.html).join('');
-    // 블록 요소는 내부 콘텐츠 전체를 한 단위로 유지하되, 너무 길면 아래에서 텍스트 기준으로 분할합니다.
-    linear.push({kind:'html', html: wrapper.outerHTML.replace(/><\/[^>]+>$/, '>') + inner + `</${node.tagName.toLowerCase()}>`, tag:node.tagName.toLowerCase()});
-  };
-
-  // 실전 편집기에서는 기존 HTML 구조를 보존하면서 줄 단위로 측정하는 편이 안전합니다.
-  // 먼저 <br> 기준의 세그먼트를 만들고, 각 세그먼트는 원본 HTML을 그대로 유지합니다.
-  const parts = documentHTML.split(/(<br\s*\/?\s*>)/gi).reduce((arr, token) => {
-    if (/^<br/i.test(token)) arr.push({html:'<br>', isBreak:true});
-    else if (token !== '') arr.push({html:token, isBreak:false});
-    else if (!arr.length) arr.push({html:'', isBreak:false});
-    return arr;
-  }, []);
-
+  const rawParts = documentHTML.split(/<br\s*[\/]?>/gi);
   const pages = [];
-  let current = '';
+  let currentLines = [];
 
-  const fits = html => {
-    measureBox.innerHTML = html || '<br>';
-    return measureBox.offsetHeight <= maxHeight;
-  };
+  for (let i = 0; i < rawParts.length; i++) {
+    let part = rawParts[i];
 
-  const pushPage = () => {
-    pages.push(current);
-    current = '';
-  };
-
-  for (const part of parts) {
-    if (part.isBreak) {
-      const candidate = current + '<br>';
-      if (fits(candidate)) current = candidate;
-      else { pushPage(); current = '<br>'; }
-      continue;
-    }
-
-    if (!part.html) continue;
-    const candidate = current + part.html;
-    if (fits(candidate)) { current = candidate; continue; }
-
-    // 현재 페이지에 통째로 들어가지 않으면 텍스트를 기준으로 세분화합니다.
-    const holder = document.createElement('div');
-    holder.innerHTML = part.html;
-    const text = holder.textContent || '';
-
-    if (!text) {
-      if (current) pushPage();
-      current = part.html;
-      if (!fits(current)) pushPage();
-      continue;
-    }
-
-    // HTML을 글자 단위로 쪼개면 태그가 깨지므로, 임시 측정용 plain text를 이용해
-    // 들어갈 수 있는 길이를 찾고, 원래 HTML은 마지막에 가능한 범위만 삽입합니다.
-    // 일반적인 입력(텍스트 + inline 서식)에서 서식 손실을 방지하기 위해
-    // 하나의 element 내부는 cloneRange 기반으로 분할합니다.
-    const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT, null, false);
-    const textNodes = [];
-    let n;
-    while ((n = walker.nextNode())) textNodes.push(n);
-
-    if (!textNodes.length) {
-      if (current) pushPage();
-      current = part.html;
-      if (!fits(current)) pushPage();
-      continue;
-    }
-
-    let remaining = part.html;
-    // 가장 안정적인 경로: 단어 경계 우선으로 HTML fragment를 찾습니다.
-    const words = text.split(/(\s+)/);
-    let consumed = '';
-    for (let i=0; i<words.length; i++) {
-      const candidateText = consumed + words[i];
-      const test = document.createElement('div');
-      test.textContent = candidateText;
-      const testHtml = current + test.innerHTML;
-      if (fits(testHtml)) consumed = candidateText;
-      else break;
-    }
-
-    if (consumed) {
-      // 원본의 HTML이 단순 텍스트인 경우에만 정확히 보존합니다.
-      if (holder.innerHTML === esc(text)) {
-        current += esc(consumed);
+    if (part === '') {
+      const test = [...currentLines, ''].join('<br>');
+      measureBox.innerHTML = test || '<br>';
+      if (measureBox.offsetHeight <= maxHeight) {
+        currentLines.push('');
       } else {
-        // 서식이 포함된 긴 조각은 우선 원본 조각 전체를 새 페이지로 넘겨 서식을 보존합니다.
-        if (current) pushPage();
-        current = part.html;
-        if (!fits(current)) {
-          // 정말 한 페이지보다 긴 서식 텍스트는 원본을 유지한 채 새 페이지에 배치합니다.
-          pushPage();
-        }
-        continue;
+        pages.push(currentLines.join('<br>'));
+        currentLines = [''];
       }
-      if (consumed.length < text.length) {
-        if (current) pushPage();
-        // 남은 텍스트는 다음 페이지에서 plain text로 이어 붙입니다.
-        current = esc(text.slice(consumed.length));
-        if (!fits(current)) {
-          pushPage();
-          current = esc(text.slice(consumed.length));
-        }
-      }
-    } else {
-      if (current) pushPage();
-      current = part.html;
-      if (!fits(current)) pushPage();
-    }
-  }
-
-  if (current || !pages.length) pages.push(current);
-  return pages.length ? pages : [''];
-}
-
-function getLogicalNodeLength(node) {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent.length;
-  if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') return 1;
-  let len = 0;
-  node.childNodes.forEach(ch => { len += getLogicalNodeLength(ch); });
-  return len;
-}
-
-function getLogicalOffset(root, container, offset) {
-  let total = 0;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL, null, false);
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('page-header')) {
-      // 헤더와 페이지 조작 UI는 문서 본문 좌표에 포함하지 않습니다.
       continue;
     }
-    if (node === container) {
-      if (node.nodeType === Node.TEXT_NODE) return total + offset;
-      let i = 0;
-      for (let k=0; k<offset && k<node.childNodes.length; k++) i += getLogicalNodeLength(node.childNodes[k]);
-      return total + i;
+
+    while (part.length > 0) {
+      const candidate = [...currentLines, part].join('<br>');
+      measureBox.innerHTML = candidate;
+
+      if (measureBox.offsetHeight <= maxHeight) {
+        currentLines.push(part);
+        break;
+      } else {
+        const words = part.split(' ');
+        let lo = 0, hi = words.length, best = 0;
+
+        while (lo <= hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          const chunk = words.slice(0, mid).join(' ');
+          const testCandidate = [...currentLines, chunk].join('<br>');
+          measureBox.innerHTML = testCandidate;
+
+          if (measureBox.offsetHeight <= maxHeight) {
+            best = mid;
+            lo = mid + 1;
+          } else {
+            hi = mid - 1;
+          }
+        }
+
+        if (best > 0) {
+          const fitChunk = words.slice(0, best).join(' ');
+          currentLines.push(fitChunk);
+          pages.push(currentLines.join('<br>'));
+          currentLines = [];
+          part = words.slice(best).join(' ').trim();
+        } else {
+          if (currentLines.length > 0) {
+            pages.push(currentLines.join('<br>'));
+            currentLines = [];
+          } else {
+            const charCount = Math.max(10, Math.floor(part.length / 2));
+            currentLines.push(part.slice(0, charCount));
+            pages.push(currentLines.join('<br>'));
+            currentLines = [];
+            part = part.slice(charCount).trim();
+          }
+        }
+      }
     }
-    if (node.nodeType === Node.TEXT_NODE) total += node.textContent.length;
-    else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') total += 1;
   }
-  return total;
+
+  if (currentLines.length) pages.push(currentLines.join('<br>'));
+  return pages.length ? pages : [''];
 }
 
 function captureGlobalCaret() {
   const sel = window.getSelection();
-  const root = document.getElementById('document-editor');
-  if (!sel || !sel.rangeCount || !root) return null;
+  if (!sel || !sel.rangeCount) return null;
   const range = sel.getRangeAt(0);
-  if (!root.contains(range.startContainer)) return null;
-  return getLogicalOffset(root, range.startContainer, range.startOffset);
+  const root = document.getElementById('document-editor');
+  if (!root || !root.contains(range.startContainer)) return null;
+
+  let offset = 0;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement && node.parentElement.closest('.page-header')) continue;
+    if (node === range.startContainer) {
+      return offset + range.startOffset;
+    }
+    offset += node.textContent.length;
+  }
+  return offset;
 }
 
 function restoreGlobalCaret(targetOffset) {
-  if (targetOffset == null) return;
+  if (targetOffset === null) return;
   const root = document.getElementById('document-editor');
   if (!root) return;
 
-  let remaining = Math.max(0, targetOffset);
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL, null, false);
-  let node;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  let node, accumulated = 0;
+
   while ((node = walker.nextNode())) {
-    if (node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('page-header')) continue;
-    const len = node.nodeType === Node.TEXT_NODE ? node.textContent.length :
-      (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR' ? 1 : 0);
-    if (!len) continue;
-    if (remaining <= len) {
+    if (node.parentElement && node.parentElement.closest('.page-header')) continue;
+    const len = node.textContent.length;
+    if (accumulated + len >= targetOffset) {
       const range = document.createRange();
-      if (node.nodeType === Node.TEXT_NODE) range.setStart(node, Math.min(remaining, node.textContent.length));
-      else {
-        const parent = node.parentNode;
-        const idx = [...parent.childNodes].indexOf(node);
-        range.setStart(parent, remaining === 0 ? idx : idx + 1);
-      }
+      range.setStart(node, Math.min(targetOffset - accumulated, len));
       range.collapse(true);
       const sel = window.getSelection();
-      sel.removeAllRanges(); sel.addRange(range);
+      sel.removeAllRanges();
+      sel.addRange(range);
       return;
     }
-    remaining -= len;
+    accumulated += len;
   }
 
-  const last = root.querySelector('.page-content:last-of-type');
+  const allContents = root.querySelectorAll('.page-content');
+  const last = allContents[allContents.length - 1];
   if (last) {
     const range = document.createRange();
-    range.selectNodeContents(last); range.collapse(false);
-    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    range.selectNodeContents(last);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
   }
 }
 
-function getCaretViewportAnchor() {
-  const sel = window.getSelection();
-  const root = document.getElementById('document-editor');
-  if (!sel || !sel.rangeCount || !root || !root.contains(sel.anchorNode)) return null;
-
-  const caret = captureGlobalCaret();
-  if (caret == null) return null;
-
-  const range = document.createRange();
-  range.setStart(sel.anchorNode, sel.anchorOffset);
-  range.collapse(true);
-  const rects = range.getClientRects();
-  const rect = rects.length ? rects[0] : null;
-
-  return {
-    offset: caret,
-    top: rect ? rect.top : null,
-    left: rect ? rect.left : null,
-    scrollTop: viewport.scrollTop,
-    scrollLeft: viewport.scrollLeft
-  };
-}
-
-function renderPages(savedCaret = null, options = {}) {
+/* 💡 화면 덜컹거림과 커서 튐을 원천 차단하는 안정적 렌더링 */
+function renderPages(savedCaret = null) {
   if (isReflowing) return;
   isReflowing = true;
 
-  const anchor = options.anchor || getCaretViewportAnchor();
   const oldScrollTop = viewport.scrollTop;
   const oldScrollLeft = viewport.scrollLeft;
   const pages = paginateDocument();
@@ -1084,26 +968,19 @@ function renderPages(savedCaret = null, options = {}) {
   while (pageMeta.length < pages.length) pageMeta.push({ title: '', align: 'left' });
   if (pageMeta.length > pages.length) pageMeta = pageMeta.slice(0, pages.length);
 
-  // IMPORTANT:
-  // #document-editor is the single editing surface and is NEVER replaced.
-  // Only its visual page containers are rebuilt. IME/composition state therefore
-  // belongs to the same contenteditable root for the lifetime of the document.
   let root = document.getElementById('document-editor');
   if (!root) {
     root = document.createElement('div');
     root.id = 'document-editor';
     root.contentEditable = 'true';
     root.spellcheck = false;
-    root.dataset.composing = '0';
-    root.setAttribute('role', 'textbox');
-    root.setAttribute('aria-multiline', 'true');
     viewport.appendChild(root);
     bindRootEvents(root);
   }
 
   const fragment = document.createDocumentFragment();
 
-  pages.forEach((pageHtml, index) => {
+  pages.forEach((html, index) => {
     const card = document.createElement('div');
     card.className = 'note-page-card';
     card.dataset.index = index;
@@ -1135,7 +1012,8 @@ function renderPages(savedCaret = null, options = {}) {
       <svg class="icon-svg" viewBox="0 0 24 24" style="width:15px;height:15px">
         <polyline points="3 6 5 6 21 6"></polyline>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>`;
+      </svg>
+    `;
     del.addEventListener('mousedown', e => e.preventDefault());
     del.addEventListener('click', e => {
       e.preventDefault();
@@ -1148,18 +1026,16 @@ function renderPages(savedCaret = null, options = {}) {
 
     const content = document.createElement('div');
     content.className = 'page-content';
-    // IMPORTANT: do not make each page a separate editing host.
-    // #document-editor is the only contenteditable surface.
-    content.removeAttribute('contenteditable');
-    content.innerHTML = pageHtml || '';
+    content.innerHTML = html || '';
     content.style.textAlign = pageMeta[index]?.align || 'left';
     content.style.fontSize = currentFontSize + 'px';
     content.style.letterSpacing = globalLetterSpacing + 'px';
     content.style.lineHeight = globalLineHeight;
     content.style.fontWeight = globalIsBold ? 'bold' : 'normal';
     content.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
-    content.setAttribute('data-page-index', index);
+
     attachContinuousEvents(content, index);
+
     card.appendChild(content);
 
     if (viewMode === 'page') {
@@ -1173,38 +1049,15 @@ function renderPages(savedCaret = null, options = {}) {
   });
 
   root.replaceChildren(fragment);
-
   updatePageInfo();
   isReflowing = false;
 
-  // Restore the old scroll position first. Then, if there was a caret anchor,
-  // compensate for the changed page heights so the editing line does not jump.
   viewport.scrollTop = oldScrollTop;
   viewport.scrollLeft = oldScrollLeft;
   updateFloatingScrollbar();
 
-  const targetCaret = savedCaret != null ? savedCaret : (anchor ? anchor.offset : null);
-  if (targetCaret != null) {
-    requestAnimationFrame(() => {
-      restoreGlobalCaret(targetCaret);
-
-      if (anchor && anchor.top != null) {
-        requestAnimationFrame(() => {
-          const sel = window.getSelection();
-          if (!sel || !sel.rangeCount) return;
-          const r = sel.getRangeAt(0).cloneRange();
-          r.collapse(true);
-          const rects = r.getClientRects();
-          if (!rects.length) return;
-
-          const deltaY = rects[0].top - anchor.top;
-          const deltaX = rects[0].left - (anchor.left ?? rects[0].left);
-          if (Math.abs(deltaY) > 1) viewport.scrollTop += deltaY;
-          if (Math.abs(deltaX) > 1) viewport.scrollLeft += deltaX;
-          updateFloatingScrollbar();
-        });
-      }
-    });
+  if (savedCaret !== null) {
+    requestAnimationFrame(() => restoreGlobalCaret(savedCaret));
   }
 }
 
@@ -1214,113 +1067,33 @@ function serializeAllContent() {
   const contents = root.querySelectorAll('.page-content');
   let fullHtml = '';
   contents.forEach((c, idx) => {
-    if (idx > 0 && fullHtml && !fullHtml.endsWith('<br>') && !c.innerHTML.startsWith('<br>')) fullHtml += '<br>';
+    if (idx > 0 && fullHtml && !fullHtml.endsWith('<br>') && !c.innerHTML.startsWith('<br>')) {
+      fullHtml += '<br>';
+    }
     fullHtml += c.innerHTML;
   });
   return fullHtml;
 }
 
-function scheduleDocumentReflow(options = {}) {
-  const {
-    preserveFocus = false,
-    delay = 45,
-    caret = null,
-    anchor = null
-  } = options;
-
-  if (reflowTimer) clearTimeout(reflowTimer);
-
-  reflowTimer = setTimeout(() => {
-    reflowTimer = null;
-    const root = document.getElementById('document-editor');
-    if (!root || root.dataset.composing === '1') return;
-
-    const keepEditorFocused =
-      preserveFocus &&
-      root.contains(document.activeElement);
-
-    const currentCaret = caret != null ? caret : captureGlobalCaret();
-    const currentAnchor = anchor || getCaretViewportAnchor();
-
-    documentHTML = serializeAllContent();
-    saveModel();
-    renderPages(currentCaret, { anchor: currentAnchor });
-
-    // Do NOT focus() here. Calling focus() during/after IME input is one of the
-    // common causes of Samsung/Android keyboards losing their composition state.
-    if (keepEditorFocused) {
-      requestAnimationFrame(() => {
-        const newRoot = document.getElementById('document-editor');
-        if (newRoot && document.activeElement !== newRoot) {
-          // Usually unnecessary because the same root remains focused.
-          // Only restore selection; never force focus.
-          restoreGlobalCaret(currentCaret);
-        }
-      });
-    }
-  }, delay);
-}
-
+/* 💡 브라우저 네이티브 입력 및 자연스러운 넘김 바인딩 */
 function bindRootEvents(root) {
-  // Android/Samsung IME support:
-  // Never re-render the page structure while Korean/Japanese/Chinese composition
-  // is active. The browser must be allowed to own the composing text until
-  // compositionend, otherwise characters can duplicate (e.g. ㅎ하나하나니...).
-  root.addEventListener('compositionstart', () => {
-    root.dataset.composing = '1';
-    root.dataset.lastCompositionCaret = String(captureGlobalCaret() ?? 0);
-    if (reflowTimer) clearTimeout(reflowTimer);
-  });
-
-  root.addEventListener('compositionupdate', () => {
-    root.dataset.composing = '1';
-  });
-
-  root.addEventListener('beforeinput', (e) => {
-    root.dataset.lastInputType = e.inputType || '';
-    root.dataset.isDeleting = /^delete/.test(e.inputType || '') ? '1' : '0';
-  });
-
   root.addEventListener('input', (e) => {
     if (isReflowing || e.target.closest('.page-title-input')) return;
 
     documentHTML = serializeAllContent();
     saveModel();
 
-    // During IME composition, absolutely no DOM/page rebuild.
-    if (root.dataset.composing === '1' || e.isComposing) return;
+    if (e.isComposing) return;
 
-    const caret = captureGlobalCaret();
-    const anchor = getCaretViewportAnchor();
-
-    // Reflow after the browser has completed its native edit operation.
-    // This keeps Backspace/Delete/Enter atomic and prevents visual jumping.
-    scheduleDocumentReflow({
-      preserveFocus: true,
-      delay: 55,
-      caret,
-      anchor
-    });
-  });
-
-  root.addEventListener('compositionend', () => {
-    root.dataset.composing = '0';
-
-    // The final committed Korean syllable is now in the DOM. Capture its actual
-    // caret position, then reflow once. Never focus() the editor.
-    requestAnimationFrame(() => {
-      documentHTML = serializeAllContent();
-      saveModel();
-
-      const caret = captureGlobalCaret();
-      const anchor = getCaretViewportAnchor();
-      scheduleDocumentReflow({
-        preserveFocus: true,
-        delay: 20,
-        caret,
-        anchor
-      });
-    });
+    // 현재 카드 높이를 초과했을 때만 디바운스로 페이지를 안전하게 분할
+    const targetContent = window.getSelection()?.anchorNode?.parentElement?.closest('.page-content');
+    if (targetContent && (targetContent.scrollHeight > targetContent.clientHeight + 4)) {
+      if (reflowTimer) clearTimeout(reflowTimer);
+      reflowTimer = setTimeout(() => {
+        const caret = captureGlobalCaret();
+        renderPages(caret);
+      }, 100);
+    }
   });
 
   root.addEventListener('keydown', (e) => {
@@ -1330,97 +1103,10 @@ function bindRootEvents(root) {
       return;
     }
 
-    const sel = window.getSelection();
-    const active = document.activeElement;
-    const content = active && active.closest ? active.closest('.page-content') : null;
-
-    // A page boundary is visual only. At the first character of page N,
-    // Backspace must continue into the end of page N-1 instead of getting
-    // trapped by the non-editable page header.
-    if (e.key === 'Backspace' && !e.ctrlKey && !e.metaKey && !e.altKey &&
-        sel && sel.rangeCount && sel.isCollapsed && content) {
-      const r = sel.getRangeAt(0);
-      const atStart = (() => {
-        const probe = document.createRange();
-        probe.selectNodeContents(content);
-        probe.setEnd(r.startContainer, r.startOffset);
-        return probe.toString().length === 0;
-      })();
-
-      const contents = [...root.querySelectorAll('.page-content')];
-      const idx = contents.indexOf(content);
-
-      if (atStart && idx > 0) {
-        e.preventDefault();
-        pushHistory();
-
-        const prev = contents[idx - 1];
-        const oldPrevHtml = prev.innerHTML;
-        const currentHtml = content.innerHTML;
-
-        // Insert a logical line break only when both sides contain content.
-        // The pagination engine will decide the final visual page split.
-        if (oldPrevHtml && currentHtml) {
-          prev.innerHTML = oldPrevHtml + '<br>' + currentHtml;
-        } else {
-          prev.innerHTML = oldPrevHtml + currentHtml;
-        }
-        content.innerHTML = '';
-
-        documentHTML = serializeAllContent();
-        saveModel();
-
-        const caret = captureGlobalCaretFromElementEnd(prev);
-        const anchor = getCaretViewportAnchor();
-        scheduleDocumentReflow({ preserveFocus: true, delay: 0, caret, anchor });
-        return;
-      }
-    }
-
-    // Symmetric handling for Delete at the end of a page: remove the visual
-    // page boundary and let the next page's first content follow naturally.
-    if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey &&
-        sel && sel.rangeCount && sel.isCollapsed && content) {
-      const r = sel.getRangeAt(0);
-      const atEnd = (() => {
-        const probe = document.createRange();
-        probe.selectNodeContents(content);
-        probe.setStart(r.startContainer, r.startOffset);
-        return probe.toString().length === 0;
-      })();
-
-      const contents = [...root.querySelectorAll('.page-content')];
-      const idx = contents.indexOf(content);
-
-      if (atEnd && idx >= 0 && idx < contents.length - 1) {
-        e.preventDefault();
-        pushHistory();
-
-        const next = contents[idx + 1];
-        const currentHtml = content.innerHTML;
-        const nextHtml = next.innerHTML;
-
-        if (currentHtml && nextHtml) {
-          content.innerHTML = currentHtml + '<br>' + nextHtml;
-        } else {
-          content.innerHTML = currentHtml + nextHtml;
-        }
-        next.innerHTML = '';
-
-        documentHTML = serializeAllContent();
-        saveModel();
-
-        const caret = captureGlobalCaret();
-        const anchor = getCaretViewportAnchor();
-        scheduleDocumentReflow({ preserveFocus: true, delay: 0, caret, anchor });
-        return;
-      }
-    }
-
+    // 엔터 및 백스페이스 시 인위적인 DOM 분해/조작 없이 브라우저 본래 동작을 따름
     if (e.key === 'Enter') {
-      // Do not re-render from keydown. Let the browser complete one native
-      // insertion, then the input handler paginates once.
       pushHistory();
+      // 브라우저의 기본 개행을 허용하고, 높이가 넘칠 때만 input 핸들러에서 안전하게 처리
       return;
     }
 
@@ -1430,55 +1116,43 @@ function bindRootEvents(root) {
     }
   });
 
-  // Return a logical caret offset at the end of a particular page-content node.
-  function captureGlobalCaretFromElementEnd(el) {
-    if (!el) return captureGlobalCaret();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    return captureGlobalCaret();
-  }
-
   root.addEventListener('paste', (e) => {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData('text/plain');
     if (!text) return;
 
     pushHistory();
-
-    const formatted = text
-      .replace(/\r\n/g, '<br>')
-      .replace(/\n/g, '<br>');
+    const formatted = text.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
 
     const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
+    const startCaret = captureGlobalCaret() || 0;
 
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
+    // 전체 선택 후 붙여넣는 경우
+    const allContents = root.querySelectorAll('.page-content');
+    if (allContents.length > 0 && sel && sel.toString().length > 30 && sel.toString().trim() === root.innerText.trim()) {
+      documentHTML = formatted;
+      renderPages(formatted.length);
+      saveModel();
+      showToast('📋 전체 원고가 교체되었습니다');
+      return;
+    }
 
-    const temp = document.createElement('div');
-    temp.innerHTML = formatted;
-
-    const frag = document.createDocumentFragment();
-    while (temp.firstChild) frag.appendChild(temp.firstChild);
-    range.insertNode(frag);
+    // 일반 위치에 붙여넣기
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const tempNode = document.createElement('div');
+      tempNode.innerHTML = formatted;
+      const frag = document.createDocumentFragment();
+      while (tempNode.firstChild) frag.appendChild(tempNode.firstChild);
+      range.insertNode(frag);
+    } else {
+      documentHTML = (documentHTML ? documentHTML + '<br>' : '') + formatted;
+    }
 
     documentHTML = serializeAllContent();
     saveModel();
-
-    const caret = captureGlobalCaret();
-    const anchor = getCaretViewportAnchor();
-
-    scheduleDocumentReflow({
-      preserveFocus: true,
-      delay: 20,
-      caret,
-      anchor
-    });
-
+    renderPages(startCaret + text.length);
     showToast('📋 붙여넣기가 완료되었습니다');
   });
 }
@@ -1522,9 +1196,7 @@ document.addEventListener('copy', (e) => {
 
 function deletePage(index) {
   const root = document.getElementById('document-editor');
-  const contents = root
-    ? root.querySelectorAll('.page-content')
-    : document.querySelectorAll('.page-content');
+  const contents = root ? root.querySelectorAll('.page-content') : document.querySelectorAll('.page-content');
 
   if (contents.length <= 1) {
     showToast('⚠️ 마지막 남은 페이지는 삭제할 수 없습니다');
@@ -1533,9 +1205,7 @@ function deletePage(index) {
   if (index < 0 || index >= contents.length) return;
 
   pushHistory();
-
   const caretBefore = captureGlobalCaret();
-  const anchorBefore = getCaretViewportAnchor();
 
   const pageHtml = contents[index].innerHTML;
   const previousHtml = index > 0 ? contents[index - 1].innerHTML : '';
@@ -1550,9 +1220,7 @@ function deletePage(index) {
   documentHTML = serializeAllContent();
   saveModel();
 
-  // Rebuild only the visual pages; the editor root remains the same.
-  renderPages(caretBefore, { anchor: anchorBefore });
-
+  renderPages(caretBefore);
   showToast('🗑️ 페이지가 삭제되었습니다');
 }
 
@@ -1574,8 +1242,7 @@ function addNewPage() {
   showToast('📄 새 페이지가 추가되었습니다');
 }
 
-
-// ---- Selection-safe formatting controls ----
+/* 서식 및 선택 영역 보존 로직 */
 let formatSelectionRange = null;
 let colorPreview = null;
 
@@ -1591,8 +1258,7 @@ function rememberFormatSelection() {
 
 function restoreFormatSelection() {
   const root = document.getElementById('document-editor');
-  if (!root || !formatSelectionRange ||
-      !root.contains(formatSelectionRange.commonAncestorContainer)) return false;
+  if (!root || !formatSelectionRange || !root.contains(formatSelectionRange.commonAncestorContainer)) return false;
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(formatSelectionRange.cloneRange());
@@ -1608,7 +1274,6 @@ function applySelectionCommand(command, value = null) {
   return ok;
 }
 
-// Save the selection before the toolbar takes focus.
 document.addEventListener('selectionchange', () => {
   const root = document.getElementById('document-editor');
   const sel = window.getSelection();
@@ -1619,21 +1284,15 @@ document.addEventListener('selectionchange', () => {
   }
 });
 
-
-// Capture the current text selection immediately before a toolbar control takes focus.
 document.addEventListener('mousedown', (e) => {
   const root = document.getElementById('document-editor');
   if (!root) return;
   const t = e.target;
-  if (t && t.closest && (t.closest('#btn-align-cycle') || t.closest('.color-btn') ||
-      t.closest('#btn-bold') || t.closest('#btn-italic'))) {
+  if (t && t.closest && (t.closest('#btn-align-cycle') || t.closest('.color-btn') || t.closest('#btn-bold') || t.closest('#btn-italic'))) {
     rememberFormatSelection();
   }
 }, true);
 
-// Color preview: while the pointer is held over a color button, show the
-// candidate color without committing it. Releasing commits the chosen color.
-// The original selection range remains stored throughout.
 function removeColorPreview() {
   if (colorPreview) {
     colorPreview.remove();
@@ -1645,19 +1304,14 @@ function showColorPreview(color) {
   if (!formatSelectionRange) return;
   removeColorPreview();
 
-  const rects = Array.from(formatSelectionRange.getClientRects())
-    .filter(r => r.width > 0 && r.height > 0);
+  const rects = Array.from(formatSelectionRange.getClientRects()).filter(r => r.width > 0 && r.height > 0);
   if (!rects.length) return;
 
   const host = document.createElement('div');
-  host.style.cssText =
-    'position:fixed;inset:0;pointer-events:none;z-index:2147483646;';
+  host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483646;';
   rects.forEach(r => {
     const el = document.createElement('div');
-    el.style.cssText =
-      `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;` +
-      `height:${r.height}px;background:${color};opacity:.48;` +
-      `mix-blend-mode:multiply;border-radius:1px;`;
+    el.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;background:${color};opacity:.48;mix-blend-mode:multiply;border-radius:1px;`;
     host.appendChild(el);
   });
   document.body.appendChild(host);
@@ -1665,14 +1319,14 @@ function showColorPreview(color) {
 }
 
 function installColorPreview() {
-  const toolbar = document.getElementById('toolbar');
+  const toolbar = document.getElementById('header-toolbar');
   if (!toolbar || toolbar.dataset.colorPreview === '1') return;
   toolbar.dataset.colorPreview = '1';
 
   toolbar.addEventListener('pointerdown', e => {
     const btn = e.target.closest('.color-btn');
     if (!btn) return;
-    const color = btn.dataset.color || btn.style.color || btn.value;
+    const color = activeColor;
     if (!color) return;
 
     rememberFormatSelection();
@@ -1684,24 +1338,13 @@ function installColorPreview() {
     try { btn.setPointerCapture(e.pointerId); } catch (_) {}
   }, true);
 
-  toolbar.addEventListener('pointerenter', e => {
-    if (!e.buttons) return;
-    const btn = e.target.closest('.color-btn');
-    if (!btn || !formatSelectionRange) return;
-    const color = btn.dataset.color || btn.style.color || btn.value;
-    if (color) showColorPreview(color);
-  }, true);
-
   toolbar.addEventListener('pointerup', e => {
     const btn = e.target.closest('.color-btn');
     if (!btn || !formatSelectionRange) return;
-    const color = btn.dataset.color || btn.style.color || btn.value;
-    if (!color) return;
-
     e.preventDefault();
     e.stopPropagation();
     removeColorPreview();
-    applySelectionCommand('foreColor', color);
+    applySelectionCommand('foreColor', activeColor);
     restoreFormatSelection();
   }, true);
 
@@ -1719,8 +1362,7 @@ function toggleBold() {
   } else {
     globalIsBold = !globalIsBold;
     document.querySelectorAll('.page-content').forEach(c => {
-      c.style.fontWeight =
-        globalIsBold ? "bold" : "normal";
+      c.style.fontWeight = globalIsBold ? "bold" : "normal";
     });
     showToast(globalIsBold ? "전체 볼드체 적용" : "전체 볼드체 해제");
     documentHTML = serializeAllContent();
@@ -1737,8 +1379,7 @@ function toggleItalic() {
   } else {
     globalIsItalic = !globalIsItalic;
     document.querySelectorAll('.page-content').forEach(c => {
-      c.style.fontStyle =
-        globalIsItalic ? "italic" : "normal";
+      c.style.fontStyle = globalIsItalic ? "italic" : "normal";
     });
     showToast(globalIsItalic ? "전체 이탤릭체 적용" : "전체 이탤릭체 해제");
     documentHTML = serializeAllContent();
@@ -1791,9 +1432,6 @@ function cycleTextAlign() {
     iconAlign.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>';
   }
 
-  // If text is selected, alignment belongs to the selected block(s), not
-  // the whole document/page. Restore the saved range because toolbar clicks
-  // move focus away from the editor.
   const hasSelection = formatSelectionRange && !formatSelectionRange.collapsed;
   if (hasSelection) {
     pushHistory();
@@ -1804,7 +1442,6 @@ function cycleTextAlign() {
     }
   }
 
-  // No selection: retain the original page-level behavior.
   pushHistory();
   if (isBatchMode) {
     document.querySelectorAll('.page-content').forEach(c => c.style.textAlign = mode);
@@ -2386,7 +2023,6 @@ function init() {
 }
 
 init();
-
 installColorPreview();
 </script>
 </body>
