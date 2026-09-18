@@ -231,11 +231,92 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   color: #ffb703; font-size: 14px; font-weight: bold; z-index: 6000;
 }
 
+/* ==========================================================================
+   스마트 프롬프터 모듈 전용 스타일
+   ========================================================================== */
+#prompter-modal {
+  display: none; position: fixed; inset: 0;
+  background-color: #0b0c10; z-index: 7000;
+  flex-direction: column; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
+  color: #4a5568; user-select: none;
+}
+#prompter-modal.active { display: flex; }
+
+#prompter-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: #12141a; border-bottom: 1px solid #20242f;
+  gap: 12px; z-index: 10;
+}
+.p-controls-group { display: flex; align-items: center; gap: 10px; }
+
+.p-icon-btn {
+  width: 42px; height: 42px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; border: 1px solid #2d3342; background: #181b24; color: #e2e8f0;
+  transition: all 0.15s ease;
+}
+.p-icon-btn svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.p-icon-btn:active { transform: scale(0.94); background: #232836; }
+.p-icon-btn.active { background: #ffffff; border-color: #ffffff; }
+.p-icon-btn.active svg { stroke: #000000; fill: #000000; }
+
+.p-stepper-group {
+  display: inline-flex; align-items: center; background: #12141a;
+  border: 1px solid #242936; border-radius: 8px; padding: 2px 4px; gap: 2px;
+}
+.p-stepper-label { font-size: 13px; color: #717c91; padding-left: 6px; }
+.p-stepper-btn {
+  width: 32px; height: 32px; padding: 0; font-size: 18px; border: none;
+  background: transparent; color: #e2e8f0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; border-radius: 4px;
+}
+.p-stepper-btn:active { background: #232836; }
+.p-stepper-value {
+  min-width: 40px; text-align: center; font-size: 14px; font-weight: 600;
+  color: #f1f5f9; font-variant-numeric: tabular-nums;
+}
+
+#p-viewport {
+  flex: 1; overflow-y: scroll;
+  padding: 25vh 14vw 75vh 14vw;
+  scrollbar-width: none; position: relative;
+}
+#p-viewport::-webkit-scrollbar { display: none; }
+#p-content-text {
+  font-size: 36px; line-height: 2.1; word-break: keep-all; word-wrap: break-word;
+}
+
+.p-word {
+  display: inline; padding: 2px 3px; border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease; cursor: pointer;
+}
+.p-word.read { color: #1e293b; }
+.p-word.active { color: #ffffff; font-weight: 700; background: rgba(255, 255, 255, 0.12); }
+.p-word.upcoming { color: #4a5568; }
+
+#p-floating-scrollbar {
+  position: absolute; right: 6px; top: 64px; bottom: 38px; width: 32px;
+  z-index: 15; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+}
+#p-floating-scrollbar.visible { opacity: 1; pointer-events: auto; }
+#p-scroll-thumb {
+  position: absolute; top: 0; right: 8px; width: 6px; background: #475569;
+  border-radius: 4px; cursor: pointer; transition: width 0.2s, background 0.2s;
+}
+#p-floating-scrollbar:active #p-scroll-thumb,
+#p-scroll-thumb:active { width: 10px; background: #ffffff; }
+
+#p-status-bar {
+  padding: 8px 20px; font-size: 13px; background: #090a0e; color: #555f73;
+  display: flex; justify-content: space-between; border-top: 1px solid #181b24; z-index: 10;
+}
+
 #print-area { display: none; }
 @media print {
   @page { margin: 15mm; size: auto; }
   html, body { position: static !important; overflow: visible !important; background: #fff !important; color: #000 !important; height: auto !important; }
-  #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #floating-scrollbar-track { display: none !important; }
+  #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #floating-scrollbar-track, #prompter-modal { display: none !important; }
   #print-area { display: block !important; width: 100% !important; background: #fff !important; }
   .print-page-sheet {
     page-break-after: always !important; break-after: page !important;
@@ -341,8 +422,16 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
       <button class="btn-icon" onclick="previewCurrentViewPage()" title="현재 화면 페이지 미리보기">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
       </button>
+      <!-- 1페이지부터 전체보기 버튼 -->
       <button class="btn-icon" onclick="startFullPresentation(0)" title="1페이지부터 전체보기">
         <svg class="icon-svg" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      </button>
+      <!-- [추가] 전체보기 우측 프롬프터 모드 버튼 -->
+      <button class="btn-icon" id="btn-open-prompter" onclick="openSmartPrompter()" title="스마트 프롬프터 실행" style="border-color: #38bdf8;">
+        <svg class="icon-svg" viewBox="0 0 24 24" style="color: #38bdf8;">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
       </button>
     </div>
   </div>
@@ -369,6 +458,70 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   <div class="touch-zone" id="touch-right" onclick="nextSlide()"></div>
   <div id="reader-viewport"></div>
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
+</div>
+
+<!-- ==========================================================================
+     스마트 프롬프터 모달 오버레이
+     ========================================================================== -->
+<div id="prompter-modal">
+  <header id="prompter-header">
+    <div class="p-controls-group">
+      <!-- 흑백 음성인식 토글 버튼 (마이크 / 정지) -->
+      <button id="p-btn-toggle" class="p-icon-btn" title="음성 인식 시작">
+        <svg id="p-icon-mic" viewBox="0 0 24 24">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+        <svg id="p-icon-stop" viewBox="0 0 24 24" style="display: none;">
+          <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+        </svg>
+      </button>
+
+      <!-- 닫기 버튼 -->
+      <button id="p-btn-close" class="p-icon-btn" onclick="closeSmartPrompter()" title="프롬프터 닫기">
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-controls-group">
+      <!-- 글자 크기 스텝퍼 -->
+      <div class="p-stepper-group">
+        <span class="p-stepper-label">크기</span>
+        <button class="p-stepper-btn" id="p-btn-font-dec">−</button>
+        <span class="p-stepper-value" id="p-val-font-size">36</span>
+        <button class="p-stepper-btn" id="p-btn-font-inc">+</button>
+      </div>
+
+      <!-- 줄 간격 스텝퍼 -->
+      <div class="p-stepper-group">
+        <span class="p-stepper-label">줄간격</span>
+        <button class="p-stepper-btn" id="p-btn-line-dec">−</button>
+        <span class="p-stepper-value" id="p-val-line-height">2.1</span>
+        <button class="p-stepper-btn" id="p-btn-line-inc">+</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 프롬프터 본문 -->
+  <div id="p-viewport">
+    <div id="p-content-text"></div>
+  </div>
+
+  <!-- 플로팅 스크롤바 -->
+  <div id="p-floating-scrollbar">
+    <div id="p-scroll-thumb"></div>
+  </div>
+
+  <!-- 하단 상태 바 -->
+  <div id="p-status-bar">
+    <span id="p-speech-preview">준비됨</span>
+    <span id="p-progress-counter">0 / 0</span>
+  </div>
 </div>
 
 <div id="print-area"></div>
@@ -1106,171 +1259,4 @@ async function translateSelectedTextWithGemini() {
     const data = await res.json();
     let out = (((data.candidates || [])[0] || {}).content || {}).parts;
     out = out && out[0] ? out[0].text : '';
-    out = String(out).replace(/^```html\s*/i, '').replace(/\s*```$/i, '').trim();
-    if (!out) throw new Error('empty');
-
-    pushHistory();
-    range.deleteContents();
-    const d = document.createElement('div');
-    d.innerHTML = out;
-    const f = document.createDocumentFragment();
-    while (d.firstChild) f.appendChild(d.firstChild);
-    range.insertNode(f);
-    saveModel();
-    reflow();
-    showToast('✨ 영어 번역 완료');
-  } catch (e) {
-    showToast('⚠️ 번역 실패: API 키 또는 네트워크 상태를 확인하세요');
-  }
-}
-
-let currentReaderIndex = 0;
-function startFullPresentation(startIndex = 0) {
-  const pages = buildPageFragments();
-  readerViewport.innerHTML = '';
-  pages.forEach((html, i) => {
-    const sheet = document.createElement('div');
-    sheet.className = 'slide-sheet' + (i === startIndex ? ' active' : '');
-    sheet.style.fontSize = currentFontSize + 'px';
-    sheet.style.lineHeight = String(globalLineHeight);
-    sheet.style.letterSpacing = globalLetterSpacing + 'px';
-    sheet.style.textAlign = ALIGN_MODES[currentTextAlignIndex];
-    sheet.innerHTML = (pageTitles[i] ? '<div class="slide-title-header">' + pageTitles[i] + '</div>' : '') + html;
-    readerViewport.appendChild(sheet);
-  });
-  currentReaderIndex = Math.min(startIndex, pages.length - 1);
-  document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
-  document.getElementById('reader-total').innerText = pages.length;
-  document.getElementById('reader-container').style.display = 'block';
-  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-}
-function previewCurrentViewPage() {
-  const unit = cardHeight() + PAGE_GAP;
-  const idx = Math.floor((viewport.scrollTop + unit * 0.35) / unit);
-  startFullPresentation(Math.min(pageCount - 1, Math.max(0, idx)));
-}
-function nextSlide() {
-  const s = document.querySelectorAll('.slide-sheet');
-  if (currentReaderIndex >= s.length - 1) return;
-  s[currentReaderIndex].classList.remove('active');
-  s[++currentReaderIndex].classList.add('active');
-  document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
-}
-function prevSlide() {
-  const s = document.querySelectorAll('.slide-sheet');
-  if (currentReaderIndex <= 0) return;
-  s[currentReaderIndex].classList.remove('active');
-  s[--currentReaderIndex].classList.add('active');
-  document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
-}
-function exitReaderMode() {
-  document.getElementById('reader-container').style.display = 'none';
-  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
-}
-document.addEventListener('keydown', e => {
-  if (document.getElementById('reader-container').style.display !== 'block') return;
-  if (e.key === 'Escape') exitReaderMode();
-  else if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
-  else if (e.key === 'ArrowLeft') prevSlide();
-});
-
-const headerToolbar = document.getElementById('header-toolbar');
-const bottomDock = document.getElementById('bottom-dock');
-const vv = window.visualViewport;
-let keyboardInset = 0;
-
-function syncViewportInsets() {
-  if (!vv) return;
-  const visibleBottom = vv.offsetTop + vv.height;
-  if (visibleBottom > stableViewportH) stableViewportH = Math.round(visibleBottom);
-  keyboardInset = Math.max(0, Math.round(stableViewportH - visibleBottom));
-  const topShift = Math.round(vv.offsetTop);
-
-  headerToolbar.style.transform = 'translateY(' + topShift + 'px)';
-  bottomDock.style.transform = 'translateX(-50%) translateY(' + keyboardInset + 'px)';
-  scrollbarTrack.style.transform = 'translateY(' + keyboardInset + 'px)';
-}
-
-if (vv) {
-  vv.addEventListener('resize', syncViewportInsets);
-  vv.addEventListener('scroll', syncViewportInsets);
-}
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => {
-    stableViewportH = window.innerHeight;
-    syncViewportInsets();
-    pageCount = 1;
-    reflow();
-  }, 250);
-});
-
-let resizeTimer = null;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    syncViewportInsets();
-    if (keyboardInset > 80) return;
-    stableViewportH = window.innerHeight;
-    pageCount = 1;
-    reflow();
-  }, 160);
-});
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.innerText = msg;
-  t.classList.add('show');
-  clearTimeout(window._tt);
-  window._tt = setTimeout(() => t.classList.remove('show'), 1500);
-}
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
-}
-let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault(); deferredPrompt = e;
-  const btn = document.getElementById('btn-install-app');
-  if (btn) btn.style.display = 'inline-flex';
-});
-function promptInstallApp() {
-  if (!deferredPrompt) { showToast('💡 브라우저 메뉴의 [홈 화면에 추가] 또는 [설치]를 눌러주세요'); return; }
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.finally(() => {
-    deferredPrompt = null;
-    const btn = document.getElementById('btn-install-app');
-    if (btn) btn.style.display = 'none';
-  });
-}
-
-function init() {
-  try {
-    const f = localStorage.getItem('yslide_note_font_idx');
-    if (f !== null) currentFontIndex = (+f) % FONT_LIST.length;
-    document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
-    btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
-    editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
-
-    const saved = localStorage.getItem('yslide_note_v90') || localStorage.getItem('yslide_note_v70');
-    if (saved) {
-      const x = JSON.parse(saved);
-      setContentHTML((x.html || '').replace(/<div class="page-gap-spacer"[^>]*>[\s\S]*?<\/div>/gi, ''));
-      pageTitles = x.titles || [];
-      applyStyleState(x.style);
-    } else {
-      setContentHTML('');
-    }
-  } catch (e) { setContentHTML(''); }
-
-  ensureReserve();
-  syncViewportInsets();
-  pushHistory();
-  reflow();
-  requestAnimationFrame(reflow);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { pageCount = 1; reflow(); });
-}
-
-init();
-</script>
-</body>
-</html>
+    out = String(out).replace(/^```html\s*/i, '').replace(/\s*
