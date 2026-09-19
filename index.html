@@ -128,7 +128,7 @@ button:active { transform: scale(0.97); }
   box-shadow: 0 10px 30px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05);
 }
 
-/* 2) 텍스트 캔버스 (에디터 본문: 좌우 패딩 36px) */
+/* 2) 텍스트 캔버스 */
 #single-stream-editor {
   position: relative; z-index: 5; width: 100%;
   padding: 66px 36px 24px 36px;
@@ -199,7 +199,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 #page-info { font-size: 13px; font-weight: bold; color: #d1d5db; min-width: 60px; text-align: center; }
 
-/* 슬라이드 뷰어 (전체모드: 에디터와 동일하게 패딩 36px로 일치) */
+/* 슬라이드 뷰어 */
 #reader-container {
   display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: #000000; z-index: 5000; user-select: none; overflow: hidden;
@@ -209,7 +209,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   width: var(--page-width); max-width: 820px;
   background: var(--page-bg); border: 1px solid #383838; border-radius: 8px;
   padding: 24px 36px; color: #ffffff;
-  white-space: pre-wrap; word-break: break-word; overflow: hidden; display: none;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; overflow: hidden; display: none;
   font-family: var(--active-font);
 }
 .slide-sheet.active { display: block; }
@@ -232,7 +232,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 
 /* ==========================================================================
-   스마트 프롬프터 모달 (에디터/전체모드와 너비 및 패딩 완벽 동기화)
+   스마트 프롬프터 모달 (에디터 완벽 일치 구조)
    ========================================================================== */
 #prompter-modal {
   display: none; position: fixed; inset: 0;
@@ -277,7 +277,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   color: #f1f5f9; font-variant-numeric: tabular-nums;
 }
 
-/* 80% 높이 시선 확보를 위한 상단 20vh 여백 뷰포트 */
+/* 80% 높이 시선 확보를 위한 상단 20vh 패딩 */
 #p-viewport {
   flex: 1; overflow-y: scroll;
   padding: 20vh 0 80vh 0;
@@ -286,19 +286,30 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 #p-viewport::-webkit-scrollbar { display: none; }
 
-/* 에디터와 100% 동일한 너비와 패딩(36px) 적용 */
-#p-content-text {
+#p-workspace-wrapper {
+  position: relative;
   width: var(--page-width);
   max-width: 820px;
+  flex-shrink: 0;
+}
+
+#p-content-text {
+  width: 100%;
   padding: 0 36px;
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   font-family: var(--active-font);
+  font-size: 26px;
+  line-height: 1.55;
+  letter-spacing: 0px;
 }
 
+/* 단어 토큰 스타일 */
 .p-word {
-  display: inline; padding: 2px 3px; border-radius: 4px;
+  display: inline;
+  padding: 0;
+  border-radius: 4px;
   transition: color 0.15s ease, background 0.15s ease;
   cursor: pointer;
 }
@@ -308,8 +319,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 .p-word.active {
   color: #ffffff;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 .p-word.preview-reading {
   color: #ffffff !important;
@@ -482,6 +492,9 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
 </div>
 
+<!-- ==========================================================================
+     스마트 프롬프터 모달 (에디터 구조 1:1 완벽 동기화)
+     ========================================================================== -->
 <div id="prompter-modal">
   <header id="prompter-header">
     <div class="p-controls-group">
@@ -523,7 +536,9 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   </header>
 
   <div id="p-viewport">
-    <div id="p-content-text"></div>
+    <div id="p-workspace-wrapper">
+      <div id="p-content-text"></div>
+    </div>
   </div>
 
   <div id="p-floating-scrollbar">
@@ -931,7 +946,7 @@ function adjustLineHeight(delta) {
 }
 function cycleFontFamily() {
   currentFontIndex = (currentFontIndex + 1) % FONT_LIST.length;
-  try { localStorage.setItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
+  try { localStorage.getItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
   document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
   btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
   editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
@@ -1347,7 +1362,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ==========================================================================
-   스마트 프롬프터 모듈 스크립트 (완벽한 폭/폰트 동기화)
+   스마트 프롬프터 모듈 스크립트 (화면 이탈 완벽 방어)
    ========================================================================== */
 const pState = {
   words: [],
@@ -1401,10 +1416,12 @@ function renderPrompterTokens() {
   pState.words.forEach((token, idx) => {
     const span = document.createElement('span');
     span.className = 'p-word upcoming';
-    span.innerText = token.raw + ' ';
+    span.innerText = token.raw;
     span.dataset.index = idx;
     span.addEventListener('click', () => setPrompterWordIndex(idx));
     pContentText.appendChild(span);
+
+    pContentText.appendChild(document.createTextNode(' '));
 
     if (token.isLineBreak) {
       pContentText.appendChild(document.createElement('br'));
@@ -1419,6 +1436,7 @@ function setPrompterWordIndex(idx) {
   pState.currentIndex = idx;
   const spans = pContentText.querySelectorAll('.p-word');
   
+  // 아래 3줄 선제적 하이라이트
   const previewLookahead = 22; 
   const previewEnd = Math.min(pState.words.length, idx + previewLookahead);
 
@@ -1442,7 +1460,7 @@ function updatePrompterTargetScroll() {
   const activeSpan = pContentText.querySelector(`.p-word[data-index="${pState.currentIndex}"]`);
   if (!activeSpan) return;
   const offset = activeSpan.getBoundingClientRect().top - pViewport.getBoundingClientRect().top;
-  const targetLine = pViewport.clientHeight * 0.20; // 80% 높이 시선 확보
+  const targetLine = pViewport.clientHeight * 0.20; // 80% 높이에 배치
   pState.targetScrollTop = pViewport.scrollTop + (offset - targetLine);
 }
 
@@ -1455,21 +1473,66 @@ function smoothPrompterScrollLoop() {
 }
 requestAnimationFrame(smoothPrompterScrollLoop);
 
+// --- 텍스트 유사도 계산 ---
+function getSimilarity(s1, s2) {
+  if (s1 === s2) return 1.0;
+  if (!s1 || !s2) return 0;
+  
+  // 어근 접두사 일치 (2글자 이상 일치 시 높은 점수)
+  if (s1.length >= 2 && s2.length >= 2) {
+    if (s1.startsWith(s2.slice(0, 2)) || s2.startsWith(s1.slice(0, 2))) return 0.88;
+  }
+
+  const getBigrams = str => {
+    const s = new Set();
+    for (let i = 0; i < str.length - 1; i++) s.add(str.slice(i, i + 2));
+    return s;
+  };
+  
+  const b1 = getBigrams(s1);
+  const b2 = getBigrams(s2);
+  if (b1.size === 0 || b2.size === 0) return s1.includes(s2) || s2.includes(s1) ? 0.7 : 0;
+
+  let intersection = 0;
+  b1.forEach(bg => { if (b2.has(bg)) intersection++; });
+  return (2.0 * intersection) / (b1.size + b2.size);
+}
+
+// --- 안전 잠금(Screen Bounds Guard) 음성 매칭 엔진 ---
 window.onNativeSpeechResult = function(recognizedText) {
   pSpeechPreview.innerText = `🗣️ ${recognizedText.slice(-20)}`;
   const incomingWords = recognizedText.trim().split(/\s+/).map(normalizePrompterWord).filter(Boolean);
   if (incomingWords.length === 0) return;
 
-  const lastWord = incomingWords[incomingWords.length - 1];
-  const start = Math.max(0, pState.currentIndex - 2);
-  const end = Math.min(pState.words.length, pState.currentIndex + 16);
+  const recentSpoken = incomingWords.slice(-3);
 
-  for (let i = start; i < end; i++) {
-    const targetClean = pState.words[i].clean;
-    if (targetClean === lastWord || (lastWord.length >= 2 && targetClean.includes(lastWord))) {
-      setPrompterWordIndex(i);
-      return;
+  // [핵심 방어선]: 현재 화면에서 벗어난 먼 과거/먼 미래로의 점프를 원천 차단
+  // 이전으로는 절대 되돌아가지 않으며(뒤로 최대 1단어만 허용),
+  // 앞으로도 현재 태블릿 화면 시야 내에 들어와 있는 약 10~12단어 안쪽에서만 탐색합니다.
+  const lookBehind = Math.max(0, pState.currentIndex - 1);
+  const lookAhead = Math.min(pState.words.length, pState.currentIndex + 12);
+
+  let bestMatchIdx = -1;
+  let bestScore = 0;
+
+  for (let spoken of recentSpoken) {
+    if (spoken.length < 2) continue;
+
+    for (let i = lookBehind; i < lookAhead; i++) {
+      const targetClean = pState.words[i].clean;
+      const score = getSimilarity(targetClean, spoken);
+
+      // 충분한 일치도(0.68) 이상일 때만 매칭 인정
+      if (score > 0.68 && score > bestScore) {
+        bestScore = score;
+        bestMatchIdx = i;
+      }
     }
+  }
+
+  // 화면 내 안전 범위에서 확인된 단어일 때만 스크롤 위치 이동
+  if (bestMatchIdx !== -1 && bestMatchIdx >= pState.currentIndex) {
+    setPrompterWordIndex(bestMatchIdx);
   }
 };
 
@@ -1629,7 +1692,6 @@ pBtnLineInc.addEventListener('click', () => {
   applyPrompterStyle();
 });
 
-// 프롬프터 모달 열기: 현재 에디터의 글자크기, 줄간격, 자간, 글꼴과 100% 동기화
 function openSmartPrompter() {
   const fullText = editor.innerText.replace(/\u200B/g, '').trim();
   if (!fullText) {
@@ -1637,7 +1699,6 @@ function openSmartPrompter() {
     return;
   }
   
-  // 에디터의 실시간 서식값 복사
   pState.fontSize = currentFontSize;
   pState.lineHeight = globalLineHeight;
   applyPrompterStyle();
