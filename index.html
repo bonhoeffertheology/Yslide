@@ -1362,7 +1362,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ==========================================================================
-   스마트 프롬프터 모듈 스크립트 (화면 이탈 완벽 방어)
+   스마트 프롬프터 모듈 스크립트 (화면 이탈 완벽 방어 + 음성인식 안정성 강화)
    ========================================================================== */
 const pState = {
   words: [],
@@ -1373,8 +1373,11 @@ const pState = {
   fontSize: 26,
   lineHeight: 1.55,
   fadeTimer: null,
-  webRecognition: null
+  webRecognition: null,
+  lastResultTime: 0,   // 마지막으로 인식 결과를 받은 시각 (워치독 용)
+  restartTimer: null   // 재시작 디바운스 타이머
 };
+let pWatchdogInterval = null; // 무음 상태로 멈추는 것을 감시하는 워치독
 
 const prompterModal = document.getElementById('prompter-modal');
 const pViewport = document.getElementById('p-viewport');
@@ -1467,7 +1470,7 @@ function updatePrompterTargetScroll() {
 function smoothPrompterScrollLoop() {
   if (!pState.isDraggingThumb && prompterModal.classList.contains('active')) {
     const diff = pState.targetScrollTop - pViewport.scrollTop;
-    if (Math.abs(diff) > 0.5) pViewport.scrollTop += diff * 0.1;
+    if (Math.abs(diff) > 0.5) pViewport.scrollTop += diff * 0.18; // 캐치업 속도 상향 (0.1 → 0.18)
   }
   requestAnimationFrame(smoothPrompterScrollLoop);
 }
@@ -1500,17 +1503,19 @@ function getSimilarity(s1, s2) {
 
 // --- 안전 잠금(Screen Bounds Guard) 음성 매칭 엔진 ---
 window.onNativeSpeechResult = function(recognizedText) {
+  pState.lastResultTime = Date.now();
   pSpeechPreview.innerText = `🗣️ ${recognizedText.slice(-20)}`;
   const incomingWords = recognizedText.trim().split(/\s+/).map(normalizePrompterWord).filter(Boolean);
   if (incomingWords.length === 0) return;
 
-  const recentSpoken = incomingWords.slice(-3);
+  // 3 → 5단어로 넓혀서 interim 결과가 들어오는 즉시 더 적극적으로 캐치업
+  const recentSpoken = incomingWords.slice(-5);
 
   // [핵심 방어선]: 현재 화면에서 벗어난 먼 과거/먼 미래로의 점프를 원천 차단
   // 이전으로는 절대 되돌아가지 않으며(뒤로 최대 1단어만 허용),
-  // 앞으로도 현재 태블릿 화면 시야 내에 들어와 있는 약 10~12단어 안쪽에서만 탐색합니다.
+  // 앞으로도 현재 태블릿 화면 시야 내에 들어와 있는 범위 안쪽에서만 탐색합니다.
   const lookBehind = Math.max(0, pState.currentIndex - 1);
-  const lookAhead = Math.min(pState.words.length, pState.currentIndex + 12);
+  const lookAhead = Math.min(pState.words.length, pState.currentIndex + 14);
 
   let bestMatchIdx = -1;
   let bestScore = 0;
@@ -1522,8 +1527,8 @@ window.onNativeSpeechResult = function(recognizedText) {
       const targetClean = pState.words[i].clean;
       const score = getSimilarity(targetClean, spoken);
 
-      // 충분한 일치도(0.68) 이상일 때만 매칭 인정
-      if (score > 0.68 && score > bestScore) {
+      // 완화된 일치도(0.62) 이상이면 매칭 인정 -> 반응 속도 향상
+      if (score > 0.62 && score > bestScore) {
         bestScore = score;
         bestMatchIdx = i;
       }
@@ -1542,22 +1547,47 @@ function initBrowserWebSpeech() {
   const rec = new SpeechRecognition();
   rec.continuous = true;
   rec.interimResults = true;
+  rec.maxAlternatives = 1;
   rec.lang = 'ko-KR';
+
   rec.onresult = (e) => {
+    pState.lastResultTime = Date.now();
     let t = '';
     for (let i = e.resultIndex; i < e.results.length; ++i) t += e.results[i][0].transcript;
     window.onNativeSpeechResult(t);
   };
+
+  rec.onerror = (e) => {
+    // no-speech / network / aborted 등은 치명적이지 않으므로 재시작으로 복구
+    if (e.error === 'no-speech' || e.error === 'audio-capture' || e.error === 'network' || e.error === 'aborted') {
+      safeRestartWebRecognition();
+    } else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      showToast('⚠️ 마이크 권한을 확인해주세요');
+      stopPrompterListening();
+    }
+  };
+
   rec.onend = () => {
     if (pState.isListening && !window.AndroidBridge) {
-      try { rec.start(); } catch (err) {}
+      safeRestartWebRecognition();
     }
   };
   return rec;
 }
 
+// 크롬이 인식기를 내부적으로 죽였을 때 "already started" 예외 없이 안전하게 재시작
+function safeRestartWebRecognition() {
+  if (!pState.isListening || !pState.webRecognition) return;
+  clearTimeout(pState.restartTimer);
+  pState.restartTimer = setTimeout(() => {
+    try { pState.webRecognition.start(); }
+    catch (err) { /* 이미 시작된 상태면 무시 */ }
+  }, 250);
+}
+
 function startPrompterListening() {
   pState.isListening = true;
+  pState.lastResultTime = Date.now();
   pBtnToggle.classList.add('active');
   pIconMic.style.display = 'none';
   pIconStop.style.display = 'block';
@@ -1571,10 +1601,23 @@ function startPrompterListening() {
       try { pState.webRecognition.start(); } catch(e) {}
     }
   }
+
+  // 워치독: 8초 이상 결과가 없으면 인식기를 강제로 끊고 재시작 (무음 정지 방지)
+  clearInterval(pWatchdogInterval);
+  pWatchdogInterval = setInterval(() => {
+    if (!pState.isListening || window.AndroidBridge) return;
+    if (Date.now() - pState.lastResultTime > 8000) {
+      try { pState.webRecognition && pState.webRecognition.abort(); } catch(e) {}
+      pState.lastResultTime = Date.now();
+      safeRestartWebRecognition();
+    }
+  }, 3000);
 }
 
 function stopPrompterListening() {
   pState.isListening = false;
+  clearInterval(pWatchdogInterval);
+  clearTimeout(pState.restartTimer);
   pBtnToggle.classList.remove('active');
   pIconMic.style.display = 'block';
   pIconStop.style.display = 'none';
