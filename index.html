@@ -199,7 +199,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 #page-info { font-size: 13px; font-weight: bold; color: #d1d5db; min-width: 60px; text-align: center; }
 
-/* 슬라이드 뷰어 */
+/* 슬라이드 뷰어 (전체모드: 에디터 규격 완벽 일치) */
 #reader-container {
   display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: #000000; z-index: 5000; user-select: none; overflow: hidden;
@@ -232,7 +232,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 
 /* ==========================================================================
-   스마트 프롬프터 모달 (에디터 완벽 일치 구조)
+   스마트 프롬프터 모달 (에디터 규격 완벽 일치)
    ========================================================================== */
 #prompter-modal {
   display: none; position: fixed; inset: 0;
@@ -277,7 +277,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   color: #f1f5f9; font-variant-numeric: tabular-nums;
 }
 
-/* 80% 높이 시선 확보를 위한 상단 20vh 패딩 */
 #p-viewport {
   flex: 1; overflow-y: scroll;
   padding: 20vh 0 80vh 0;
@@ -305,7 +304,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   letter-spacing: 0px;
 }
 
-/* 단어 토큰 스타일 */
 .p-word {
   display: inline;
   padding: 0;
@@ -492,9 +490,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
 </div>
 
-<!-- ==========================================================================
-     스마트 프롬프터 모달 (에디터 구조 1:1 완벽 동기화)
-     ========================================================================== -->
+<!-- 스마트 프롬프터 모달 -->
 <div id="prompter-modal">
   <header id="prompter-header">
     <div class="p-controls-group">
@@ -946,7 +942,7 @@ function adjustLineHeight(delta) {
 }
 function cycleFontFamily() {
   currentFontIndex = (currentFontIndex + 1) % FONT_LIST.length;
-  try { localStorage.getItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
+  try { localStorage.setItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
   document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
   btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
   editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
@@ -1304,11 +1300,31 @@ async function translateSelectedTextWithGemini() {
   }
 }
 
+/* ==========================================================================
+   전체모드 (첫 클릭 시에도 에디터와 100% 동일한 크기로 렌더링)
+   ========================================================================== */
 let currentReaderIndex = 0;
+
+function syncReaderSlideDimensions() {
+  const ch = cardHeight();
+  document.querySelectorAll('.slide-sheet').forEach(sheet => {
+    sheet.style.height = ch + 'px';
+    sheet.style.fontSize = currentFontSize + 'px';
+    sheet.style.lineHeight = String(globalLineHeight);
+    sheet.style.letterSpacing = globalLetterSpacing + 'px';
+    sheet.style.textAlign = ALIGN_MODES[currentTextAlignIndex];
+    sheet.style.fontWeight = globalIsBold ? 'bold' : 'normal';
+    sheet.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
+  });
+}
+
 function startFullPresentation(startIndex = 0) {
+  // 1. 진입 즉시 현재 화면 기준으로 높이 계산
+  stableViewportH = window.innerHeight;
   const pages = buildPageFragments();
   readerViewport.innerHTML = '';
   const ch = cardHeight();
+
   pages.forEach((html, i) => {
     const sheet = document.createElement('div');
     sheet.className = 'slide-sheet' + (i === startIndex ? ' active' : '');
@@ -1322,12 +1338,24 @@ function startFullPresentation(startIndex = 0) {
     sheet.innerHTML = (pageTitles[i] ? '<div class="slide-title-header">' + pageTitles[i] + '</div>' : '') + html;
     readerViewport.appendChild(sheet);
   });
+
   currentReaderIndex = Math.min(startIndex, pages.length - 1);
   document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
   document.getElementById('reader-total').innerText = pages.length;
   document.getElementById('reader-container').style.display = 'block';
-  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+
+  // 2. 전체화면 요청
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+
+  // 3. 첫 클릭 시 브라우저 주소창이 사라진 뒤의 높이 변화를 감지하여 1회 더 크기 갱신
+  setTimeout(() => {
+    stableViewportH = window.innerHeight;
+    syncReaderSlideDimensions();
+  }, 100);
 }
+
 function previewCurrentViewPage() {
   const unit = cardHeight() + PAGE_GAP;
   const idx = Math.floor((viewport.scrollTop + unit * 0.35) / unit);
@@ -1361,8 +1389,16 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// 전체화면 상태 전환 감지 시 높이 즉시 동기화
+document.addEventListener('fullscreenchange', () => {
+  stableViewportH = window.innerHeight;
+  if (document.getElementById('reader-container').style.display === 'block') {
+    syncReaderSlideDimensions();
+  }
+});
+
 /* ==========================================================================
-   스마트 프롬프터 모듈 스크립트 (화면 이탈 완벽 방어 + 음성인식 안정성 강화)
+   스마트 프롬프터 모듈 스크립트
    ========================================================================== */
 const pState = {
   words: [],
@@ -1374,10 +1410,10 @@ const pState = {
   lineHeight: 1.55,
   fadeTimer: null,
   webRecognition: null,
-  lastResultTime: 0,   // 마지막으로 인식 결과를 받은 시각 (워치독 용)
-  restartTimer: null   // 재시작 디바운스 타이머
+  lastResultTime: 0,
+  restartTimer: null
 };
-let pWatchdogInterval = null; // 무음 상태로 멈추는 것을 감시하는 워치독
+let pWatchdogInterval = null;
 
 const prompterModal = document.getElementById('prompter-modal');
 const pViewport = document.getElementById('p-viewport');
@@ -1439,7 +1475,6 @@ function setPrompterWordIndex(idx) {
   pState.currentIndex = idx;
   const spans = pContentText.querySelectorAll('.p-word');
   
-  // 아래 3줄 선제적 하이라이트
   const previewLookahead = 22; 
   const previewEnd = Math.min(pState.words.length, idx + previewLookahead);
 
@@ -1470,50 +1505,38 @@ function updatePrompterTargetScroll() {
 function smoothPrompterScrollLoop() {
   if (!pState.isDraggingThumb && prompterModal.classList.contains('active')) {
     const diff = pState.targetScrollTop - pViewport.scrollTop;
-    if (Math.abs(diff) > 0.5) pViewport.scrollTop += diff * 0.18; // 캐치업 속도 상향 (0.1 → 0.18)
+    if (Math.abs(diff) > 0.5) pViewport.scrollTop += diff * 0.18;
   }
   requestAnimationFrame(smoothPrompterScrollLoop);
 }
 requestAnimationFrame(smoothPrompterScrollLoop);
 
-// --- 텍스트 유사도 계산 ---
 function getSimilarity(s1, s2) {
   if (s1 === s2) return 1.0;
   if (!s1 || !s2) return 0;
-  
-  // 어근 접두사 일치 (2글자 이상 일치 시 높은 점수)
   if (s1.length >= 2 && s2.length >= 2) {
     if (s1.startsWith(s2.slice(0, 2)) || s2.startsWith(s1.slice(0, 2))) return 0.88;
   }
-
   const getBigrams = str => {
     const s = new Set();
     for (let i = 0; i < str.length - 1; i++) s.add(str.slice(i, i + 2));
     return s;
   };
-  
   const b1 = getBigrams(s1);
   const b2 = getBigrams(s2);
   if (b1.size === 0 || b2.size === 0) return s1.includes(s2) || s2.includes(s1) ? 0.7 : 0;
-
   let intersection = 0;
   b1.forEach(bg => { if (b2.has(bg)) intersection++; });
   return (2.0 * intersection) / (b1.size + b2.size);
 }
 
-// --- 안전 잠금(Screen Bounds Guard) 음성 매칭 엔진 ---
 window.onNativeSpeechResult = function(recognizedText) {
   pState.lastResultTime = Date.now();
   pSpeechPreview.innerText = `🗣️ ${recognizedText.slice(-20)}`;
   const incomingWords = recognizedText.trim().split(/\s+/).map(normalizePrompterWord).filter(Boolean);
   if (incomingWords.length === 0) return;
 
-  // 3 → 5단어로 넓혀서 interim 결과가 들어오는 즉시 더 적극적으로 캐치업
   const recentSpoken = incomingWords.slice(-5);
-
-  // [핵심 방어선]: 현재 화면에서 벗어난 먼 과거/먼 미래로의 점프를 원천 차단
-  // 이전으로는 절대 되돌아가지 않으며(뒤로 최대 1단어만 허용),
-  // 앞으로도 현재 태블릿 화면 시야 내에 들어와 있는 범위 안쪽에서만 탐색합니다.
   const lookBehind = Math.max(0, pState.currentIndex - 1);
   const lookAhead = Math.min(pState.words.length, pState.currentIndex + 14);
 
@@ -1522,12 +1545,9 @@ window.onNativeSpeechResult = function(recognizedText) {
 
   for (let spoken of recentSpoken) {
     if (spoken.length < 2) continue;
-
     for (let i = lookBehind; i < lookAhead; i++) {
       const targetClean = pState.words[i].clean;
       const score = getSimilarity(targetClean, spoken);
-
-      // 완화된 일치도(0.62) 이상이면 매칭 인정 -> 반응 속도 향상
       if (score > 0.62 && score > bestScore) {
         bestScore = score;
         bestMatchIdx = i;
@@ -1535,7 +1555,6 @@ window.onNativeSpeechResult = function(recognizedText) {
     }
   }
 
-  // 화면 내 안전 범위에서 확인된 단어일 때만 스크롤 위치 이동
   if (bestMatchIdx !== -1 && bestMatchIdx >= pState.currentIndex) {
     setPrompterWordIndex(bestMatchIdx);
   }
@@ -1558,7 +1577,6 @@ function initBrowserWebSpeech() {
   };
 
   rec.onerror = (e) => {
-    // no-speech / network / aborted 등은 치명적이지 않으므로 재시작으로 복구
     if (e.error === 'no-speech' || e.error === 'audio-capture' || e.error === 'network' || e.error === 'aborted') {
       safeRestartWebRecognition();
     } else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
@@ -1575,13 +1593,12 @@ function initBrowserWebSpeech() {
   return rec;
 }
 
-// 크롬이 인식기를 내부적으로 죽였을 때 "already started" 예외 없이 안전하게 재시작
 function safeRestartWebRecognition() {
   if (!pState.isListening || !pState.webRecognition) return;
   clearTimeout(pState.restartTimer);
   pState.restartTimer = setTimeout(() => {
     try { pState.webRecognition.start(); }
-    catch (err) { /* 이미 시작된 상태면 무시 */ }
+    catch (err) {}
   }, 250);
 }
 
@@ -1602,7 +1619,6 @@ function startPrompterListening() {
     }
   }
 
-  // 워치독: 8초 이상 결과가 없으면 인식기를 강제로 끊고 재시작 (무음 정지 방지)
   clearInterval(pWatchdogInterval);
   pWatchdogInterval = setInterval(() => {
     if (!pState.isListening || window.AndroidBridge) return;
