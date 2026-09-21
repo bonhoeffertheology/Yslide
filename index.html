@@ -199,7 +199,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 #page-info { font-size: 13px; font-weight: bold; color: #d1d5db; min-width: 60px; text-align: center; }
 
-/* 슬라이드 뷰어 (전체모드: 에디터 규격 완벽 일치) */
+/* 슬라이드 뷰어 (전체모드) */
 #reader-container {
   display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: #000000; z-index: 5000; user-select: none; overflow: hidden;
@@ -590,8 +590,20 @@ const scrollbarTrack = document.getElementById('floating-scrollbar-track');
 
 let reserve = null;
 
-let stableViewportH = window.innerHeight;
-function cardHeight() { return Math.max(460, Math.round(stableViewportH * 0.8)); }
+// [핵심 수정]: 화면 전체화면 진입/이탈 여부와 무관하게 일관된 고정 기준 높이 설정
+function getStableBaseHeight() {
+  // 브라우저 주소창 영향을 받지 않는 뷰포트 절대 높이 확보
+  const h = window.innerHeight;
+  const sh = window.screen ? window.screen.availHeight || window.screen.height : h;
+  return Math.min(h, sh);
+}
+
+let stableViewportH = getStableBaseHeight();
+
+// 처음 시작할 때와 전체화면을 다녀온 후에도 항상 100% 동일한 카드 높이 유지
+function cardHeight() { 
+  return Math.max(460, Math.round(stableViewportH * 0.8)); 
+}
 function contentHeight() { return cardHeight() - HEADER_H - PAD_TOP - PAD_BOT; }
 function pageUnit() { return contentHeight() + GAP_BLOCK; }
 function contentOriginY() { return editor.getBoundingClientRect().top + EDITOR_PAD_TOP; }
@@ -942,7 +954,7 @@ function adjustLineHeight(delta) {
 }
 function cycleFontFamily() {
   currentFontIndex = (currentFontIndex + 1) % FONT_LIST.length;
-  try { localStorage.setItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
+  try { localStorage.getItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
   document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
   btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
   editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
@@ -1301,7 +1313,7 @@ async function translateSelectedTextWithGemini() {
 }
 
 /* ==========================================================================
-   전체모드 (첫 클릭 시에도 에디터와 100% 동일한 크기로 렌더링)
+   전체모드 (에디터 카드 크기와 완벽 동기화)
    ========================================================================== */
 let currentReaderIndex = 0;
 
@@ -1319,8 +1331,6 @@ function syncReaderSlideDimensions() {
 }
 
 function startFullPresentation(startIndex = 0) {
-  // 1. 진입 즉시 현재 화면 기준으로 높이 계산
-  stableViewportH = window.innerHeight;
   const pages = buildPageFragments();
   readerViewport.innerHTML = '';
   const ch = cardHeight();
@@ -1344,16 +1354,9 @@ function startFullPresentation(startIndex = 0) {
   document.getElementById('reader-total').innerText = pages.length;
   document.getElementById('reader-container').style.display = 'block';
 
-  // 2. 전체화면 요청
   if (document.documentElement.requestFullscreen) {
     document.documentElement.requestFullscreen().catch(() => {});
   }
-
-  // 3. 첫 클릭 시 브라우저 주소창이 사라진 뒤의 높이 변화를 감지하여 1회 더 크기 갱신
-  setTimeout(() => {
-    stableViewportH = window.innerHeight;
-    syncReaderSlideDimensions();
-  }, 100);
 }
 
 function previewCurrentViewPage() {
@@ -1386,14 +1389,6 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'ArrowLeft') prevSlide();
   } else if (document.getElementById('prompter-modal').classList.contains('active')) {
     if (e.key === 'Escape') closeSmartPrompter();
-  }
-});
-
-// 전체화면 상태 전환 감지 시 높이 즉시 동기화
-document.addEventListener('fullscreenchange', () => {
-  stableViewportH = window.innerHeight;
-  if (document.getElementById('reader-container').style.display === 'block') {
-    syncReaderSlideDimensions();
   }
 });
 
@@ -1786,7 +1781,6 @@ let keyboardInset = 0;
 function syncViewportInsets() {
   if (!vv) return;
   const visibleBottom = vv.offsetTop + vv.height;
-  if (visibleBottom > stableViewportH) stableViewportH = Math.round(visibleBottom);
   keyboardInset = Math.max(0, Math.round(stableViewportH - visibleBottom));
   const topShift = Math.round(vv.offsetTop);
 
@@ -1799,24 +1793,31 @@ if (vv) {
   vv.addEventListener('resize', syncViewportInsets);
   vv.addEventListener('scroll', syncViewportInsets);
 }
+
+// 가로/세로 회전 시에만 높이를 정확하게 재측정
 window.addEventListener('orientationchange', () => {
   setTimeout(() => {
-    stableViewportH = window.innerHeight;
+    stableViewportH = getStableBaseHeight();
     syncViewportInsets();
     pageCount = 1;
     reflow();
-  }, 250);
+  }, 300);
 });
 
 let resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    syncViewportInsets();
-    if (keyboardInset > 80) return;
-    stableViewportH = window.innerHeight;
-    pageCount = 1;
-    reflow();
+    // 키보드가 올라온 상태가 아닐 때만 화면 리사이즈 반영
+    if (keyboardInset <= 80) {
+      // 전체화면 상태 전환 중이 아닐 때만 기준 높이 보존
+      if (!document.fullscreenElement) {
+        stableViewportH = getStableBaseHeight();
+      }
+      syncViewportInsets();
+      pageCount = 1;
+      reflow();
+    }
   }, 160);
 });
 
@@ -1866,6 +1867,8 @@ function init() {
     }
   } catch (e) { setContentHTML(''); }
 
+  // 시작 시 안정된 높이 한 번 더 계산
+  stableViewportH = getStableBaseHeight();
   ensureReserve();
   syncViewportInsets();
   pushHistory();
