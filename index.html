@@ -232,7 +232,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 
 /* ==========================================================================
-   스마트 프롬프터 모달 (5줄 선제 하이라이트 & 자연스러운 점진적 그라데이션)
+   스마트 프롬프터 모달 (3줄 선제 하이라이트 & 텍스트 시인성 강화)
    ========================================================================== */
 #prompter-modal {
   display: none; position: fixed; inset: 0;
@@ -304,41 +304,47 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   letter-spacing: 0px;
 }
 
-/* 단어 토큰 스타일 & 그라데이션 단계 */
+/* 단어 토큰 스타일 & 또렷한 시각 가이드 */
 .p-word {
   display: inline;
   padding: 0;
   border-radius: 4px;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition: color 0.2s ease, text-shadow 0.2s ease, background 0.2s ease;
   cursor: pointer;
 }
 /* 1) 이미 읽고 지나간 이전 단어 */
 .p-word.read {
   color: #242b3d;
+  text-shadow: none;
 }
-/* 2) 현재 실시간 발화 단어 (인디케이터) */
+/* 2) 현재 실시간 발화 단어 (인디케이터 박스 강조) */
 .p-word.active {
   color: #ffffff;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.25);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
 }
-/* 3) 현재 읽고 있는 영역 + 아래 5줄 (100% 화이트) */
+/* 3) 현재 읽고 있는 영역 + 아래 3줄 (시인성 극대화: 100% 화이트 + 글로우) */
 .p-word.preview-tier1 {
   color: #ffffff !important;
-  font-weight: 600;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.45);
 }
 /* 4) 그 아래 이어지는 2~3줄 (부드러운 중간 화이트: 70%) */
 .p-word.preview-tier2 {
   color: rgba(255, 255, 255, 0.70) !important;
   font-weight: 500;
+  text-shadow: none;
 }
 /* 5) 그 아래 이어지는 2~3줄 (은은한 라이트 그레이: 40%) */
 .p-word.preview-tier3 {
   color: rgba(255, 255, 255, 0.40) !important;
+  text-shadow: none;
 }
 /* 6) 아직 시야에 멀리 남은 하단 원고 (다크 그레이: 18%) */
 .p-word.upcoming {
   color: rgba(255, 255, 255, 0.18);
+  text-shadow: none;
 }
 
 #p-floating-scrollbar {
@@ -993,7 +999,7 @@ function adjustLineHeight(delta) {
 }
 function cycleFontFamily() {
   currentFontIndex = (currentFontIndex + 1) % FONT_LIST.length;
-  try { localStorage.setItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
+  try { localStorage.getItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
   document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
   btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
   editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
@@ -1457,7 +1463,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ==========================================================================
-   스마트 프롬프터 모듈 스크립트 (5줄 하이라이트 & 자연스러운 3단계 그라데이션)
+   스마트 프롬프터 모듈 스크립트 (3줄 선제 하이라이트 & 텍스트 시인성 강화)
    ========================================================================== */
 const pState = {
   words: [],
@@ -1529,15 +1535,14 @@ function renderPrompterTokens() {
   updatePrompterThumbPosition();
 }
 
-// [핵심]: 아래 5줄 분량 100% 화이트 + 단계별 그라데이션 적용
+// [수정]: 3줄 분량 선명한 화이트(글로우) 복원 + 3단계 점진적 그라데이션
 function setPrompterWordIndex(idx) {
   if (idx < 0 || idx >= pState.words.length) return;
   pState.currentIndex = idx;
   const spans = pContentText.querySelectorAll('.p-word');
   
-  // 한국어 기준 1줄 약 7~8단어
-  // 5줄 선제 하이라이트 = 약 38단어 (100% 화이트)
-  const tier1End = Math.min(pState.words.length, idx + 38);
+  // 한국어 기준 3줄 선제 하이라이트 = 약 22단어 (100% 화이트 + 텍스트 글로우)
+  const tier1End = Math.min(pState.words.length, idx + 22);
   // 그라데이션 2단계 (70% 화이트) = 추가 약 16단어 (약 2줄)
   const tier2End = Math.min(pState.words.length, tier1End + 16);
   // 그라데이션 3단계 (40% 화이트) = 추가 약 16단어 (약 2줄)
@@ -1549,7 +1554,7 @@ function setPrompterWordIndex(idx) {
     } else if (i === idx) {
       s.className = 'p-word active';
     } else if (i > idx && i <= tier1End) {
-      s.className = 'p-word preview-tier1'; // 5줄 전체 완전한 화이트
+      s.className = 'p-word preview-tier1'; // 3줄 완전한 화이트 + 시인성 강화 글로우
     } else if (i > tier1End && i <= tier2End) {
       s.className = 'p-word preview-tier2'; // 70% 화이트
     } else if (i > tier2End && i <= tier3End) {
@@ -1856,6 +1861,7 @@ function syncViewportInsets() {
   if (!vv) return;
   const visibleBottom = vv.offsetTop + vv.height;
   
+  // 전체모드나 전체화면 중일 때는 stableViewportH를 절대로 변경하지 않음
   if (!document.fullscreenElement) {
     if (visibleBottom > stableViewportH) stableViewportH = Math.round(visibleBottom);
   }
