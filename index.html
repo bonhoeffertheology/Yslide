@@ -231,9 +231,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   color: #ffb703; font-size: 14px; font-weight: bold; z-index: 6000;
 }
 
-/* ==========================================================================
-   스마트 프롬프터 모달 (3줄 선제 하이라이트 & 텍스트 시인성 강화)
-   ========================================================================== */
+/* 스마트 프롬프터 모달 */
 #prompter-modal {
   display: none; position: fixed; inset: 0;
   background-color: #0b0c10; z-index: 7000;
@@ -304,7 +302,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   letter-spacing: 0px;
 }
 
-/* 단어 토큰 스타일 & 또렷한 시각 가이드 */
 .p-word {
   display: inline;
   padding: 0;
@@ -312,36 +309,30 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   transition: color 0.2s ease, text-shadow 0.2s ease, background 0.2s ease;
   cursor: pointer;
 }
-/* 1) 이미 읽고 지나간 이전 단어 */
 .p-word.read {
   color: #242b3d;
   text-shadow: none;
 }
-/* 2) 현재 실시간 발화 단어 (인디케이터 박스 강조) */
 .p-word.active {
   color: #ffffff;
   font-weight: 700;
   background: rgba(255, 255, 255, 0.25);
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
 }
-/* 3) 현재 읽고 있는 영역 + 아래 3줄 (시인성 극대화: 100% 화이트 + 글로우) */
 .p-word.preview-tier1 {
   color: #ffffff !important;
   font-weight: 700;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.45);
 }
-/* 4) 그 아래 이어지는 2~3줄 (부드러운 중간 화이트: 70%) */
 .p-word.preview-tier2 {
   color: rgba(255, 255, 255, 0.70) !important;
   font-weight: 500;
   text-shadow: none;
 }
-/* 5) 그 아래 이어지는 2~3줄 (은은한 라이트 그레이: 40%) */
 .p-word.preview-tier3 {
   color: rgba(255, 255, 255, 0.40) !important;
   text-shadow: none;
 }
-/* 6) 아직 시야에 멀리 남은 하단 원고 (다크 그레이: 18%) */
 .p-word.upcoming {
   color: rgba(255, 255, 255, 0.18);
   text-shadow: none;
@@ -364,11 +355,45 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   display: flex; justify-content: space-between; border-top: 1px solid #181b24; z-index: 10;
 }
 
+/* 저장 형식 선택 모달 창 */
+#save-dialog-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.75); z-index: 8000;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#save-dialog-backdrop.active { display: flex; }
+.save-dialog-card {
+  width: 90%; max-width: 380px; background: #16181f;
+  border: 1px solid #333a4d; border-radius: 14px;
+  padding: 24px; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.save-dialog-title { font-size: 17px; font-weight: bold; color: #fff; text-align: center; margin-bottom: 4px; }
+.save-dialog-desc { font-size: 13px; color: #8c97ad; text-align: center; margin-bottom: 8px; }
+.btn-save-choice {
+  width: 100%; height: 46px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  cursor: pointer; transition: all 0.15s ease;
+}
+.btn-save-doc {
+  background: #0284c7; border: 1px solid #38bdf8; color: #ffffff;
+}
+.btn-save-doc:hover { background: #0369a1; }
+.btn-save-json {
+  background: #232836; border: 1px solid #3b4254; color: #e2e8f0;
+}
+.btn-save-json:hover { background: #2f3647; }
+.btn-save-cancel {
+  background: transparent; border: none; color: #717c91; height: 32px; font-size: 13px; cursor: pointer;
+}
+.btn-save-cancel:hover { color: #cbd5e1; }
+
 #print-area { display: none; }
 @media print {
   @page { margin: 15mm; size: auto; }
   html, body { position: static !important; overflow: visible !important; background: #fff !important; color: #000 !important; height: auto !important; }
-  #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #floating-scrollbar-track, #prompter-modal { display: none !important; }
+  #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #floating-scrollbar-track, #prompter-modal, #save-dialog-backdrop { display: none !important; }
   #print-area { display: block !important; width: 100% !important; background: #fff !important; }
   .print-page-sheet {
     page-break-after: always !important; break-after: page !important;
@@ -438,14 +463,12 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
       
-      <button class="btn-icon" onclick="saveDocDocument()" title="워드 문서(.doc)로 저장">
-        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
-      </button>
-
-      <button class="btn-icon" onclick="saveNoteData()" title="백업 파일(.json)로 저장">
+      <!-- 저장 형식 선택 팝업 연결 -->
+      <button class="btn-icon" onclick="openSaveDialog()" title="문서 저장 (형식 선택)">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       </button>
-      <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
+
+      <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 및 서식 복사">
         <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
       </button>
       <button class="btn-icon" onclick="printNoteDocument()" title="문서 인쇄">
@@ -568,6 +591,23 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   <div id="p-status-bar">
     <span id="p-speech-preview">준비됨</span>
     <span id="p-progress-counter">0 / 0</span>
+  </div>
+</div>
+
+<!-- 저장 방식 선택 모달 창 -->
+<div id="save-dialog-backdrop">
+  <div class="save-dialog-card">
+    <div class="save-dialog-title">문서 저장 형식 선택</div>
+    <div class="save-dialog-desc">원하시는 저장 방식을 선택해주세요.</div>
+    <button class="btn-save-choice btn-save-doc" onclick="executeSaveDoc()">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+      워드 문서 (.doc / HWP 호환)
+    </button>
+    <button class="btn-save-choice btn-save-json" onclick="executeSaveJson()">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline></svg>
+      Yslide 원본 백업 파일 (.json)
+    </button>
+    <button class="btn-save-cancel" onclick="closeSaveDialog()">취소</button>
   </div>
 </div>
 
@@ -905,6 +945,9 @@ editor.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') pushHistory();
 });
 
+/* ==========================================================================
+   [1] 삼성노트 ↔ Yslide 상호 색상 보존: 붙여넣기 및 복사 파서
+   ========================================================================== */
 editor.addEventListener('paste', e => {
   e.preventDefault();
   pushHistory();
@@ -920,16 +963,42 @@ editor.addEventListener('paste', e => {
 
     const cleanNode = (node) => {
       if (node.nodeType === Node.ELEMENT_NODE) {
-        node.style.backgroundColor = '';
-        node.style.background = '';
+        // 삼성노트 등 외부 앱 스타일 정밀 추출
+        const inlineColor = node.getAttribute('color') || node.style.color;
+        const inlineBg = node.style.backgroundColor;
+        const inlineWeight = node.style.fontWeight;
+        const inlineStyle = node.style.fontStyle;
+
+        // 레이아웃 간섭 스타일 제거
         node.style.fontFamily = '';
         node.style.fontSize = '';
         node.style.lineHeight = '';
         node.style.margin = '';
         node.style.padding = '';
+        node.style.width = '';
+        node.style.height = '';
 
-        const c = node.getAttribute('color') || node.style.color;
-        if (c) node.style.color = c;
+        // 유효 글자색 보존
+        if (inlineColor && inlineColor !== 'initial' && inlineColor !== 'inherit') {
+          node.style.color = inlineColor;
+        } else {
+          node.style.color = '';
+        }
+
+        // 형광펜 강조 보존
+        if (inlineBg && inlineBg !== 'initial' && inlineBg !== 'inherit' && !inlineBg.includes('255, 255, 255')) {
+          node.style.backgroundColor = inlineBg;
+        } else {
+          node.style.backgroundColor = '';
+        }
+
+        if (inlineWeight === 'bold' || parseInt(inlineWeight) >= 600) {
+          node.style.fontWeight = 'bold';
+        }
+        if (inlineStyle === 'italic') {
+          node.style.fontStyle = 'italic';
+        }
+
         Array.from(node.childNodes).forEach(cleanNode);
       }
     };
@@ -942,6 +1011,27 @@ editor.addEventListener('paste', e => {
   saveModel();
   scheduleReflow();
   showToast('📋 서식(색상)을 유지하여 붙여넣었습니다');
+});
+
+// 에디터에서 드래그 복사 시 색상(HTML) 함께 클립보드에 기록 -> 삼성노트에 붙여넣을 때 색상 유지
+editor.addEventListener('copy', e => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+
+  const range = sel.getRangeAt(0);
+  const tempDiv = document.createElement('div');
+  tempDiv.appendChild(range.cloneContents());
+
+  tempDiv.querySelectorAll('#pagination-reserve, .manual-break').forEach(x => x.remove());
+
+  const plainText = tempDiv.innerText;
+  const htmlContent = tempDiv.innerHTML;
+
+  if (e.clipboardData) {
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', plainText);
+    e.clipboardData.setData('text/html', htmlContent);
+  }
 });
 
 /* 서식 */
@@ -999,7 +1089,7 @@ function adjustLineHeight(delta) {
 }
 function cycleFontFamily() {
   currentFontIndex = (currentFontIndex + 1) % FONT_LIST.length;
-  try { localStorage.getItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
+  try { localStorage.setItem('yslide_note_font_idx', currentFontIndex); } catch (e) {}
   document.documentElement.style.setProperty('--active-font', FONT_LIST[currentFontIndex].family);
   btnFontCycle.innerText = FONT_LIST[currentFontIndex].name;
   editor.style.fontFamily = FONT_LIST[currentFontIndex].family;
@@ -1244,7 +1334,18 @@ function redo() {
   showToast('↷ 다시 실행');
 }
 
-function saveDocDocument() {
+/* ==========================================================================
+   [2] 저장 방식 선택 모달 및 Word / JSON 내보내기
+   ========================================================================== */
+function openSaveDialog() {
+  document.getElementById('save-dialog-backdrop').classList.add('active');
+}
+function closeSaveDialog() {
+  document.getElementById('save-dialog-backdrop').classList.remove('active');
+}
+
+function executeSaveDoc() {
+  closeSaveDialog();
   saveModel();
   const pages = buildPageFragments();
   const now = new Date();
@@ -1282,7 +1383,8 @@ function saveDocDocument() {
   showToast('📄 Word(.doc) 문서로 저장되었습니다');
 }
 
-function saveNoteData() {
+function executeSaveJson() {
+  closeSaveDialog();
   saveModel();
   const now = new Date();
   const p = v => String(v).padStart(2, '0');
@@ -1323,13 +1425,34 @@ function handleFileImport(files) {
   reader.readAsText(files[0]);
 }
 
+// 상단 공유 버튼 클릭 시에도 색상과 서식이 들어간 HTML 데이터를 함께 복사하여 삼성노트에 완벽하게 붙여넣어짐
 async function shareNoteContent() {
-  const text = editor.innerText.trim();
-  if (!text) { showToast('⚠️ 공유할 내용이 없습니다'); return; }
+  const plainText = editor.innerText.trim();
+  if (!plainText) { showToast('⚠️ 공유할 내용이 없습니다'); return; }
+
+  const clone = editor.cloneNode(true);
+  clone.querySelectorAll('#pagination-reserve, .manual-break').forEach(x => x.remove());
+  const richHtml = clone.innerHTML;
+
+  if (navigator.clipboard && window.ClipboardItem) {
+    try {
+      const textBlob = new Blob([plainText], { type: 'text/plain' });
+      const htmlBlob = new Blob([richHtml], { type: 'text/html' });
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': textBlob,
+          'text/html': htmlBlob
+        })
+      ]);
+      showToast('📋 색상이 포함된 서식 복사 완료 (삼성노트에 붙여넣기 가능)');
+      return;
+    } catch (e) {}
+  }
+
   if (navigator.share) {
-    try { await navigator.share({ title: 'Yslide 원고 공유', text }); showToast('📤 공유 완료'); } catch (e) {}
+    try { await navigator.share({ title: 'Yslide 원고 공유', text: plainText }); showToast('📤 공유 완료'); } catch (e) {}
   } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => showToast('📋 클립보드에 복사되었습니다'));
+    navigator.clipboard.writeText(plainText).then(() => showToast('📋 클립보드에 복사되었습니다'));
   }
 }
 
@@ -1535,17 +1658,13 @@ function renderPrompterTokens() {
   updatePrompterThumbPosition();
 }
 
-// [수정]: 3줄 분량 선명한 화이트(글로우) 복원 + 3단계 점진적 그라데이션
 function setPrompterWordIndex(idx) {
   if (idx < 0 || idx >= pState.words.length) return;
   pState.currentIndex = idx;
   const spans = pContentText.querySelectorAll('.p-word');
   
-  // 한국어 기준 3줄 선제 하이라이트 = 약 22단어 (100% 화이트 + 텍스트 글로우)
   const tier1End = Math.min(pState.words.length, idx + 22);
-  // 그라데이션 2단계 (70% 화이트) = 추가 약 16단어 (약 2줄)
   const tier2End = Math.min(pState.words.length, tier1End + 16);
-  // 그라데이션 3단계 (40% 화이트) = 추가 약 16단어 (약 2줄)
   const tier3End = Math.min(pState.words.length, tier2End + 16);
 
   spans.forEach((s, i) => {
@@ -1554,13 +1673,13 @@ function setPrompterWordIndex(idx) {
     } else if (i === idx) {
       s.className = 'p-word active';
     } else if (i > idx && i <= tier1End) {
-      s.className = 'p-word preview-tier1'; // 3줄 완전한 화이트 + 시인성 강화 글로우
+      s.className = 'p-word preview-tier1';
     } else if (i > tier1End && i <= tier2End) {
-      s.className = 'p-word preview-tier2'; // 70% 화이트
+      s.className = 'p-word preview-tier2';
     } else if (i > tier2End && i <= tier3End) {
-      s.className = 'p-word preview-tier3'; // 40% 화이트
+      s.className = 'p-word preview-tier3';
     } else {
-      s.className = 'p-word upcoming';      // 18% 다크 그레이
+      s.className = 'p-word upcoming';
     }
   });
 
@@ -1861,7 +1980,6 @@ function syncViewportInsets() {
   if (!vv) return;
   const visibleBottom = vv.offsetTop + vv.height;
   
-  // 전체모드나 전체화면 중일 때는 stableViewportH를 절대로 변경하지 않음
   if (!document.fullscreenElement) {
     if (visibleBottom > stableViewportH) stableViewportH = Math.round(visibleBottom);
   }
