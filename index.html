@@ -232,7 +232,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 
 /* ==========================================================================
-   스마트 프롬프터 모달 (에디터 규격 완벽 일치)
+   스마트 프롬프터 모달 (5줄 선제 하이라이트 & 자연스러운 점진적 그라데이션)
    ========================================================================== */
 #prompter-modal {
   display: none; position: fixed; inset: 0;
@@ -304,27 +304,41 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   letter-spacing: 0px;
 }
 
+/* 단어 토큰 스타일 & 그라데이션 단계 */
 .p-word {
   display: inline;
   padding: 0;
   border-radius: 4px;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.2s ease, background 0.2s ease;
   cursor: pointer;
 }
+/* 1) 이미 읽고 지나간 이전 단어 */
 .p-word.read {
   color: #242b3d;
 }
+/* 2) 현재 실시간 발화 단어 (인디케이터) */
 .p-word.active {
   color: #ffffff;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
 }
-.p-word.preview-reading {
+/* 3) 현재 읽고 있는 영역 + 아래 5줄 (100% 화이트) */
+.p-word.preview-tier1 {
   color: #ffffff !important;
   font-weight: 600;
 }
+/* 4) 그 아래 이어지는 2~3줄 (부드러운 중간 화이트: 70%) */
+.p-word.preview-tier2 {
+  color: rgba(255, 255, 255, 0.70) !important;
+  font-weight: 500;
+}
+/* 5) 그 아래 이어지는 2~3줄 (은은한 라이트 그레이: 40%) */
+.p-word.preview-tier3 {
+  color: rgba(255, 255, 255, 0.40) !important;
+}
+/* 6) 아직 시야에 멀리 남은 하단 원고 (다크 그레이: 18%) */
 .p-word.upcoming {
-  color: #525866;
+  color: rgba(255, 255, 255, 0.18);
 }
 
 #p-floating-scrollbar {
@@ -417,7 +431,12 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
-      <button class="btn-icon" onclick="saveNoteData()" title="저장">
+      
+      <button class="btn-icon" onclick="saveDocDocument()" title="워드 문서(.doc)로 저장">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+      </button>
+
+      <button class="btn-icon" onclick="saveNoteData()" title="백업 파일(.json)로 저장">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       </button>
       <button class="btn-icon" onclick="shareNoteContent()" title="텍스트 공유">
@@ -490,9 +509,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
 </div>
 
-<!-- ==========================================================================
-     스마트 프롬프터 모달 (에디터 구조 1:1 완벽 동기화)
-     ========================================================================== -->
 <div id="prompter-modal">
   <header id="prompter-header">
     <div class="p-controls-group">
@@ -592,11 +608,9 @@ const scrollbarTrack = document.getElementById('floating-scrollbar-track');
 
 let reserve = null;
 
-// [해결 핵심]: 일반 모드 기준 높이를 최초 1회 화면 기준으로 고정하여
-// 전체모드 진입/퇴장 시의 전체화면 높이 변화가 에디터 높이를 변형하지 못하게 방어합니다.
 let stableViewportH = window.innerHeight;
 
-// [80% 비율 고정]: 처음 시작 시나 전체모드 종료 후나 항상 0.8 비율 유지
+// [80% 비율 고정]
 function cardHeight() { 
   return Math.max(460, Math.round(stableViewportH * 0.8)); 
 }
@@ -884,15 +898,44 @@ editor.addEventListener('input', e => {
 editor.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') pushHistory();
 });
+
 editor.addEventListener('paste', e => {
   e.preventDefault();
-  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-  if (!text) return;
   pushHistory();
-  document.execCommand('insertText', false, text);
+
+  const clip = e.clipboardData || window.clipboardData;
+  const htmlData = clip ? clip.getData('text/html') : '';
+  const textData = clip ? clip.getData('text/plain') : '';
+
+  if (htmlData && htmlData.trim().length > 0) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlData, 'text/html');
+    const body = doc.body;
+
+    const cleanNode = (node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        node.style.backgroundColor = '';
+        node.style.background = '';
+        node.style.fontFamily = '';
+        node.style.fontSize = '';
+        node.style.lineHeight = '';
+        node.style.margin = '';
+        node.style.padding = '';
+
+        const c = node.getAttribute('color') || node.style.color;
+        if (c) node.style.color = c;
+        Array.from(node.childNodes).forEach(cleanNode);
+      }
+    };
+    cleanNode(body);
+    document.execCommand('insertHTML', false, body.innerHTML);
+  } else if (textData) {
+    document.execCommand('insertText', false, textData);
+  }
+
   saveModel();
   scheduleReflow();
-  showToast('📋 붙여넣기가 완료되었습니다');
+  showToast('📋 서식(색상)을 유지하여 붙여넣었습니다');
 });
 
 /* 서식 */
@@ -1195,6 +1238,44 @@ function redo() {
   showToast('↷ 다시 실행');
 }
 
+function saveDocDocument() {
+  saveModel();
+  const pages = buildPageFragments();
+  const now = new Date();
+  const p = v => String(v).padStart(2, '0');
+  const ds = now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate()) + '_' + p(now.getHours()) + p(now.getMinutes());
+  
+  let docContent = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset='utf-8'><title>Yslide Document</title>
+    <style>
+      body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-size: 14pt; line-height: 1.6; }
+      .page-break { page-break-before: always; }
+      .page-header { font-size: 11pt; color: #666; border-bottom: 1px solid #ccc; margin-bottom: 20px; padding-bottom: 5px; }
+      .page-title { font-size: 16pt; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
+    </style></head><body>
+  `;
+
+  pages.forEach((html, i) => {
+    if (i > 0) docContent += `<div class="page-break"></div>`;
+    docContent += `
+      <div class="page-header">[ PAGE ${i + 1} / ${pages.length} ]</div>
+      ${pageTitles[i] ? `<div class="page-title">${pageTitles[i]}</div>` : ''}
+      <div>${html}</div>
+    `;
+  });
+
+  docContent += `</body></html>`;
+
+  const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Yslide_' + ds + '.doc';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showToast('📄 Word(.doc) 문서로 저장되었습니다');
+}
+
 function saveNoteData() {
   saveModel();
   const now = new Date();
@@ -1206,7 +1287,7 @@ function saveNoteData() {
   a.download = 'Yslide_' + ds + '.json';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  showToast('💾 파일로 저장되었습니다');
+  showToast('💾 JSON 백업 파일로 저장되었습니다');
 }
 
 function handleFileImport(files) {
@@ -1376,7 +1457,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ==========================================================================
-   스마트 프롬프터 모듈 스크립트
+   스마트 프롬프터 모듈 스크립트 (5줄 하이라이트 & 자연스러운 3단계 그라데이션)
    ========================================================================== */
 const pState = {
   words: [],
@@ -1448,23 +1529,33 @@ function renderPrompterTokens() {
   updatePrompterThumbPosition();
 }
 
+// [핵심]: 아래 5줄 분량 100% 화이트 + 단계별 그라데이션 적용
 function setPrompterWordIndex(idx) {
   if (idx < 0 || idx >= pState.words.length) return;
   pState.currentIndex = idx;
   const spans = pContentText.querySelectorAll('.p-word');
   
-  const previewLookahead = 22; 
-  const previewEnd = Math.min(pState.words.length, idx + previewLookahead);
+  // 한국어 기준 1줄 약 7~8단어
+  // 5줄 선제 하이라이트 = 약 38단어 (100% 화이트)
+  const tier1End = Math.min(pState.words.length, idx + 38);
+  // 그라데이션 2단계 (70% 화이트) = 추가 약 16단어 (약 2줄)
+  const tier2End = Math.min(pState.words.length, tier1End + 16);
+  // 그라데이션 3단계 (40% 화이트) = 추가 약 16단어 (약 2줄)
+  const tier3End = Math.min(pState.words.length, tier2End + 16);
 
   spans.forEach((s, i) => {
     if (i < idx) {
       s.className = 'p-word read';
     } else if (i === idx) {
       s.className = 'p-word active';
-    } else if (i > idx && i <= previewEnd) {
-      s.className = 'p-word preview-reading';
+    } else if (i > idx && i <= tier1End) {
+      s.className = 'p-word preview-tier1'; // 5줄 전체 완전한 화이트
+    } else if (i > tier1End && i <= tier2End) {
+      s.className = 'p-word preview-tier2'; // 70% 화이트
+    } else if (i > tier2End && i <= tier3End) {
+      s.className = 'p-word preview-tier3'; // 40% 화이트
     } else {
-      s.className = 'p-word upcoming';
+      s.className = 'p-word upcoming';      // 18% 다크 그레이
     }
   });
 
@@ -1765,7 +1856,6 @@ function syncViewportInsets() {
   if (!vv) return;
   const visibleBottom = vv.offsetTop + vv.height;
   
-  // 전체모드나 전체화면 중일 때는 stableViewportH를 절대로 변경하지 않음
   if (!document.fullscreenElement) {
     if (visibleBottom > stableViewportH) stableViewportH = Math.round(visibleBottom);
   }
@@ -1796,7 +1886,6 @@ let resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    // 키보드가 올라온 상태나 전체화면 상태가 아닐 때만 기준 높이를 측정
     if (keyboardInset <= 80 && !document.fullscreenElement) {
       stableViewportH = window.innerHeight;
       syncViewportInsets();
