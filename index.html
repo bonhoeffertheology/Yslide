@@ -199,7 +199,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 }
 #page-info { font-size: 13px; font-weight: bold; color: #d1d5db; min-width: 60px; text-align: center; }
 
-/* 슬라이드 뷰어 (전체모드) - 에디터와 동일한 패딩 및 레이아웃 구조 적용 */
+/* 슬라이드 뷰어 (전체모드) - 에디터 카드와 완벽히 동일한 크기 및 패딩 적용 */
 #reader-container {
   display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: #000000; z-index: 5000; user-select: none; overflow: hidden;
@@ -637,8 +637,8 @@ const ALIGN_MODES = ['left', 'center', 'right'];
 const ALIGN_NAMES = ['좌측 정렬', '가운데 정렬', '우측 정렬'];
 
 const HEADER_H = 42;
-const PAD_TOP  = 66; // 에디터와 패딩값 일치화
-const PAD_BOT  = 36; // 에디터와 패딩값 일치화
+const PAD_TOP  = 66;
+const PAD_BOT  = 36;
 const PAGE_GAP = 28;
 const EDITOR_PAD_TOP = HEADER_H + PAD_TOP;
 const GAP_BLOCK = PAGE_GAP + PAD_BOT + HEADER_H + PAD_TOP;
@@ -879,15 +879,35 @@ function rangeBetween(from, to) {
   return r;
 }
 
+/* ===== 수정된 핵심 함수: 에디터의 실제 페이지 영역을 정확히 1:1 복제하여 슬라이드 구성 ===== */
 function buildPageFragments() {
+  const cardH = cardHeight();
+  const unit = pageUnit();
   const pts = pageBoundaryPoints();
   const out = [];
-  for (let i = 0; i <= pts.length; i++) {
-    const r = rangeBetween(i === 0 ? null : pts[i - 1], i < pts.length ? pts[i] : null);
+
+  for (let i = 0; i < pageCount; i++) {
+    const from = i === 0 ? null : pts[i - 1];
+    const to = i < pts.length ? pts[i] : null;
+    const r = rangeBetween(from, to);
+
     const box = document.createElement('div');
-    box.appendChild(r.cloneContents());
-    box.querySelectorAll('#pagination-reserve, .pg-col, .pg-band, .manual-break').forEach(x => x.remove());
-    out.push(box.innerHTML);
+    box.style.width = '100%';
+    box.style.height = (cardH - HEADER_H - PAD_TOP - PAD_BOT) + 'px';
+    box.style.overflow = 'hidden';
+    box.style.fontSize = currentFontSize + 'px';
+    box.style.lineHeight = String(globalLineHeight);
+    box.style.letterSpacing = globalLetterSpacing + 'px';
+    box.style.textAlign = ALIGN_MODES[currentTextAlignIndex];
+    box.style.fontWeight = globalIsBold ? 'bold' : 'normal';
+    box.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
+
+    const inner = document.createElement('div');
+    inner.appendChild(r.cloneContents());
+    inner.querySelectorAll('#pagination-reserve, .pg-col, .pg-band, .manual-break').forEach(x => x.remove());
+    box.appendChild(inner);
+
+    out.push(box.outerHTML);
   }
   return out;
 }
@@ -942,7 +962,7 @@ function deletePageAt(idx) {
   pageCount = Math.max(1, pageCount - 1);
   saveModel();
   reflow();
-  showToast('🗑️ 페이지가 삭제되었습니다');
+  showToast('🗑️️ 페이지가 삭제되었습니다');
 }
 
 editor.addEventListener('compositionstart', () => { composing = true; });
@@ -1536,27 +1556,21 @@ function updateReaderClock() {
 }
 
 function startFullPresentation(startIndex = 0) {
-  const pages = buildPageFragments();
+  const fragments = buildPageFragments();
   readerViewport.innerHTML = '';
   const ch = cardHeight();
 
-  pages.forEach((html, i) => {
+  fragments.forEach((fragHtml, i) => {
     const sheet = document.createElement('div');
     sheet.className = 'slide-sheet' + (i === startIndex ? ' active' : '');
     sheet.style.height = ch + 'px';
-    sheet.style.fontSize = currentFontSize + 'px';
-    sheet.style.lineHeight = String(globalLineHeight);
-    sheet.style.letterSpacing = globalLetterSpacing + 'px';
-    sheet.style.textAlign = ALIGN_MODES[currentTextAlignIndex];
-    sheet.style.fontWeight = globalIsBold ? 'bold' : 'normal';
-    sheet.style.fontStyle = globalIsItalic ? 'italic' : 'normal';
-    sheet.innerHTML = (pageTitles[i] ? '<div class="slide-title-header">' + pageTitles[i] + '</div>' : '') + html;
+    sheet.innerHTML = (pageTitles[i] ? '<div class="slide-title-header">' + pageTitles[i] + '</div>' : '') + fragHtml;
     readerViewport.appendChild(sheet);
   });
 
-  currentReaderIndex = Math.min(startIndex, pages.length - 1);
+  currentReaderIndex = Math.min(startIndex, fragments.length - 1);
   document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
-  document.getElementById('reader-total').innerText = pages.length;
+  document.getElementById('reader-total').innerText = fragments.length;
   document.getElementById('reader-container').style.display = 'block';
 
   updateReaderClock();
