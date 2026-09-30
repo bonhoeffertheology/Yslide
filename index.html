@@ -463,7 +463,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
       
-      <!-- 저장 형식 선택 팝업 연결 -->
       <button class="btn-icon" onclick="openSaveDialog()" title="문서 저장 (형식 선택)">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       </button>
@@ -594,7 +593,6 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   </div>
 </div>
 
-<!-- 저장 방식 선택 모달 창 -->
 <div id="save-dialog-backdrop">
   <div class="save-dialog-card">
     <div class="save-dialog-title">문서 저장 형식 선택</div>
@@ -653,10 +651,8 @@ const scrollbarThumb = document.getElementById('floating-scrollbar-thumb');
 const scrollbarTrack = document.getElementById('floating-scrollbar-track');
 
 let reserve = null;
-
 let stableViewportH = window.innerHeight;
 
-// [80% 비율 고정]
 function cardHeight() { 
   return Math.max(460, Math.round(stableViewportH * 0.8)); 
 }
@@ -946,7 +942,7 @@ editor.addEventListener('keydown', e => {
 });
 
 /* ==========================================================================
-   [1] 삼성노트 ↔ Yslide 상호 색상 보존: 붙여넣기 및 복사 파서
+   [1] 수정된 삼성노트 붙여넣기 파서 (줄바꿈 과다 발생 및 블록 여백 문제 해결)
    ========================================================================== */
 editor.addEventListener('paste', e => {
   e.preventDefault();
@@ -963,13 +959,12 @@ editor.addEventListener('paste', e => {
 
     const cleanNode = (node) => {
       if (node.nodeType === Node.ELEMENT_NODE) {
-        // 삼성노트 등 외부 앱 스타일 정밀 추출
         const inlineColor = node.getAttribute('color') || node.style.color;
         const inlineBg = node.style.backgroundColor;
         const inlineWeight = node.style.fontWeight;
         const inlineStyle = node.style.fontStyle;
 
-        // 레이아웃 간섭 스타일 제거
+        // 불필요한 레이아웃 스타일 초기화
         node.style.fontFamily = '';
         node.style.fontSize = '';
         node.style.lineHeight = '';
@@ -978,14 +973,12 @@ editor.addEventListener('paste', e => {
         node.style.width = '';
         node.style.height = '';
 
-        // 유효 글자색 보존
         if (inlineColor && inlineColor !== 'initial' && inlineColor !== 'inherit') {
           node.style.color = inlineColor;
         } else {
           node.style.color = '';
         }
 
-        // 형광펜 강조 보존
         if (inlineBg && inlineBg !== 'initial' && inlineBg !== 'inherit' && !inlineBg.includes('255, 255, 255')) {
           node.style.backgroundColor = inlineBg;
         } else {
@@ -999,6 +992,12 @@ editor.addEventListener('paste', e => {
           node.style.fontStyle = 'italic';
         }
 
+        // 삼성노트 등에서 블록 태그(div, p 등) 사용 시 줄바꿈이 중복 적용되는 현상 방지
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'div' || tag === 'p') {
+          node.style.display = 'inline';
+        }
+
         Array.from(node.childNodes).forEach(cleanNode);
       }
     };
@@ -1010,10 +1009,9 @@ editor.addEventListener('paste', e => {
 
   saveModel();
   scheduleReflow();
-  showToast('📋 서식(색상)을 유지하여 붙여넣었습니다');
+  showToast('📋 서식을 유지하여 붙여넣었습니다');
 });
 
-// 에디터에서 드래그 복사 시 색상(HTML) 함께 클립보드에 기록 -> 삼성노트에 붙여넣을 때 색상 유지
 editor.addEventListener('copy', e => {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
@@ -1034,7 +1032,6 @@ editor.addEventListener('copy', e => {
   }
 });
 
-/* 서식 */
 let formatSelectionRange = null;
 
 document.addEventListener('selectionchange', () => {
@@ -1181,6 +1178,10 @@ function toggleContinuousMode() {
   isContinuousMode = !isContinuousMode;
   document.getElementById('btn-continuous').classList.toggle('active', isContinuousMode);
   document.body.classList.toggle('paint-mode', isContinuousMode);
+  
+  /* [2] 연속 채색 모드 활성화 시 스크롤바가 숨겨지지 않고 항상 올바르게 표시되도록 보장 */
+  updateFloatingScrollbar();
+
   showToast(isContinuousMode ? '🎨 연속 채색 모드 ON' : '⌨️ 일반 텍스트 모드 ON');
 }
 function toggleBatchMode() {
@@ -1193,14 +1194,18 @@ function toggleBatchMode() {
 function updateFloatingScrollbar() {
   if (!scrollbarThumb) return;
   const sh = viewport.scrollHeight, ch = viewport.clientHeight;
-  if (sh <= ch + 10) { scrollbarThumb.classList.remove('visible'); return; }
+  if (sh <= ch + 10 && !isContinuousMode) { scrollbarThumb.classList.remove('visible'); return; }
   const th = Math.max(36, (ch / sh) * scrollbarTrack.clientHeight);
   const top = (viewport.scrollTop / (sh - ch)) * (scrollbarTrack.clientHeight - th);
   scrollbarThumb.style.height = th + 'px';
   scrollbarThumb.style.transform = 'translateY(' + top + 'px)';
   scrollbarThumb.classList.add('visible');
-  clearTimeout(window._sf);
-  window._sf = setTimeout(() => { if (!isDrag) scrollbarThumb.classList.remove('visible'); }, 1400);
+  
+  /* [2] 연속 채색 모드일 때는 타이머로 자동 숨김 처리되지 않고 스크롤바가 계속 유지되도록 설정 */
+  if (!isContinuousMode) {
+    clearTimeout(window._sf);
+    window._sf = setTimeout(() => { if (!isDrag) scrollbarThumb.classList.remove('visible'); }, 1400);
+  }
 }
 viewport.addEventListener('scroll', updateFloatingScrollbar, { passive: true });
 
@@ -1334,9 +1339,6 @@ function redo() {
   showToast('↷ 다시 실행');
 }
 
-/* ==========================================================================
-   [2] 저장 방식 선택 모달 및 Word / JSON 내보내기
-   ========================================================================== */
 function openSaveDialog() {
   document.getElementById('save-dialog-backdrop').classList.add('active');
 }
@@ -1425,7 +1427,6 @@ function handleFileImport(files) {
   reader.readAsText(files[0]);
 }
 
-// 상단 공유 버튼 클릭 시에도 색상과 서식이 들어간 HTML 데이터를 함께 복사하여 삼성노트에 완벽하게 붙여넣어짐
 async function shareNoteContent() {
   const plainText = editor.innerText.trim();
   if (!plainText) { showToast('⚠️ 공유할 내용이 없습니다'); return; }
@@ -1518,9 +1519,6 @@ async function translateSelectedTextWithGemini() {
   }
 }
 
-/* ==========================================================================
-   전체모드 (에디터 카드 크기와 일치)
-   ========================================================================== */
 let currentReaderIndex = 0;
 
 function startFullPresentation(startIndex = 0) {
@@ -1585,9 +1583,6 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* ==========================================================================
-   스마트 프롬프터 모듈 스크립트 (3줄 선제 하이라이트 & 텍스트 시인성 강화)
-   ========================================================================== */
 const pState = {
   words: [],
   currentIndex: 0,
