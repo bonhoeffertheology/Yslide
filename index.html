@@ -989,6 +989,115 @@ editor.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') pushHistory();
 });
 
+/* ===== 붙여넣기: 삼성노트 등 외부 HTML을 줄바꿈/공백 유지하며 정규화 ===== */
+function escapeHtmlText(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function isTooDarkColor(c) {
+  if (!c) return true;
+  c = c.trim().toLowerCase();
+  if (c === 'black' || c === 'windowtext' || c === 'initial' || c === 'inherit' || c === 'transparent') return true;
+  let m = c.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+  let r, g, b;
+  if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+  else if ((m = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/))) {
+    let h = m[1];
+    if (h.length === 3) h = h.split('').map(x => x + x).join('');
+    r = parseInt(h.slice(0, 2), 16); g = parseInt(h.slice(2, 4), 16); b = parseInt(h.slice(4, 6), 16);
+  } else return false;
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 70;   // 어두운 배경에서 안 보이는 글자색 제거
+}
+function isTooLightBg(c) {
+  if (!c) return true;
+  c = c.trim().toLowerCase();
+  if (c === 'white' || c === 'transparent' || c === 'initial' || c === 'inherit') return true;
+  const m = c.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/);
+  if (m) {
+    if (m[4] !== undefined && parseFloat(m[4]) === 0) return true;
+    return (+m[1] + +m[2] + +m[3]) / 3 > 235;
+  }
+  return c === '#fff' || c === '#ffffff';
+}
+
+function htmlToEditorHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const BLOCK = new Set(['P','DIV','LI','UL','OL','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','PRE','TR','TABLE','SECTION','ARTICLE','HEADER','FOOTER']);
+  const SKIP = new Set(['STYLE','SCRIPT','META','LINK','TITLE','HEAD','NOSCRIPT']);
+  const out = [];
+  let lineOpen = false;   // 현재 줄에 내용이 있는지
+
+  const breakLine = () => { out.push('<br>'); lineOpen = false; };
+  const closeLineIfOpen = () => { if (lineOpen) breakLine(); };
+
+  function walk(node, inPre) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      let t = node.nodeValue || '';
+      if (inPre) {
+        t = t.replace(/\r\n?/g, '\n');
+        const parts = t.split('\n');
+        parts.forEach((p, i) => {
+          if (p) { out.push(escapeHtmlText(p)); lineOpen = true; }
+          if (i < parts.length - 1) breakLine();
+        });
+        return;
+      }
+      t = t.replace(/[ \t\r\n\f]+/g, ' ');       // HTML 규칙대로 공백 압축 (소스 줄바꿈 제거)
+      if (!lineOpen) t = t.replace(/^ /, '');     // 줄 맨 앞 공백 제거
+      if (!t) return;
+      out.push(escapeHtmlText(t));
+      lineOpen = true;
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const tag = node.tagName;
+    if (SKIP.has(tag)) return;
+    if (tag === 'BR') { breakLine(); return; }
+
+    const isBlock = BLOCK.has(tag);
+    if (isBlock) closeLineIfOpen();
+
+    // 서식 수집
+    const st = node.style || {};
+    const styles = [];
+    let color = node.getAttribute('color') || st.color;
+    if (color && !isTooDarkColor(color)) styles.push('color:' + color);
+    const bg = st.backgroundColor;
+    if (bg && !isTooLightBg(bg)) styles.push('background-color:' + bg);
+    const fw = st.fontWeight;
+    if (tag === 'B' || tag === 'STRONG' || fw === 'bold' || parseInt(fw) >= 600) styles.push('font-weight:bold');
+    if (tag === 'I' || tag === 'EM' || st.fontStyle === 'italic') styles.push('font-style:italic');
+    const td = (st.textDecorationLine || st.textDecoration || '');
+    if (tag === 'U' || td.includes('underline')) styles.push('text-decoration:underline');
+
+    const open = styles.length ? '<span style="' + styles.join(';') + '">' : '';
+    if (open) out.push(open);
+
+    if (tag === 'LI') {
+      let prefix = '• ';
+      if (node.parentElement && node.parentElement.tagName === 'OL') {
+        let idx = 1, s = node.previousElementSibling;
+        while (s) { idx++; s = s.previousElementSibling; }
+        prefix = idx + '. ';
+      }
+      out.push(prefix); lineOpen = true;
+    }
+
+    const pre = inPre || tag === 'PRE';
+    node.childNodes.forEach(ch => walk(ch, pre));
+
+    if ((tag === 'TD' || tag === 'TH') && lineOpen) { out.push(' '); }
+    if (open) out.push('</span>');
+    if (isBlock) closeLineIfOpen();
+  }
+
+  walk(doc.body, false);
+
+  // 끝에 남은 <br> 하나 제거 (붙여넣기 후 커서가 불필요하게 다음 줄로 가지 않도록)
+  while (out.length && out[out.length - 1] === '<br>') { out.pop(); break; }
+  return out.join('');
+}
+
 editor.addEventListener('paste', e => {
   e.preventDefault();
   pushHistory();
@@ -998,56 +1107,15 @@ editor.addEventListener('paste', e => {
   const textData = clip ? clip.getData('text/plain') : '';
 
   if (htmlData && htmlData.trim().length > 0) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlData, 'text/html');
-    const body = doc.body;
-
-    const cleanNode = (node) => {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const inlineColor = node.getAttribute('color') || node.style.color;
-        const inlineBg = node.style.backgroundColor;
-        const inlineWeight = node.style.fontWeight;
-        const inlineStyle = node.style.fontStyle;
-
-        node.style.fontFamily = '';
-        node.style.fontSize = '';
-        node.style.lineHeight = '';
-        node.style.margin = '';
-        node.style.padding = '';
-        node.style.width = '';
-        node.style.height = '';
-
-        if (inlineColor && inlineColor !== 'initial' && inlineColor !== 'inherit') {
-          node.style.color = inlineColor;
-        } else {
-          node.style.color = '';
-        }
-
-        if (inlineBg && inlineBg !== 'initial' && inlineBg !== 'inherit' && !inlineBg.includes('255, 255, 255')) {
-          node.style.backgroundColor = inlineBg;
-        } else {
-          node.style.backgroundColor = '';
-        }
-
-        if (inlineWeight === 'bold' || parseInt(inlineWeight) >= 600) {
-          node.style.fontWeight = 'bold';
-        }
-        if (inlineStyle === 'italic') {
-          node.style.fontStyle = 'italic';
-        }
-
-        const tag = node.tagName.toLowerCase();
-        if (tag === 'div' || tag === 'p') {
-          node.style.display = 'inline';
-        }
-
-        Array.from(node.childNodes).forEach(cleanNode);
-      }
-    };
-    cleanNode(body);
-    document.execCommand('insertHTML', false, body.innerHTML);
+    const cleaned = htmlToEditorHtml(htmlData);
+    if (cleaned.replace(/<[^>]*>/g, '').trim().length || /<br>/.test(cleaned)) {
+      document.execCommand('insertHTML', false, cleaned);
+    } else if (textData) {
+      document.execCommand('insertHTML', false, escapeHtmlText(textData.replace(/\r\n?/g, '\n')).replace(/\n/g, '<br>'));
+    }
   } else if (textData) {
-    document.execCommand('insertText', false, textData);
+    // 일반 텍스트: 줄바꿈은 <br>로, 연속 공백은 그대로 유지
+    document.execCommand('insertHTML', false, escapeHtmlText(textData.replace(/\r\n?/g, '\n')).replace(/\n/g, '<br>'));
   }
 
   saveModel();
