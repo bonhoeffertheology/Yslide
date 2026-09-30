@@ -231,6 +231,16 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   color: #ffb703; font-size: 14px; font-weight: bold; z-index: 6000;
 }
 
+/* 전체화면 좌측 상단 시계 라인 (텍스트 밀림 방지 오버레이 스타일) */
+#reader-clock-badge {
+  position: absolute; top: 22px; left: 155px; background: rgba(30,30,30,0.85);
+  border: 1px solid #444444; padding: 6px 14px; border-radius: 12px;
+  color: #38bdf8; font-size: 14px; font-weight: bold; z-index: 6000;
+  pointer-events: none; user-select: none;
+  display: flex; align-items: center; gap: 6px;
+  letter-spacing: -0.2px;
+}
+
 /* 스마트 프롬프터 모달 */
 #prompter-modal {
   display: none; position: fixed; inset: 0;
@@ -535,6 +545,11 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   <div class="touch-zone" id="touch-right" onclick="nextSlide()"></div>
   <div id="reader-viewport"></div>
   <div id="reader-page-badge"><span id="reader-curr">1</span> / <span id="reader-total">1</span></div>
+  <!-- 전체화면 좌측 상단 실시간 시계 라인 추가 (레이아웃 밀림 방지 오버레이) -->
+  <div id="reader-clock-badge">
+    <svg class="icon-svg" style="width:14px;height:14px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span id="reader-clock-text">00:00</span>
+  </div>
 </div>
 
 <div id="prompter-modal">
@@ -941,9 +956,6 @@ editor.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') pushHistory();
 });
 
-/* ==========================================================================
-   [1] 수정된 삼성노트 붙여넣기 파서 (줄바꿈 과다 발생 및 블록 여백 문제 해결)
-   ========================================================================== */
 editor.addEventListener('paste', e => {
   e.preventDefault();
   pushHistory();
@@ -964,7 +976,6 @@ editor.addEventListener('paste', e => {
         const inlineWeight = node.style.fontWeight;
         const inlineStyle = node.style.fontStyle;
 
-        // 불필요한 레이아웃 스타일 초기화
         node.style.fontFamily = '';
         node.style.fontSize = '';
         node.style.lineHeight = '';
@@ -992,7 +1003,6 @@ editor.addEventListener('paste', e => {
           node.style.fontStyle = 'italic';
         }
 
-        // 삼성노트 등에서 블록 태그(div, p 등) 사용 시 줄바꿈이 중복 적용되는 현상 방지
         const tag = node.tagName.toLowerCase();
         if (tag === 'div' || tag === 'p') {
           node.style.display = 'inline';
@@ -1123,7 +1133,6 @@ function selectColor(color, el) {
   if (hasSelection() && !isContinuousMode) { pushHistory(); applyFormatCommand('foreColor', color); }
 }
 
-/* 연속 채색 */
 editor.addEventListener('touchstart', e => {
   if (!isContinuousMode) return;
   pushHistory(); isPainting = true;
@@ -1178,10 +1187,7 @@ function toggleContinuousMode() {
   isContinuousMode = !isContinuousMode;
   document.getElementById('btn-continuous').classList.toggle('active', isContinuousMode);
   document.body.classList.toggle('paint-mode', isContinuousMode);
-  
-  /* [2] 연속 채색 모드 활성화 시 스크롤바가 숨겨지지 않고 항상 올바르게 표시되도록 보장 */
   updateFloatingScrollbar();
-
   showToast(isContinuousMode ? '🎨 연속 채색 모드 ON' : '⌨️ 일반 텍스트 모드 ON');
 }
 function toggleBatchMode() {
@@ -1190,7 +1196,6 @@ function toggleBatchMode() {
   showToast(isBatchMode ? '🌐 문서 전체 적용 모드 ON' : '📄 선택 영역 적용 모드 ON');
 }
 
-/* 10px 플로팅 스크롤바 */
 function updateFloatingScrollbar() {
   if (!scrollbarThumb) return;
   const sh = viewport.scrollHeight, ch = viewport.clientHeight;
@@ -1200,8 +1205,6 @@ function updateFloatingScrollbar() {
   scrollbarThumb.style.height = th + 'px';
   scrollbarThumb.style.transform = 'translateY(' + top + 'px)';
   scrollbarThumb.classList.add('visible');
-  
-  /* [2] 연속 채색 모드일 때는 타이머로 자동 숨김 처리되지 않고 스크롤바가 계속 유지되도록 설정 */
   if (!isContinuousMode) {
     clearTimeout(window._sf);
     window._sf = setTimeout(() => { if (!isDrag) scrollbarThumb.classList.remove('visible'); }, 1400);
@@ -1520,6 +1523,18 @@ async function translateSelectedTextWithGemini() {
 }
 
 let currentReaderIndex = 0;
+let clockInterval = null;
+
+// 실시간 시계 업데이트 함수
+function updateReaderClock() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const clockEl = document.getElementById('reader-clock-text');
+  if (clockEl) {
+    clockEl.innerText = `${hours}:${minutes}`;
+  }
+}
 
 function startFullPresentation(startIndex = 0) {
   const pages = buildPageFragments();
@@ -1544,6 +1559,11 @@ function startFullPresentation(startIndex = 0) {
   document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
   document.getElementById('reader-total').innerText = pages.length;
   document.getElementById('reader-container').style.display = 'block';
+
+  // 시계 표시 및 실시간 갱신 시작
+  updateReaderClock();
+  clearInterval(clockInterval);
+  clockInterval = setInterval(updateReaderClock, 10000); // 10초마다 갱신
 
   if (document.documentElement.requestFullscreen) {
     document.documentElement.requestFullscreen().catch(() => {});
@@ -1570,6 +1590,7 @@ function prevSlide() {
   document.getElementById('reader-curr').innerText = currentReaderIndex + 1;
 }
 function exitReaderMode() {
+  clearInterval(clockInterval);
   document.getElementById('reader-container').style.display = 'none';
   if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
 }
