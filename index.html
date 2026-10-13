@@ -409,6 +409,12 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   background: transparent; border: none; color: #717c91; height: 32px; font-size: 13px; cursor: pointer;
 }
 .btn-save-cancel:hover { color: #cbd5e1; }
+.btn-save-pdf { background: #b91c1c; border: 1px solid #f87171; color: #ffffff; }
+.btn-save-pdf:hover { background: #991b1b; }
+.btn-save-over { background: #14532d; border: 1px solid #4ade80; color: #dcfce7; font-size: 13px; height: 40px; }
+.btn-save-over:hover { background: #166534; }
+#overwrite-row { display: none; flex-direction: column; gap: 8px; border-top: 1px solid #2a3042; padding-top: 12px; }
+.save-dialog-note { font-size: 11px; color: #5d6780; text-align: center; line-height: 1.5; }
 
 #print-area { display: none; }
 @media print {
@@ -479,7 +485,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 
   <div class="toolbar-row">
     <div class="tool-group">
-      <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="파일 불러오기 (.txt, .json)">
+      <button class="btn-icon" onclick="importWithPicker()" title="파일 불러오기 (.txt, .json)">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
       </button>
       <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
@@ -621,16 +627,22 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 
 <div id="save-dialog-backdrop">
   <div class="save-dialog-card">
-    <div class="save-dialog-title">문서 저장 형식 선택</div>
-    <div class="save-dialog-desc">원하시는 저장 방식을 선택해주세요.</div>
-    <button class="btn-save-choice btn-save-doc" onclick="executeSaveDoc()">
+    <div class="save-dialog-title">문서 저장</div>
+    <div class="save-dialog-desc">형식을 고르면 저장할 폴더와 파일을 선택하는 창이 열립니다.</div>
+    <button class="btn-save-choice btn-save-doc" onclick="executeSaveDoc(false)">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
       워드 문서 (.doc / HWP 호환)
     </button>
-    <button class="btn-save-choice btn-save-json" onclick="executeSaveJson()">
+    <button class="btn-save-choice btn-save-pdf" onclick="executeSavePdf(false)">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+      PDF 문서 (.pdf)
+    </button>
+    <button class="btn-save-choice btn-save-json" onclick="executeSaveJson(false)">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline></svg>
       Yslide 원본 백업 파일 (.json)
     </button>
+    <div id="overwrite-row"></div>
+    <div class="save-dialog-note">기존 파일을 선택하면 덮어쓰기, 새 이름을 입력하면 새로 저장됩니다.<br>위치 선택을 지원하지 않는 브라우저에서는 공유/다운로드로 저장됩니다.</div>
     <button class="btn-save-cancel" onclick="closeSaveDialog()">취소</button>
   </div>
 </div>
@@ -892,7 +904,49 @@ function rangeBetween(from, to) {
   return r;
 }
 
-/* Word(.doc) 저장 / 인쇄용 페이지 조각 (전체화면 뷰어는 더 이상 사용하지 않음) */
+/* ===== 종이(흰 배경)용 색 변환: Word / PDF / 인쇄에서 흰 글씨가 안 보이는 문제 해결 ===== */
+const PAPER_COLOR_MAP = {
+  '#ffffff': '#000000',   // 흰색 → 검정
+  '#ef4444': '#dc2626',   // 빨강
+  '#ffb703': '#b45309',   // 황금 주황 → 짙은 주황/갈색
+  '#38bdf8': '#0369a1',   // 밝은 파랑 → 짙은 파랑
+  '#4ade80': '#15803d'    // 밝은 초록 → 짙은 초록
+};
+let _colorCtx = null;
+function toPaperColor(c) {
+  if (!c) return c;
+  try {
+    if (!_colorCtx) _colorCtx = document.createElement('canvas').getContext('2d');
+    _colorCtx.fillStyle = '#000000';
+    _colorCtx.fillStyle = c;
+    const v = String(_colorCtx.fillStyle).toLowerCase();
+    let r, g, b;
+    if (v[0] === '#') {
+      if (PAPER_COLOR_MAP[v]) return PAPER_COLOR_MAP[v];
+      r = parseInt(v.slice(1, 3), 16); g = parseInt(v.slice(3, 5), 16); b = parseInt(v.slice(5, 7), 16);
+    } else {
+      const m = v.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+      if (!m) return c;
+      r = +m[1]; g = +m[2]; b = +m[3];
+    }
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum > 0.9) return '#000000';              // 거의 흰색 → 검정
+    if (lum > 0.5) {                               // 밝은 색 → 어둡게
+      const k = 0.6;
+      return 'rgb(' + Math.round(r * k) + ',' + Math.round(g * k) + ',' + Math.round(b * k) + ')';
+    }
+    return c;
+  } catch (e) { return c; }
+}
+function paperizeColors(root) {
+  root.querySelectorAll('*').forEach(el => {
+    const attr = el.getAttribute && el.getAttribute('color');
+    if (attr) el.setAttribute('color', toPaperColor(attr));
+    if (el.style && el.style.color) el.style.color = toPaperColor(el.style.color);
+  });
+}
+
+/* Word(.doc) / PDF / 인쇄용 페이지 조각 */
 function buildPageFragments() {
   const cardH = cardHeight();
   const unit = pageUnit();
@@ -918,6 +972,7 @@ function buildPageFragments() {
     const inner = document.createElement('div');
     inner.appendChild(r.cloneContents());
     inner.querySelectorAll('#pagination-reserve, .pg-col, .pg-band, .manual-break').forEach(x => x.remove());
+    paperizeColors(inner);
     box.appendChild(inner);
 
     out.push(box.outerHTML);
@@ -1443,65 +1498,211 @@ function redo() {
   showToast('↷ 다시 실행');
 }
 
+/* ===== 저장: 위치 선택 / 덮어쓰기 / Word / PDF / JSON ===== */
+const fileHandles = { doc: null, json: null, pdf: null };
+const FS_PICKER_OK = typeof window.showSaveFilePicker === 'function';
+
+function dateStamp() {
+  const now = new Date(), p = v => String(v).padStart(2, '0');
+  return now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate()) + '_' + p(now.getHours()) + p(now.getMinutes());
+}
+
 function openSaveDialog() {
+  const row = document.getElementById('overwrite-row');
+  row.innerHTML = '';
+  const fns = { doc: executeSaveDoc, json: executeSaveJson, pdf: executeSavePdf };
+  ['doc', 'pdf', 'json'].forEach(k => {
+    const h = fileHandles[k];
+    if (!h) return;
+    const b = document.createElement('button');
+    b.className = 'btn-save-choice btn-save-over';
+    b.textContent = '↻ ' + h.name + ' 에 바로 덮어쓰기';
+    b.onclick = () => fns[k](true);
+    row.appendChild(b);
+  });
+  row.style.display = row.children.length ? 'flex' : 'none';
   document.getElementById('save-dialog-backdrop').classList.add('active');
 }
 function closeSaveDialog() {
   document.getElementById('save-dialog-backdrop').classList.remove('active');
 }
 
-function executeSaveDoc() {
+/* 1단계: 저장 위치 선택 (사용자 클릭 직후에 호출해야 브라우저가 허용함)
+   반환: {handle} (handle이 null이면 공유/다운로드 방식), 취소 시 null */
+async function pickTarget(suggestedName, ext, mime, desc, key, overwrite) {
+  if (!FS_PICKER_OK) return { handle: null };
+  if (overwrite && fileHandles[key]) {
+    try {
+      const h = fileHandles[key];
+      if (h.queryPermission && (await h.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        if ((await h.requestPermission({ mode: 'readwrite' })) !== 'granted') throw new Error('perm');
+      }
+      return { handle: h };
+    } catch (e) { fileHandles[key] = null; }
+  }
+  try {
+    const h = await window.showSaveFilePicker({
+      suggestedName,
+      types: [{ description: desc, accept: { [mime]: ['.' + ext] } }]
+    });
+    return { handle: h };
+  } catch (e) {
+    if (e && e.name === 'AbortError') return null;   // 사용자가 취소
+    return { handle: null };
+  }
+}
+
+/* 2단계: 실제 기록. 저장 창 → 공유 시트 → 다운로드 순. 저장된 이름 반환 */
+async function writeTarget(target, blob, suggestedName, mime, key) {
+  if (target.handle) {
+    try {
+      const w = await target.handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      fileHandles[key] = target.handle;
+      return target.handle.name;
+    } catch (e) { fileHandles[key] = null; }
+  }
+  if (navigator.canShare && navigator.share) {
+    try {
+      const file = new File([blob], suggestedName, { type: mime });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: suggestedName });
+        return suggestedName;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return null;
+    }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = suggestedName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return suggestedName;
+}
+
+async function executeSaveDoc(overwrite) {
   closeSaveDialog();
   saveModel();
+  const fname = 'Yslide_' + dateStamp() + '.doc';
+  const target = await pickTarget(fname, 'doc', 'application/msword', 'Word 문서', 'doc', overwrite);
+  if (!target) return;
+
   const pages = buildPageFragments();
-  const now = new Date();
-  const p = v => String(v).padStart(2, '0');
-  const ds = now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate()) + '_' + p(now.getHours()) + p(now.getMinutes());
-  
   let docContent = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head><meta charset='utf-8'><title>Yslide Document</title>
     <style>
-      body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-size: 14pt; line-height: 1.6; }
+      body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-size: 14pt; line-height: 1.6; color: #000; }
       .page-break { page-break-before: always; }
       .page-header { font-size: 11pt; color: #666; border-bottom: 1px solid #ccc; margin-bottom: 20px; padding-bottom: 5px; }
       .page-title { font-size: 16pt; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
     </style></head><body>
   `;
-
   pages.forEach((html, i) => {
     if (i > 0) docContent += `<div class="page-break"></div>`;
     docContent += `
       <div class="page-header">[ PAGE ${i + 1} / ${pages.length} ]</div>
-      ${pageTitles[i] ? `<div class="page-title">${pageTitles[i]}</div>` : ''}
+      ${pageTitles[i] ? `<div class="page-title">${escapeHtmlText(pageTitles[i])}</div>` : ''}
       <div>${html}</div>
     `;
   });
-
   docContent += `</body></html>`;
 
   const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'Yslide_' + ds + '.doc';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  showToast('📄 Word(.doc) 문서로 저장되었습니다');
+  const name = await writeTarget(target, blob, fname, 'application/msword', 'doc');
+  if (name) showToast('📄 저장 완료: ' + name);
 }
 
-function executeSaveJson() {
+async function executeSaveJson(overwrite) {
   closeSaveDialog();
   saveModel();
-  const now = new Date();
-  const p = v => String(v).padStart(2, '0');
-  const ds = now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate()) + '_' + p(now.getHours()) + p(now.getMinutes());
-  const blob = new Blob([JSON.stringify({ html: getContentHTML(), titles: pageTitles, style: currentStyleState() }, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'Yslide_' + ds + '.json';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  showToast('💾 JSON 백업 파일로 저장되었습니다');
+  const fname = 'Yslide_' + dateStamp() + '.json';
+  const target = await pickTarget(fname, 'json', 'application/json', 'Yslide 백업 파일', 'json', overwrite);
+  if (!target) return;
+
+  const json = JSON.stringify({ html: getContentHTML(), titles: pageTitles, style: currentStyleState() }, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const name = await writeTarget(target, blob, fname, 'application/json', 'json');
+  if (name) showToast('💾 저장 완료: ' + name);
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+async function ensurePdfLibs() {
+  if (!window.html2canvas) await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+  if (!(window.jspdf && window.jspdf.jsPDF)) await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+}
+
+async function executeSavePdf(overwrite) {
+  closeSaveDialog();
+  saveModel();
+  const fname = 'Yslide_' + dateStamp() + '.pdf';
+
+  // 저장 위치를 먼저 받아둠 (PDF 생성이 오래 걸려도 클릭 권한이 만료되지 않도록)
+  const target = await pickTarget(fname, 'pdf', 'application/pdf', 'PDF 문서', 'pdf', overwrite);
+  if (!target) return;
+
+  showToast('📕 PDF 생성 중... 잠시만 기다려주세요');
+  let host = null;
+  try {
+    await ensurePdfLibs();
+    reflow();
+    const pages = buildPageFragments();             // 이미 흰 종이용 색으로 변환됨
+    const W = Math.round(lastLayout.width);         // 에디터와 동일한 폭 → 줄바꿈 일치
+    const { jsPDF } = window.jspdf;
+    let pdf = null;
+
+    host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;background:#fff;color:#000;' +
+      'padding:28px 36px;box-sizing:border-box;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;' +
+      'width:' + W + 'px;font-family:' + FONT_LIST[currentFontIndex].family + ';';
+    document.body.appendChild(host);
+
+    for (let i = 0; i < pages.length; i++) {
+      host.innerHTML =
+        (pageTitles[i] ? '<div style="font:600 15px sans-serif;color:#0284c7;text-align:center;margin-bottom:14px;white-space:normal"></div>' : '') +
+        pages[i];
+      if (pageTitles[i]) host.firstChild.textContent = pageTitles[i];
+
+      const canvas = await window.html2canvas(host, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const w = canvas.width / 2, h = canvas.height / 2;
+      const orient = w > h ? 'l' : 'p';
+      if (!pdf) pdf = new jsPDF({ unit: 'px', format: [w, h], orientation: orient, hotfixes: ['px_scaling'] });
+      else pdf.addPage([w, h], orient);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, w, h);
+    }
+
+    const blob = pdf.output('blob');
+    const name = await writeTarget(target, blob, fname, 'application/pdf', 'pdf');
+    if (name) showToast('📕 저장 완료: ' + name);
+  } catch (err) {
+    showToast('⚠️ PDF 생성 실패 (인터넷 연결 확인 / 인쇄 → PDF로 저장도 가능)');
+  } finally {
+    if (host) host.remove();
+  }
+}
+
+/* 불러오기: 가능하면 파일 핸들을 기억해 JSON을 바로 덮어쓰기 저장 */
+async function importWithPicker() {
+  if (typeof window.showOpenFilePicker !== 'function') {
+    document.getElementById('file-input').click();
+    return;
+  }
+  try {
+    const [h] = await window.showOpenFilePicker({
+      types: [{ description: 'Yslide / 텍스트', accept: { 'application/json': ['.json'], 'text/plain': ['.txt'] } }]
+    });
+    const f = await h.getFile();
+    if (/\.json$/i.test(f.name)) fileHandles.json = h;
+    handleFileImport([f]);
+  } catch (e) { /* 취소 */ }
 }
 
 function handleFileImport(files) {
@@ -1571,7 +1772,7 @@ function printNoteDocument() {
     sheet.className = 'print-page-sheet';
     sheet.innerHTML =
       '<div class="print-page-header"><span>[ PAGE ' + (i + 1) + ' / ' + pages.length + ' ]</span>' +
-      '<span>' + (pageTitles[i] || '') + '</span></div><div>' + html + '</div>';
+      '<span>' + escapeHtmlText(pageTitles[i] || '') + '</span></div><div>' + html + '</div>';
     area.appendChild(sheet);
   });
   window.print();
