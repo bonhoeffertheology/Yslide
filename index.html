@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>Yslide Note</title>
 
 <meta name="theme-color" content="#181818">
@@ -485,10 +485,10 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 
   <div class="toolbar-row">
     <div class="tool-group">
-      <button class="btn-icon" onclick="importWithPicker()" title="파일 불러오기 (.txt, .json)">
+      <button class="btn-icon" onclick="importWithPicker()" title="파일 불러오기 (.json, .doc, .txt)">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
       </button>
-      <input type="file" id="file-input" accept=".txt,.json" onchange="handleFileImport(this.files)">
+      <input type="file" id="file-input" accept=".txt,.json,.doc,.html,.htm" onchange="handleFileImport(this.files)">
       
       <button class="btn-icon" onclick="openSaveDialog()" title="문서 저장 (형식 선택)">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -544,7 +544,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 <div id="main-viewport">
   <div id="document-workspace">
     <div id="page-cards-layer"></div>
-    <div id="single-stream-editor" contenteditable="true" spellcheck="false"></div>
+    <div id="single-stream-editor" contenteditable="true" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" enterkeyhint="enter"></div>
     <div id="page-headers-layer"></div>
   </div>
 </div>
@@ -805,10 +805,24 @@ function scheduleReflow() {
   requestAnimationFrame(() => { reflowQueued = false; reflow(); });
 }
 
+let lastChromeKey = '';
 function renderPageChrome(n) {
   const cardH = cardHeight();
   while (pageTitles.length < n) pageTitles.push('');
   if (pageTitles.length > n) pageTitles = pageTitles.slice(0, n);
+
+  const chromeKey = n + '|' + cardH;
+  if (chromeKey === lastChromeKey && headersLayer.children.length === n) {
+    // 페이지 수/크기가 같으면 DOM을 다시 만들지 않음 (타이핑 중 끊김 방지)
+    headersLayer.querySelectorAll('.page-title-input').forEach((inp, i) => {
+      const v = pageTitles[i] || '';
+      if (document.activeElement !== inp && inp.value !== v) inp.value = v;
+    });
+    document.getElementById('page-info').textContent = n + ' 페이지';
+    updateFloatingScrollbar();
+    return;
+  }
+  lastChromeKey = chromeKey;
 
   cardsLayer.innerHTML = '';
   headersLayer.innerHTML = '';
@@ -1033,12 +1047,55 @@ function deletePageAt(idx) {
   showToast('🗑️️ 페이지가 삭제되었습니다');
 }
 
-editor.addEventListener('compositionstart', () => { composing = true; });
-editor.addEventListener('compositionend', () => { composing = false; saveModel(); scheduleReflow(); });
+/* 가상키보드(IME) 대응: 조합이 끝났다는 신호(compositionend)가 안 오는 키보드가 있어
+   일정 시간 입력이 없으면 조합이 끝난 것으로 보고 레이아웃/저장을 재개함 */
+let compGuardTimer = null, caretRaf = 0;
+function armCompositionGuard() {
+  clearTimeout(compGuardTimer);
+  compGuardTimer = setTimeout(endComposition, 900);
+}
+function endComposition() {
+  clearTimeout(compGuardTimer);
+  if (!composing) return;
+  composing = false;
+  saveModel(); scheduleReflow(); ensureCaretVisible();
+}
+function ensureCaretVisible() {
+  if (caretRaf) return;
+  caretRaf = requestAnimationFrame(() => {
+    caretRaf = 0;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) return;
+    const r = sel.getRangeAt(0).cloneRange();
+    r.collapse(false);
+    let rect = r.getClientRects()[0];
+    if (!rect || !rect.height) {
+      const n = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
+      if (!n || n === editor) return;
+      rect = n.getBoundingClientRect();
+    }
+    if (!rect || !rect.height || rect.height > 240) return;
+    const vp = viewport.getBoundingClientRect();
+    const vvBottom = window.visualViewport ? window.visualViewport.offsetTop + window.visualViewport.height : window.innerHeight;
+    const top = vp.top + 8;
+    const bottom = Math.min(vp.bottom, vvBottom) - 90;   // 하단 도크 여유
+    if (rect.bottom > bottom) viewport.scrollTop += rect.bottom - bottom;
+    else if (rect.top < top) viewport.scrollTop -= top - rect.top;
+  });
+}
+editor.addEventListener('compositionstart', () => { composing = true; armCompositionGuard(); });
+editor.addEventListener('compositionupdate', () => { composing = true; armCompositionGuard(); });
+editor.addEventListener('compositionend', () => {
+  clearTimeout(compGuardTimer);
+  composing = false;
+  saveModel(); scheduleReflow(); ensureCaretVisible();
+});
+editor.addEventListener('blur', endComposition);
 editor.addEventListener('input', e => {
-  if (e.isComposing || composing) return;
+  if (e.isComposing || composing) { saveModel(); armCompositionGuard(); ensureCaretVisible(); return; }
   saveModel();
   scheduleReflow();
+  ensureCaretVisible();
 });
 editor.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') pushHistory();
@@ -1204,6 +1261,12 @@ document.addEventListener('selectionchange', () => {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const r = sel.getRangeAt(0);
+  if (r.collapsed && r.startContainer === editor && r.startOffset === 0 && reserve && reserve.parentNode === editor && !composing) {
+    const nr = document.createRange();
+    nr.setStartAfter(reserve); nr.collapse(true);
+    sel.removeAllRanges(); sel.addRange(nr);
+    return;
+  }
   if (editor.contains(r.commonAncestorContainer) && !r.collapsed) formatSelectionRange = r.cloneRange();
 });
 
@@ -1463,13 +1526,21 @@ function applyStyleState(s) {
   document.getElementById('size-display').innerText = currentFontSize;
 }
 
-function saveModel() {
+let _saveTimer = null;
+function saveModelNow() {
+  clearTimeout(_saveTimer); _saveTimer = null;
   try {
     localStorage.setItem('yslide_note_v90', JSON.stringify({
       html: getContentHTML(), titles: pageTitles, style: currentStyleState()
     }));
   } catch (e) {}
 }
+function saveModel() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveModelNow, 400);
+}
+window.addEventListener('pagehide', saveModelNow);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveModelNow(); });
 function pushHistory() {
   const st = JSON.stringify({ html: getContentHTML(), titles: pageTitles });
   if (!undoStack.length || undoStack[undoStack.length - 1] !== st) {
@@ -1697,7 +1768,7 @@ async function importWithPicker() {
   }
   try {
     const [h] = await window.showOpenFilePicker({
-      types: [{ description: 'Yslide / 텍스트', accept: { 'application/json': ['.json'], 'text/plain': ['.txt'] } }]
+      types: [{ description: 'Yslide / Word(.doc) / 텍스트', accept: { 'application/json': ['.json'], 'application/msword': ['.doc'], 'text/html': ['.html', '.htm'], 'text/plain': ['.txt'] } }]
     });
     const f = await h.getFile();
     if (/\.json$/i.test(f.name)) fileHandles.json = h;
@@ -1705,31 +1776,149 @@ async function importWithPicker() {
   } catch (e) { /* 취소 */ }
 }
 
+/* ===== 이 프로그램에서 저장한 .doc(HTML 기반) 불러오기 ===== */
+const SCREEN_COLOR_MAP = { '#dc2626': '#ef4444', '#b45309': '#ffb703', '#0369a1': '#38bdf8', '#15803d': '#4ade80' };
+
+function colorInfo(c) {
+  try {
+    if (!_colorCtx) _colorCtx = document.createElement('canvas').getContext('2d');
+    _colorCtx.fillStyle = '#000000';
+    _colorCtx.fillStyle = c;
+    const v = String(_colorCtx.fillStyle).toLowerCase();
+    let r, g, b, hex;
+    if (v[0] === '#') {
+      hex = v;
+      r = parseInt(v.slice(1, 3), 16); g = parseInt(v.slice(3, 5), 16); b = parseInt(v.slice(5, 7), 16);
+    } else {
+      const m = v.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+      if (!m) return null;
+      r = +m[1]; g = +m[2]; b = +m[3];
+      hex = '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    return { hex, lum: (0.299 * r + 0.587 * g + 0.114 * b) / 255 };
+  } catch (e) { return null; }
+}
+/* 종이용 색 → 어두운 화면용 색. 어두워서 안 보이는 색(검정 등)은 빈 문자열(= 기본 흰색) */
+function toScreenColor(c) {
+  const info = colorInfo(c);
+  if (!info) return c;
+  if (SCREEN_COLOR_MAP[info.hex]) return SCREEN_COLOR_MAP[info.hex];
+  if (info.lum < 0.27) return '';
+  return c;
+}
+
+function sanitizeImportedHtml(html) {
+  const d = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html');   // 실행되지 않는 문서에서 처리
+  const root = d.body;
+  root.querySelectorAll('script,style,link,meta,iframe,object,embed,img,svg,form,input,button').forEach(x => x.remove());
+  root.querySelectorAll('*').forEach(el => {
+    const keep = [];
+    const st = el.style;
+    const col = el.getAttribute('color') || (st && st.color);
+    if (col) { const sc = toScreenColor(col); if (sc) keep.push('color:' + sc); }
+    if (st) {
+      if (st.backgroundColor && !isTooLightBg(st.backgroundColor)) keep.push('background-color:' + st.backgroundColor);
+      if (st.fontWeight) keep.push('font-weight:' + st.fontWeight);
+      if (st.fontStyle) keep.push('font-style:' + st.fontStyle);
+      const td = st.textDecorationLine || st.textDecoration || '';
+      if (td.includes('underline')) keep.push('text-decoration:underline');
+      if (st.textAlign) keep.push('text-align:' + st.textAlign);
+    }
+    Array.from(el.attributes).forEach(a => el.removeAttribute(a.name));
+    if (keep.length) el.setAttribute('style', keep.join(';'));
+  });
+  return root.innerHTML;
+}
+
+function importSavedDoc(text) {
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+
+  // 이 프로그램이 저장한 구조(.page-header)가 없으면 붙여넣기와 같은 방식으로 정리해서 불러옴
+  if (!doc.querySelector('.page-header')) {
+    setContentHTML(htmlToEditorHtml(text));
+    pageTitles = [];
+    return;
+  }
+
+  const pages = [];
+  let cur = null, styleSrc = null;
+  const ensure = () => { if (!cur) { cur = { title: '', html: '' }; pages.push(cur); } };
+
+  Array.from(doc.body.children).forEach(el => {
+    const cl = el.classList;
+    if (cl.contains('page-break')) return;
+    if (cl.contains('page-header')) { cur = { title: '', html: '' }; pages.push(cur); return; }
+    if (cl.contains('page-title')) { ensure(); cur.title = el.textContent.trim(); return; }
+    ensure();
+    const box = el.firstElementChild;
+    const inner = box && box.firstElementChild;
+    if (!styleSrc && box && box.style && box.style.fontSize) styleSrc = box.style;
+    cur.html += sanitizeImportedHtml(inner ? inner.innerHTML : el.innerHTML);
+  });
+
+  setContentHTML(pages.map(p => p.html).join('<div class="manual-break" contenteditable="false"></div>'));
+  pageTitles = pages.map(p => p.title);
+
+  if (styleSrc) {
+    applyStyleState({
+      fontSize: parseInt(styleSrc.fontSize) || 26,
+      lineHeight: parseFloat(styleSrc.lineHeight) || 1.55,
+      letterSpacing: parseFloat(styleSrc.letterSpacing) || 0,
+      bold: styleSrc.fontWeight === 'bold' || parseInt(styleSrc.fontWeight) >= 600,
+      italic: styleSrc.fontStyle === 'italic',
+      align: Math.max(0, ALIGN_MODES.indexOf(styleSrc.textAlign))
+    });
+  }
+}
+
 function handleFileImport(files) {
   if (!files || !files.length) return;
+  const file = files[0];
+  const fi = document.getElementById('file-input');
+
+  if (/\.docx$/i.test(file.name)) {
+    showToast('⚠️ .docx는 지원하지 않습니다 (.doc / .json / .txt 사용)');
+    if (fi) fi.value = '';
+    return;
+  }
+
   const reader = new FileReader();
+  reader.onloadend = () => { if (fi) fi.value = ''; };
   reader.onload = e => {
+    const text = String(e.target.result);
+    const isDocLike = /\.(doc|html?)$/i.test(file.name) || /^\s*<(!doctype|html)/i.test(text);
+
+    if (isDocLike && !/<(html|body|div|p)[\s>]/i.test(text)) {
+      showToast('⚠️ 지원하지 않는 .doc 형식입니다 (이 프로그램에서 저장한 .doc만 가능)');
+      return;
+    }
+
     pushHistory();
-    try {
-      const x = JSON.parse(e.target.result);
-      if (x.html !== undefined) {
-        setContentHTML(x.html);
-        pageTitles = x.titles || [];
-        applyStyleState(x.style);
-      } else if (Array.isArray(x)) {
-        setContentHTML(x.map(p => p.html || '').join('<br><br>'));
-        pageTitles = x.map(p => p.title || '');
+    if (isDocLike) {
+      try { importSavedDoc(text); }
+      catch (err) { showToast('⚠️ 문서를 불러오지 못했습니다'); return; }
+    } else {
+      try {
+        const x = JSON.parse(text);
+        if (x.html !== undefined) {
+          setContentHTML(x.html);
+          pageTitles = x.titles || [];
+          applyStyleState(x.style);
+        } else if (Array.isArray(x)) {
+          setContentHTML(x.map(p => p.html || '').join('<br><br>'));
+          pageTitles = x.map(p => p.title || '');
+        }
+      } catch (err) {
+        setContentHTML(text.replace(/\r\n/g, '\n').replace(/\n/g, '<br>'));
+        pageTitles = [];
       }
-    } catch (err) {
-      setContentHTML(String(e.target.result).replace(/\r\n/g, '\n').replace(/\n/g, '<br>'));
-      pageTitles = [];
     }
     pageCount = 1;
     reflow();
     saveModel();
     showToast('📂 파일을 성공적으로 불러왔습니다');
   };
-  reader.readAsText(files[0]);
+  reader.readAsText(file);
 }
 
 async function shareNoteContent() {
@@ -2327,7 +2516,7 @@ function closeSmartPrompter() {
 const headerToolbar = document.getElementById('header-toolbar');
 const bottomDock = document.getElementById('bottom-dock');
 const vv = window.visualViewport;
-let keyboardInset = 0;
+let keyboardInset = 0, lastLayoutInset = 0;
 
 function syncViewportInsets() {
   if (!vv) return;
@@ -2343,6 +2532,15 @@ function syncViewportInsets() {
   headerToolbar.style.transform = 'translateY(' + topShift + 'px)';
   bottomDock.style.transform = 'translateX(-50%) translateY(' + keyboardInset + 'px)';
   scrollbarTrack.style.transform = 'translateY(' + keyboardInset + 'px)';
+
+  // 레이아웃이 줄지 않는 환경(visual viewport만 줄어드는 경우)에서도 글 영역이 키보드 위에서 끝나도록
+  const layoutInset = Math.max(0, Math.round(window.innerHeight - visibleBottom));
+  if (layoutInset !== lastLayoutInset) {
+    lastLayoutInset = layoutInset;
+    viewport.style.bottom = layoutInset + 'px';
+    updateFloatingScrollbar();
+  }
+  if (document.activeElement === editor) ensureCaretVisible();
 }
 
 if (vv) {
