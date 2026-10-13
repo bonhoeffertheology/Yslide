@@ -415,12 +415,25 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 .btn-save-over:hover { background: #166534; }
 #overwrite-row { display: none; flex-direction: column; gap: 8px; border-top: 1px solid #2a3042; padding-top: 12px; }
 .save-dialog-note { font-size: 11px; color: #5d6780; text-align: center; line-height: 1.5; }
+#new-confirm-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.75); z-index: 8100;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#new-confirm-backdrop.active { display: flex; }
+.confirm-row { display: flex; gap: 10px; margin-top: 6px; }
+.btn-confirm { flex: 1; height: 44px; font-size: 14px; font-weight: 600; border-radius: 8px; }
+.btn-confirm-yes { background: #0284c7; border: 1px solid #38bdf8; color: #fff; }
+.btn-confirm-yes:hover { background: #0369a1; }
+.btn-confirm-no { background: #7f1d1d; border: 1px solid #f87171; color: #fff; }
+.btn-confirm-no:hover { background: #991b1b; }
 
 #print-area { display: none; }
 @media print {
   @page { margin: 15mm; size: auto; }
   html, body { position: static !important; overflow: visible !important; background: #fff !important; color: #000 !important; height: auto !important; }
-  #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #floating-scrollbar-track, #prompter-modal, #save-dialog-backdrop { display: none !important; }
+  #header-toolbar, #main-viewport, #bottom-dock, #reader-container, #toast, #floating-scrollbar-track, #prompter-modal, #save-dialog-backdrop, #new-confirm-backdrop { display: none !important; }
   #print-area { display: block !important; width: 100% !important; background: #fff !important; }
   .print-page-sheet {
     page-break-after: always !important; break-after: page !important;
@@ -485,6 +498,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
 
   <div class="toolbar-row">
     <div class="tool-group">
+      <button onclick="requestNewDocument()" title="새창 (현재 문서를 닫고 새 문서 열기)">새창</button>
       <button class="btn-icon" onclick="importWithPicker()" title="파일 불러오기 (.json, .doc, .txt)">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
       </button>
@@ -625,10 +639,22 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
   </div>
 </div>
 
+<div id="new-confirm-backdrop">
+  <div class="save-dialog-card">
+    <div class="save-dialog-title">새창</div>
+    <div class="save-dialog-desc">기존의 작업을 저장 후 종료하시겠습니까?</div>
+    <div class="confirm-row">
+      <button class="btn-confirm btn-confirm-yes" onclick="newWindowChoice('yes')">예</button>
+      <button class="btn-confirm btn-confirm-no" onclick="newWindowChoice('no')">아니오</button>
+      <button class="btn-confirm" onclick="newWindowChoice('cancel')">취소</button>
+    </div>
+  </div>
+</div>
+
 <div id="save-dialog-backdrop">
   <div class="save-dialog-card">
     <div class="save-dialog-title">문서 저장</div>
-    <div class="save-dialog-desc">형식을 고르면 저장할 폴더와 파일을 선택하는 창이 열립니다.</div>
+    <div class="save-dialog-desc" id="save-dialog-desc">형식을 고르면 저장할 폴더와 파일을 선택하는 창이 열립니다.</div>
     <button class="btn-save-choice btn-save-doc" onclick="executeSaveDoc(false)">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
       워드 문서 (.doc / HWP 호환)
@@ -643,7 +669,7 @@ body.paint-mode #single-stream-editor { cursor: crosshair !important; user-selec
     </button>
     <div id="overwrite-row"></div>
     <div class="save-dialog-note">기존 파일을 선택하면 덮어쓰기, 새 이름을 입력하면 새로 저장됩니다.<br>위치 선택을 지원하지 않는 브라우저에서는 공유/다운로드로 저장됩니다.</div>
-    <button class="btn-save-cancel" onclick="closeSaveDialog()">취소</button>
+    <button class="btn-save-cancel" onclick="cancelSaveDialog()">취소</button>
   </div>
 </div>
 
@@ -1592,10 +1618,50 @@ function openSaveDialog() {
     row.appendChild(b);
   });
   row.style.display = row.children.length ? 'flex' : 'none';
+  document.getElementById('save-dialog-desc').textContent = pendingNewAfterSave
+    ? '저장이 끝나면 새 문서가 열립니다. 형식을 선택하세요.'
+    : '형식을 고르면 저장할 폴더와 파일을 선택하는 창이 열립니다.';
   document.getElementById('save-dialog-backdrop').classList.add('active');
 }
 function closeSaveDialog() {
   document.getElementById('save-dialog-backdrop').classList.remove('active');
+}
+function cancelSaveDialog() {
+  pendingNewAfterSave = false;   // 저장 후 종료 도중 취소하면 기존 작업 유지
+  closeSaveDialog();
+}
+
+/* ===== 새창: 기존 작업 종료 후 새 문서 ===== */
+let pendingNewAfterSave = false;
+
+function resetDocument() {
+  setContentHTML('');
+  pageTitles = [];
+  undoStack = []; redoStack = [];
+  fileHandles.doc = fileHandles.json = fileHandles.pdf = null;   // 이전 파일에 덮어쓰지 않도록
+  pageCount = 1;
+  lastChromeKey = '';
+  reflow();
+  pushHistory();
+  saveModelNow();
+  viewport.scrollTop = 0;
+  showToast('🆕 새 문서가 열렸습니다');
+}
+function requestNewDocument() {
+  const empty = editor.textContent.replace(/\u200B/g, '').trim() === '' && !pageTitles.some(t => t && t.trim());
+  if (empty) { resetDocument(); return; }   // 비어 있으면 물어볼 필요 없음
+  document.getElementById('new-confirm-backdrop').classList.add('active');
+}
+function newWindowChoice(choice) {
+  document.getElementById('new-confirm-backdrop').classList.remove('active');
+  if (choice === 'yes') { pendingNewAfterSave = true; openSaveDialog(); }   // 저장이 성공하면 새 문서
+  else if (choice === 'no') resetDocument();                              // 저장 없이 종료
+  /* 'cancel' → 아무것도 하지 않고 기존 작업 유지 */
+}
+function afterSaveDone(name) {
+  if (!pendingNewAfterSave) return;
+  pendingNewAfterSave = false;
+  if (name) resetDocument();
 }
 
 /* 1단계: 저장 위치 선택 (사용자 클릭 직후에 호출해야 브라우저가 허용함)
@@ -1658,7 +1724,7 @@ async function executeSaveDoc(overwrite) {
   saveModel();
   const fname = 'Yslide_' + dateStamp() + '.doc';
   const target = await pickTarget(fname, 'doc', 'application/msword', 'Word 문서', 'doc', overwrite);
-  if (!target) return;
+  if (!target) { pendingNewAfterSave = false; return; }
 
   const pages = buildPageFragments();
   let docContent = `
@@ -1684,6 +1750,7 @@ async function executeSaveDoc(overwrite) {
   const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
   const name = await writeTarget(target, blob, fname, 'application/msword', 'doc');
   if (name) showToast('📄 저장 완료: ' + name);
+  afterSaveDone(name);
 }
 
 async function executeSaveJson(overwrite) {
@@ -1691,12 +1758,13 @@ async function executeSaveJson(overwrite) {
   saveModel();
   const fname = 'Yslide_' + dateStamp() + '.json';
   const target = await pickTarget(fname, 'json', 'application/json', 'Yslide 백업 파일', 'json', overwrite);
-  if (!target) return;
+  if (!target) { pendingNewAfterSave = false; return; }
 
   const json = JSON.stringify({ html: getContentHTML(), titles: pageTitles, style: currentStyleState() }, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const name = await writeTarget(target, blob, fname, 'application/json', 'json');
   if (name) showToast('💾 저장 완료: ' + name);
+  afterSaveDone(name);
 }
 
 function loadScriptOnce(src) {
@@ -1718,7 +1786,7 @@ async function executeSavePdf(overwrite) {
 
   // 저장 위치를 먼저 받아둠 (PDF 생성이 오래 걸려도 클릭 권한이 만료되지 않도록)
   const target = await pickTarget(fname, 'pdf', 'application/pdf', 'PDF 문서', 'pdf', overwrite);
-  if (!target) return;
+  if (!target) { pendingNewAfterSave = false; return; }
 
   showToast('📕 PDF 생성 중... 잠시만 기다려주세요');
   let host = null;
@@ -1753,7 +1821,9 @@ async function executeSavePdf(overwrite) {
     const blob = pdf.output('blob');
     const name = await writeTarget(target, blob, fname, 'application/pdf', 'pdf');
     if (name) showToast('📕 저장 완료: ' + name);
+    afterSaveDone(name);
   } catch (err) {
+    pendingNewAfterSave = false;
     showToast('⚠️ PDF 생성 실패 (인터넷 연결 확인 / 인쇄 → PDF로 저장도 가능)');
   } finally {
     if (host) host.remove();
