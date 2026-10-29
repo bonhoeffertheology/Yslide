@@ -15,8 +15,18 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.0/kopubworld.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<script>
+/* 외부 글꼴은 화면 표시를 막지 않도록 비동기로 로드 (오프라인이면 기기 기본 글꼴 사용) */
+(function(){
+  ['https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.0/kopubworld.min.css',
+   'https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'].forEach(function(h){
+    var l=document.createElement('link'); l.rel='stylesheet'; l.href=h; l.media='print';
+    l.onload=function(){ l.media='all'; };
+    l.onerror=function(){ l.remove(); };
+    document.head.appendChild(l);
+  });
+})();
+</script>
 
 <style>
 :root {
@@ -1647,7 +1657,19 @@ function resetDocument() {
   pushHistory();
   saveModelNow();
   viewport.scrollTop = 0;
+  focusEditorCaret();
+  setTimeout(focusEditorCaret, 60);
   showToast('🆕 새 문서가 열렸습니다');
+}
+function focusEditorCaret() {
+  ensureReserve();
+  if (!reserve.nextSibling) editor.appendChild(document.createElement('br'));
+  try { editor.focus({ preventScroll: true }); } catch (e) { editor.focus(); }
+  const idx = Array.prototype.indexOf.call(editor.childNodes, reserve) + 1;
+  const r = document.createRange();
+  r.setStart(editor, idx); r.collapse(true);
+  const s = window.getSelection();
+  s.removeAllRanges(); s.addRange(r);
 }
 function requestNewDocument() {
   const empty = editor.textContent.replace(/\u200B/g, '').trim() === '' && !pageTitles.some(t => t && t.trim());
@@ -1776,9 +1798,12 @@ function loadScriptOnce(src) {
     document.head.appendChild(s);
   });
 }
+async function loadLibWithFallback(local, remote) {
+  try { await loadScriptOnce(local); } catch (e) { await loadScriptOnce(remote); }
+}
 async function ensurePdfLibs() {
-  if (!window.html2canvas) await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
-  if (!(window.jspdf && window.jspdf.jsPDF)) await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+  if (!window.html2canvas) await loadLibWithFallback('lib/html2canvas.min.js', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+  if (!(window.jspdf && window.jspdf.jsPDF)) await loadLibWithFallback('lib/jspdf.umd.min.js', 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
 }
 
 async function executeSavePdf(overwrite) {
